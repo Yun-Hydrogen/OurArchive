@@ -1,0 +1,25 @@
+{
+  "name": "our-archive",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Our Archive - Blue Archive visual novel simulator",
+  "author": "Yun-Hydrogen",
+  "license": "AGPL-3.0-only",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,green\" \"npm run dev -w @our-archive/server\" \"npm run dev -w @our-archive/client\"",
+    "dev:server": "npm run dev -w @our-archive/server",
+    "dev:client": "npm run dev -w @our-archive/client",
+    "build": "npm run build -w @our-archive/client && npm run build -w @our-archive/server",
+    "build:client": "npm run build -w @our-archive/client",
+    "build:server": "npm run build -w @our-archive/server",
+    "build:exe": "npm run build:client && npm run build:exe -w @our-archive/server",
+    "start": "npm run start -w @our-archive/server",
+    "package": "npm run build && npm run package -w @our-archive/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
