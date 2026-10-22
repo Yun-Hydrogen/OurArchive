@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "cross-env PORT=3000 tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm --out-dir dist --clean",
     "build:exe": "tsup src/index.ts --format cjs --out-dir dist_pkg --clean && npx @yao-pkg/pkg dist_pkg/index.cjs --target node20-win-x64 --output bin/our-archive-server.exe",
     "start": "node dist/index.js"

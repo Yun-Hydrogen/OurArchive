@@ -3,7 +3,10 @@ import path from 'node:path';
 import type { StoragePaths } from '../config/paths.js';
 
 export interface StartupInfo {
+  /** 后端监听端口 */
   port: number;
+  /** 浏览器访问地址（生产为后端端口，开发为 Vite 端口） */
+  publicUrl: string;
   storage: StoragePaths;
   firstRun: boolean;
   /** 已加载的全局配置项数量 */
@@ -13,7 +16,7 @@ export interface StartupInfo {
 }
 
 export function printStartupInfo(info: StartupInfo) {
-  const { port, storage, firstRun, settingsCount, clientDistPath } = info;
+  const { port, publicUrl, storage, firstRun, settingsCount, clientDistPath } = info;
   const line = pc.cyan('═'.repeat(58));
 
   const rel = (target: string) => path.relative(storage.rootDir, target) || '.';
@@ -28,18 +31,18 @@ export function printStartupInfo(info: StartupInfo) {
   console.log(pc.dim('        -- Blue Archive Visual Novel Simulator --'));
   console.log(line);
   console.log();
-  console.log(`  ${pc.green('➜')}  ${pc.bold('Local:')}     ${pc.cyan(`http://localhost:${port}/`)}`);
-  console.log(`  ${pc.green('➜')}  ${pc.bold('Network:')}   ${pc.cyan(`http://<本机局域网IP>:${port}/`)}`);
+  console.log(`  ${pc.green('➜')}  ${pc.bold('URL:')}        ${pc.cyan(publicUrl)}`);
+  console.log(`  ${pc.green('➜')}  ${pc.bold('Server:')}     ${pc.dim(`:${port}`)}`);
   console.log();
-  console.log(`  ${pc.green('➜')}  ${pc.bold('Platform:')}  ${pc.yellow(storage.platform)}`);
-  console.log(`  ${pc.green('➜')}  ${pc.bold('Storage:')}   ${pc.yellow(storage.rootDir)}`);
+  console.log(`  ${pc.green('➜')}  ${pc.bold('Platform:')}   ${pc.yellow(storage.platform)}`);
+  console.log(`  ${pc.green('➜')}  ${pc.bold('Storage:')}    ${pc.yellow(storage.rootDir)}`);
   console.log(
-    `  ${pc.green('➜')}  ${pc.bold('Dirs:')}      ${pc.dim(
+    `  ${pc.green('➜')}  ${pc.bold('Dirs:')}       ${pc.dim(
       `${rel(storage.resDir)}/  ${rel(storage.preloadDir)}/  ${rel(storage.configDir)}/`
     )}`
   );
   console.log(
-    `  ${pc.green('➜')}  ${pc.bold('Config:')}    ${pc.dim(
+    `  ${pc.green('➜')}  ${pc.bold('Config:')}     ${pc.dim(
       `${rel(storage.settingsFile)}  (${settingsCount} 项)`
     )}`
   );

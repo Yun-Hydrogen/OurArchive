@@ -20,6 +20,7 @@
     "package": "npm run build && npm run package -w @our-archive/server"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "cross-env": "^10.1.0"
   }
 }

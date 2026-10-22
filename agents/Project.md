@@ -2,52 +2,46 @@
 
 > Blue Archive 视觉小说模拟器（Visual Novel Simulator）
 >
-> 本项目是一个独立的《蔚蓝档案》(Blue Archive) 同人视觉小说模拟器，与任何其他同类项目（包括 Azure Archive）**毫无关联**，不基于、不复刻、不引用任何第三方同类项目的代码或设计。
+> 独立的《蔚蓝档案》(Blue Archive) 同人视觉小说模拟器，与任何其他同类项目**毫无关联**：不基于、不复刻、不引用任何第三方同类项目的代码或设计。
 
-## 项目定位
+## 定位
 
-Our Archive 是一个用于编写、编辑与模拟《蔚蓝档案》风格视觉小说剧情的工具。用户可以在其中创建剧本、管理角色与对话，并以视觉小说的形式进行演出与模拟。
+用于编写、编辑与模拟《蔚蓝档案》风格视觉小说剧情的工具：创建剧本、管理角色与对话，并以视觉小说形式演出。
 
 ## 技术栈
 
 | 层 | 技术 |
 | --- | --- |
-| 前端 | Vue 3 + Vite + TypeScript |
-| 后端 | Node.js + Express + TypeScript |
-| 构建 | tsup（服务端）、@yao-pkg/pkg（可选打包为单文件 exe） |
-| 包管理 | npm workspaces（monorepo） |
+| 前端 | Vue 3 + Vite 6 + TypeScript + vue-router 4 |
+| 后端 | Node.js + Express 4 + TypeScript |
+| 构建 | tsup（服务端）、@yao-pkg/pkg（可选单文件 exe） |
+| 包管理 | npm workspaces |
 
-## 目录结构
+## 目录
 
 ```
 OurArchiveStudio/
-├── package.json            # 根工作区配置
-├── tsconfig.base.json      # 共享 TS 配置
-├── agents/                 # Agent 协作说明
-│   ├── Project.md          # 项目说明（本文件）
-│   └── README.md           # Agent 协作约定
+├── agents/                 # Agent 协作文档（Project.md + client/ + server/）
+├── resources/              # 项目自带美术 / 音频（不进入用户数据目录）
+│   ├── UI.ttf              # 全站字体
+│   └── OurArchive/         # banner SVG、音效、LICENSE
 ├── packages/
 │   ├── client/             # Vue 3 前端
-│   │   ├── index.html
-│   │   ├── vite.config.ts
 │   │   └── src/
-│   │       ├── App.vue
-│   │       ├── main.ts
-│   │       └── style.css
+│   │       ├── main.ts App.vue style.css
+│   │       ├── router/ config/ composables/
+│   │       ├── components/splash/   # OABannerSvg.vue（仅横幅 SVG）
+│   │       └── views/SplashView.vue # splash 整页
 │   └── server/             # Express 后端
 │       └── src/
-│           ├── index.ts        # 启动入口：初始化存储 + 静态托管
-│           ├── config/
-│           │   ├── paths.ts    # 平台识别与资源路径解析
-│           │   └── storage.ts  # 目录初始化与全局配置读写
-│           └── utils/
-│               └── banner.ts   # 启动信息输出
+│           ├── index.ts             # 启动编排
+│           ├── app/mountClient.ts   # 静态托管 + SPA fallback
+│           ├── config/              # paths / storage / server / publicUrl
+│           └── utils/               # banner / openBrowser / waitForReachable
 └── scripts/                # 跨平台启动脚本 (bat / sh)
 ```
 
-## 资源与配置目录
-
-资源根目录按平台固定：
+## 用户数据目录
 
 | 平台 | 资源根目录 |
 | --- | --- |
@@ -55,65 +49,48 @@ OurArchiveStudio/
 | Linux | `/home/<用户>/OurArchive` |
 | Android | `/sdcard/OurArchive` |
 
-根目录下固定分为三个子目录：
-
-| 子目录 | 用途 |
-| --- | --- |
-| `res/` | 资源（图片、音频等素材） |
-| `preload/` | 预加载内容 |
-| `config/` | 配置 |
-
-### 首次启动逻辑
-
-后端启动时调用 `initializeStorage()`（[storage.ts](../packages/server/src/config/storage.ts)）：
-
-1. 创建资源根目录及 `res/` `preload/` `config/` 三个子目录（已存在则跳过）；
-2. 若 `config/global_settings.yml` 不存在，则创建空配置 `{}`；
-3. 读取并加载全局配置；
-4. 输出启动信息（运行平台、路径、配置项数量），首次启动会额外提示。
-
-目录创建失败会直接终止启动并给出明确提示。可通过环境变量 `OUR_ARCHIVE_DATA_DIR` 覆盖资源根目录（便于开发与测试）。
+固定三个子目录：`res/`（素材）、`preload/`（预加载）、`config/`（配置，当前只有 `global_settings.yml`）。
+后端启动时由 `initializeStorage()` 创建并加载配置，失败即终止启动；可用 `OUR_ARCHIVE_DATA_DIR` 覆盖根目录。细节见 [server/storage.md](./server/storage.md)。
 
 ## 当前状态
 
-项目处于**初始骨架阶段**：
+- **后端**：最小 Express 服务 —— 初始化资源目录、托管前端产物、启动后自动打开浏览器。**无任何 API 路由。**
+- **前端**：默认访问 `/` 进入 splash（白屏引导 → 音效 + banner 动画 + 气泡 → TOUCH TO START → 版权声明）。
+- **未实现**：主流程入口、剧本编辑器、角色管理、对话演出。
 
-- 后端：最小 Express 服务器，启动时初始化资源目录与全局配置，托管前端构建产物（`packages/client/dist`）并提供 SPA fallback。**没有任何 API 路由或业务逻辑。**
-- 前端：仅保留一个最小 Vue 3 入口页面。**没有任何页面、组件或业务逻辑。**
-- 尚未实现：剧本编辑器、角色管理、对话模拟等核心功能。
-
-## 开发
+## 命令
 
 ```bash
-# 安装依赖
-npm install
-
-# 同时启动前后端开发模式
-npm run dev
-
-# 仅启动后端 (http://localhost:3000)
-npm run dev:server
-
-# 仅启动前端 (http://localhost:5173, /api 代理到 3000)
-npm run dev:client
+npm install          # 安装依赖
+npm run dev          # 前后端同时开发（Vite 5173，后端 3000），自动开浏览器
+npm run dev:server   # 仅后端 http://localhost:3000
+npm run dev:client   # 仅前端 http://localhost:5173（/api 代理到 3000）
+npm run build        # 构建前后端
+npm run build:exe    # 构建并打包 Windows 单文件 exe
+npm start            # 生产启动：后端监听 5173 并托管前端
 ```
 
-## 构建与运行
+## 端口
 
-```bash
-# 构建前后端
-npm run build
+| 场景 | 前端 | 后端 | 浏览器打开 |
+| --- | --- | --- | --- |
+| 生产 `npm start` | 5173（后端托管） | 5173 | `http://localhost:5173/` |
+| 开发 `npm run dev` | 5173（Vite） | 3000 | `http://localhost:5173/` |
 
-# 构建并打包为 Windows 单文件 exe
-npm run build:exe
+## 环境变量
 
-# 生产模式启动（托管前端构建产物）
-npm start
-```
+| 变量 | 说明 |
+| --- | --- |
+| `PORT` | 后端监听端口（默认 5173，dev 脚本设为 3000） |
+| `OUR_ARCHIVE_PUBLIC_PORT` | 浏览器打开的端口（默认 5173） |
+| `OUR_ARCHIVE_DATA_DIR` | 覆盖用户资源根目录 |
+| `OUR_ARCHIVE_NO_OPEN` | 设为 `1` 禁用自动打开浏览器 |
 
 ## 设计约定
 
-- **跨平台**：需支持 Windows / Linux / Android (Termux) 运行，脚本层已提供对应启动方式。
-- **局域网访问**：服务监听 `0.0.0.0`，便于同 Wi-Fi 下移动设备访问。
-- **数据存储**：资源与配置统一存放在平台固定的资源根目录（见上文），由后端启动时初始化。
-- **许可证**：AGPL-3.0-only。
+- **跨平台**：Windows / Linux / Android (Termux)。
+- **局域网访问**：监听 `0.0.0.0`。
+- **完全离线**：不请求任何外部资源。
+- **许可证**：代码 AGPL-3.0-only；`resources/` 资产为 CC BY-NC-ND 4.0，与 BA 官方无关联，不附带 BA 版权资源。
+
+模块文档：[client/](./client/README.md)、[server/](./server/README.md)。

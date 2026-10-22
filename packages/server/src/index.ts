@@ -1,10 +1,13 @@
 import express from 'express';
 import path from 'node:path';
-import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { initializeStorage, type StorageInitResult } from './config/storage.js';
+import { resolvePort, shouldOpenBrowser, SERVER_HOST } from './config/server.js';
+import { resolvePublicUrl } from './config/publicUrl.js';
+import { mountClient, resolveClientDistPath } from './app/mountClient.js';
 import { printStartupInfo } from './utils/banner.js';
+import { autoOpenBrowser } from './utils/openBrowser.js';
 
 dotenv.config();
 
@@ -12,8 +15,8 @@ const currentDir = typeof __dirname !== 'undefined'
   ? __dirname
   : path.dirname(fileURLToPath(import.meta.url));
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
-const HOST = '0.0.0.0';
+const PORT = resolvePort();
+const publicUrl = resolvePublicUrl();
 
 // 启动即初始化资源目录与全局配置（首次启动会自动创建）
 let storage: StorageInitResult;
@@ -25,34 +28,21 @@ try {
 }
 
 const app = express();
+const clientDistPath = resolveClientDistPath(currentDir);
 
-// Frontend static assets location (check both dev and compiled paths)
-const clientDistCandidates = [
-  path.resolve(currentDir, '../../client/dist'),
-  path.resolve(currentDir, '../client/dist'),
-  path.resolve(currentDir, './client/dist'),
-  path.resolve(process.cwd(), 'packages/client/dist'),
-  path.resolve(process.cwd(), 'client/dist'),
-  path.resolve(process.cwd(), 'dist'),
-];
+mountClient(app, clientDistPath);
 
-const clientDistPath = clientDistCandidates.find((dir) => fs.existsSync(dir)) ?? null;
-
-if (clientDistPath) {
-  app.use(express.static(clientDistPath));
-
-  // SPA fallback
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientDistPath, 'index.html'));
-  });
-}
-
-app.listen(PORT, HOST, () => {
+app.listen(PORT, SERVER_HOST, () => {
   printStartupInfo({
     port: PORT,
+    publicUrl,
     storage: storage.paths,
     firstRun: storage.firstRun,
     settingsCount: Object.keys(storage.settings).length,
     clientDistPath,
   });
+
+  if (shouldOpenBrowser()) {
+    void autoOpenBrowser({ publicUrl });
+  }
 });
