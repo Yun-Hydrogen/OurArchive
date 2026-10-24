@@ -6,21 +6,24 @@
 | --- | --- | --- |
 | [app-shell.md](./app-shell.md) | `main.ts`、`App.vue`、`router/`、`style.css`、`config/`、`vite.config.ts` | 入口、路由、字体与全局变量、资源别名 |
 | [splash.md](./splash.md) | `views/SplashView.vue`、`components/splash/`、`composables/` | 启动画面（当前唯一页面） |
+| [mouse-spark.md](./mouse-spark.md) | `components/common/OAMouseSpark.vue`、`composables/useMouseSpark.ts` | 全局鼠标交互与点击粒子动效 |
 
 ## 目录
 
 ```
 packages/client/src/
 ├── main.ts                # createApp + router
-├── App.vue                # 仅 <router-view />
+├── App.vue                # <router-view /> + 全局点击特效 <OAMouseSpark />
 ├── style.css              # @font-face、:root 变量、全局重置
 ├── router/index.ts        # 路由表
 ├── config/
 │   ├── routes.ts          # 路由名与路径常量
 │   ├── assets.ts          # SPLASH_ASSETS
 │   └── splash.ts          # SPLASH_TIMING、SPLASH_SOUND_VOLUME
-├── composables/           # useBannerSequence、useSplashAudio
-├── components/splash/     # OABannerSvg.vue（仅横幅 SVG）
+├── composables/           # useBannerSequence、useSplashAudio、useMouseSpark
+├── components/
+│   ├── common/            # OAMouseSpark.vue（全站交互点击特效 Canvas）
+│   └── splash/            # OABannerSvg.vue（仅横幅 SVG）
 └── views/SplashView.vue   # splash 整页
 ```
 

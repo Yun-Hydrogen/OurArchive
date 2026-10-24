@@ -7,7 +7,7 @@
 | 文档 | 覆盖 | 说明 |
 | --- | --- | --- |
 | [startup.md](./startup.md) | `index.ts`、`config/server.ts`、`config/publicUrl.ts` | 启动编排、端口与环境变量 |
-| [storage.md](./storage.md) | `config/paths.ts`、`config/storage.ts` | 资源目录规范、首次启动初始化、配置读写 |
+| [storage.md](./storage.md) | `config/paths.ts`、`config/storage.ts`、`config/preload.ts` | 资源目录规范、首次启动初始化、预加载清单检查、配置读写 |
 | [serve-client.md](./serve-client.md) | `app/mountClient.ts`、`utils/banner.ts` | 静态托管、SPA fallback、启动信息 |
 | [auto-open-browser.md](./auto-open-browser.md) | `utils/openBrowser.ts`、`utils/waitForReachable.ts` | 就绪检测与跨平台开浏览器 |
 
@@ -18,6 +18,7 @@ packages/server/src/
 ├── config/
 │   ├── paths.ts            # 平台识别与路径解析
 │   ├── storage.ts          # 目录初始化、YAML 配置读写
+│   ├── preload.ts          # 读取随程序分发的 preload_assets.yml 并比对用户资源
 │   ├── server.ts           # 端口 / 主机 / 自动打开开关
 │   └── publicUrl.ts        # 浏览器访问地址
 └── utils/

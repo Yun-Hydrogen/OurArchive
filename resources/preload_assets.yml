@@ -1,0 +1,26 @@
+# ==============================================================================
+# Our Archive — 预加载资源清单 (preload_assets.yml)
+# ==============================================================================
+# 说明：
+# 本文件作为资源根目录下 preload/ 文件夹的资源索引。
+# 后端启动时会对照本文件检查资源文件夹下的 preload 资源。
+# 若资源缺失或对不上，将提示预加载不完整。
+#
+# 配置项说明：
+# - id: 资源唯一标识，必须为全小写字母（可包含数字与下划线）
+# - file: 资源相对路径，以 preload 为起始项（如 preload/xxx.wav 或 preload/audio/se/click.wav）
+# - file_type: 资源类型，常见值包括 sound（音频）、image（图片）等
+# ==============================================================================
+
+assets:
+  - id: main_bgm
+    file: preload/sounds/main_bgm.mp3
+    file_type: sound
+
+  - id: button_bg
+    file: preload/images/button_background.png
+    file_type: image
+
+
+
+

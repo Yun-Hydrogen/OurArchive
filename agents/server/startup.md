@@ -10,10 +10,11 @@ index.ts
   ├─ resolvePort()                      # config/server.ts
   ├─ resolvePublicUrl()                 # config/publicUrl.ts
   ├─ initializeStorage()                # config/storage.ts —— 失败即 exit(1)
+  ├─ loadPreloadAssets(storage.paths)   # config/preload.ts —— 校验 preload 完整度
   ├─ resolveClientDistPath(currentDir)  # app/mountClient.ts
   ├─ mountClient(app, distPath)
   └─ app.listen(PORT, SERVER_HOST, …)
-       ├─ printStartupInfo()
+       ├─ printStartupInfo()            # banner.ts —— 含 preload 状态与不完整提示
        └─ shouldOpenBrowser() && autoOpenBrowser()
 ```
 

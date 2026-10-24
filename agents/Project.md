@@ -24,6 +24,7 @@ OurArchiveStudio/
 ├── agents/                 # Agent 协作文档（Project.md + client/ + server/）
 ├── resources/              # 项目自带美术 / 音频（不进入用户数据目录）
 │   ├── UI.ttf              # 全站字体
+│   ├── preload_assets.yml  # 预加载资源索引清单模板
 │   └── OurArchive/         # banner SVG、音效、LICENSE
 ├── packages/
 │   ├── client/             # Vue 3 前端
@@ -50,7 +51,7 @@ OurArchiveStudio/
 | Android | `/sdcard/OurArchive` |
 
 固定三个子目录：`res/`（素材）、`preload/`（预加载）、`config/`（配置，当前只有 `global_settings.yml`）。
-后端启动时由 `initializeStorage()` 创建并加载配置，失败即终止启动；可用 `OUR_ARCHIVE_DATA_DIR` 覆盖根目录。细节见 [server/storage.md](./server/storage.md)。
+后端启动时由 `initializeStorage()` 创建并加载配置，并对照随代码分发的 `resources/preload_assets.yml` 校验用户 `preload/` 完整度；失败即终止启动；可用 `OUR_ARCHIVE_DATA_DIR` 覆盖根目录。细节见 [server/storage.md](./server/storage.md)。
 
 ## 当前状态
 

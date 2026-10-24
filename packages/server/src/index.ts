@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { initializeStorage, type StorageInitResult } from './config/storage.js';
+import { loadPreloadAssets } from './config/preload.js';
 import { resolvePort, shouldOpenBrowser, SERVER_HOST } from './config/server.js';
 import { resolvePublicUrl } from './config/publicUrl.js';
 import { mountClient, resolveClientDistPath } from './app/mountClient.js';
@@ -27,6 +28,8 @@ try {
   process.exit(1);
 }
 
+const preload = loadPreloadAssets(currentDir, storage.paths);
+
 const app = express();
 const clientDistPath = resolveClientDistPath(currentDir);
 
@@ -40,6 +43,7 @@ app.listen(PORT, SERVER_HOST, () => {
     firstRun: storage.firstRun,
     settingsCount: Object.keys(storage.settings).length,
     clientDistPath,
+    preload,
   });
 
   if (shouldOpenBrowser()) {

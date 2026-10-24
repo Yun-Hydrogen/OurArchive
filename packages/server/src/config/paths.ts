@@ -17,6 +17,7 @@ export const STORAGE_DIRS = {
 } as const;
 
 export const SETTINGS_FILE_NAME = 'global_settings.yml';
+export const PRELOAD_ASSETS_FILE_NAME = 'preload_assets.yml';
 
 export interface StoragePaths {
   platform: SupportedPlatform;
@@ -106,4 +107,21 @@ export function getStoragePaths(): StoragePaths {
     configDir: path.join(rootDir, STORAGE_DIRS.config),
     settingsFile: path.join(rootDir, STORAGE_DIRS.config, SETTINGS_FILE_NAME),
   };
+}
+
+/**
+ * 解析随代码一同分发的预加载资源清单 preload_assets.yml 路径。
+ */
+export function resolvePreloadAssetsPath(currentDir: string): string | null {
+  const candidates = [
+    path.resolve(currentDir, '../../../resources', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(currentDir, '../../resources', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(currentDir, '../resources', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(currentDir, './resources', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(currentDir, PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(process.cwd(), 'resources', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(process.cwd(), PRELOAD_ASSETS_FILE_NAME),
+  ];
+
+  return candidates.find((filePath) => fs.existsSync(filePath)) ?? null;
 }

@@ -5,7 +5,7 @@
 ## 入口与路由
 
 `main.ts`：`createApp(App).use(router).mount('#app')`，并在最前引入 `style.css`（保证 `@font-face` 优先加载）。
-`App.vue` 只有 `<router-view />`；页面自己负责全屏布局与背景。
+`App.vue` 包含 `<router-view />` 与全站交互特效 `<OAMouseSpark />`（覆盖在全屏最上层，`pointer-events: none` 不遮挡交互，实现点击波纹、旋转锥形光弧、飞散星芒与拖尾辉光）；页面自己负责全屏布局与背景。
 
 路由名/路径统一在 `config/routes.ts` 以常量定义，路由表与业务代码都引用常量：
 
