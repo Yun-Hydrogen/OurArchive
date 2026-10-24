@@ -15,12 +15,3 @@ export function resolvePort(): number {
   }
   return DEFAULT_PORT;
 }
-
-/**
- * 是否在启动完成后自动打开浏览器。
- * 设置 OUR_ARCHIVE_NO_OPEN=1 可禁用（CI / 无头环境）。
- */
-export function shouldOpenBrowser(): boolean {
-  const flag = (process.env.OUR_ARCHIVE_NO_OPEN ?? '').toLowerCase();
-  return !(flag === '1' || flag === 'true' || flag === 'yes');
-}

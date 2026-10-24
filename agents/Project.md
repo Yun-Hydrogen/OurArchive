@@ -50,20 +50,20 @@ OurArchiveStudio/
 | Linux | `/home/<用户>/OurArchive` |
 | Android | `/sdcard/OurArchive` |
 
-固定三个子目录：`res/`（素材）、`preload/`（预加载）、`config/`（配置，当前只有 `global_settings.yml`）。
+固定三个子目录：`res/`（素材）、`preload/`（预加载）、`config/`（配置，当前包含 `global_config.yml`）。
 后端启动时由 `initializeStorage()` 创建并加载配置，并对照随代码分发的 `resources/preload_assets.yml` 校验用户 `preload/` 完整度；失败即终止启动；可用 `OUR_ARCHIVE_DATA_DIR` 覆盖根目录。细节见 [server/storage.md](./server/storage.md)。
 
 ## 当前状态
 
-- **后端**：最小 Express 服务 —— 初始化资源目录、托管前端产物、启动后自动打开浏览器。**无任何 API 路由。**
-- **前端**：默认访问 `/` 进入 splash（白屏引导 → 音效 + banner 动画 + 气泡 → TOUCH TO START → 版权声明）。
+- **后端**：Express 服务 —— 初始化资源目录、校验预加载资源、托管前端产物、提供预加载与配置 API。启动完成后在控制台输出 Local 与 Network（局域网）访问地址。
+- **前端**：默认访问 `/` 进入 splash（白屏引导 → 音效 + banner 动画 + 气泡 → TOUCH TO START → 版权声明，支持 RizUI 设置面板与全局鼠标点击交互特效）。
 - **未实现**：主流程入口、剧本编辑器、角色管理、对话演出。
 
 ## 命令
 
 ```bash
 npm install          # 安装依赖
-npm run dev          # 前后端同时开发（Vite 5173，后端 3000），自动开浏览器
+npm run dev          # 前后端同时开发（Vite 5173，后端 3000）
 npm run dev:server   # 仅后端 http://localhost:3000
 npm run dev:client   # 仅前端 http://localhost:5173（/api 代理到 3000）
 npm run build        # 构建前后端
@@ -73,7 +73,7 @@ npm start            # 生产启动：后端监听 5173 并托管前端
 
 ## 端口
 
-| 场景 | 前端 | 后端 | 浏览器打开 |
+| 场景 | 前端 | 后端 | 浏览器访问 |
 | --- | --- | --- | --- |
 | 生产 `npm start` | 5173（后端托管） | 5173 | `http://localhost:5173/` |
 | 开发 `npm run dev` | 5173（Vite） | 3000 | `http://localhost:5173/` |
@@ -83,9 +83,8 @@ npm start            # 生产启动：后端监听 5173 并托管前端
 | 变量 | 说明 |
 | --- | --- |
 | `PORT` | 后端监听端口（默认 5173，dev 脚本设为 3000） |
-| `OUR_ARCHIVE_PUBLIC_PORT` | 浏览器打开的端口（默认 5173） |
+| `OUR_ARCHIVE_PUBLIC_PORT` | 对外访问端口（默认 5173） |
 | `OUR_ARCHIVE_DATA_DIR` | 覆盖用户资源根目录 |
-| `OUR_ARCHIVE_NO_OPEN` | 设为 `1` 禁用自动打开浏览器 |
 
 ## 设计约定
 

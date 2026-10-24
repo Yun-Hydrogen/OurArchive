@@ -6,8 +6,10 @@ import type { PreloadCheckResult } from '../config/preload.js';
 export interface StartupInfo {
   /** 后端监听端口 */
   port: number;
-  /** 浏览器访问地址（生产为后端端口，开发为 Vite 端口） */
+  /** 本地访问地址 */
   publicUrl: string;
+  /** 局域网访问地址 */
+  networkUrl?: string | null;
   storage: StoragePaths;
   firstRun: boolean;
   /** 已加载的全局配置项数量 */
@@ -19,7 +21,8 @@ export interface StartupInfo {
 }
 
 export function printStartupInfo(info: StartupInfo) {
-  const { port, publicUrl, storage, firstRun, settingsCount, clientDistPath, preload } = info;
+  const { port, publicUrl, networkUrl, storage, firstRun, settingsCount, clientDistPath, preload } =
+    info;
   const line = pc.cyan('═'.repeat(58));
 
   const rel = (target: string) => path.relative(storage.rootDir, target) || '.';
@@ -34,7 +37,10 @@ export function printStartupInfo(info: StartupInfo) {
   console.log(pc.dim('        -- Blue Archive Visual Novel Simulator --'));
   console.log(line);
   console.log();
-  console.log(`  ${pc.green('➜')}  ${pc.bold('URL:')}        ${pc.cyan(publicUrl)}`);
+  console.log(`  ${pc.green('➜')}  ${pc.bold('Local:')}      ${pc.cyan(publicUrl)}`);
+  if (networkUrl) {
+    console.log(`  ${pc.green('➜')}  ${pc.bold('Network:')}    ${pc.cyan(networkUrl)}`);
+  }
   console.log(`  ${pc.green('➜')}  ${pc.bold('Server:')}     ${pc.dim(`:${port}`)}`);
   console.log();
   console.log(`  ${pc.green('➜')}  ${pc.bold('Platform:')}   ${pc.yellow(storage.platform)}`);
@@ -59,9 +65,13 @@ export function printStartupInfo(info: StartupInfo) {
     );
   }
 
+  console.log();
+  console.log(
+    `  ${pc.cyan('★')}  ${pc.bold(pc.green('后端启动完成！'))}${pc.bold('可通过局域网在浏览器中打开访问。')}`
+  );
+
   if (firstRun) {
-    console.log();
-    console.log(`  ${pc.cyan('★')}  ${pc.bold('首次启动：已初始化资源目录与配置文件')}`);
+    console.log(`  ${pc.cyan('★')}  ${pc.dim('首次启动：已初始化资源目录与配置文件')}`);
   }
 
   if (preload && !preload.isComplete) {

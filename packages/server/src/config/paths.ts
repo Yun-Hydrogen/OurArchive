@@ -16,7 +16,7 @@ export const STORAGE_DIRS = {
   config: 'config',
 } as const;
 
-export const SETTINGS_FILE_NAME = 'global_settings.yml';
+export const SETTINGS_FILE_NAME = 'global_config.yml';
 export const PRELOAD_ASSETS_FILE_NAME = 'preload_assets.yml';
 
 export interface StoragePaths {

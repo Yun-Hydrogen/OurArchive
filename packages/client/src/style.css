@@ -14,6 +14,8 @@
   --oa-bg: #0b1017;
   --oa-text: #e9eef5;
   --oa-border: #1e293b;
+  /* RizUI 主题色跟随全站蓝色 */
+  --rizui_themecolor: var(--oa-blue);
 }
 
 * {

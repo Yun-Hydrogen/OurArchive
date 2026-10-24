@@ -1,17 +1,38 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import OABannerSvg from '@/components/splash/OABannerSvg.vue';
+import OASettingsModal from '@/components/common/OASettingsModal.vue';
 import { useBannerSequence } from '@/composables/useBannerSequence';
 import { useSplashAudio } from '@/composables/useSplashAudio';
+import { useGlobalConfig } from '@/composables/useGlobalConfig';
 import { SPLASH_ASSETS } from '@/config/assets';
 import { SPLASH_TIMING } from '@/config/splash';
 
+const { config, fetchConfig } = useGlobalConfig();
 const { playToken, isIdle, isReady, play: playBanner } = useBannerSequence();
 const { preload, play: playSound } = useSplashAudio(SPLASH_ASSETS.titleSoundUrl);
+const {
+  fadeIn: fadeInMainBgm,
+  setVolume: setBgmAudioVolume,
+} = useSplashAudio(
+  '/api/preload/asset/main_bgm',
+  {
+    loop: true,
+    volume: config.value.main_bgm_volume / 100,
+  }
+);
+
+watch(
+  () => config.value.main_bgm_volume,
+  (val) => {
+    setBgmAudioVolume(val / 100);
+  }
+);
 
 const BUBBLES = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10'] as const;
 
 const hasStarted = ref(false);
+const isSettingsOpen = ref(false);
 
 /** 播放 banner 动画与音效（重播也走这里） */
 async function startSequence() {
@@ -19,10 +40,12 @@ async function startSequence() {
   await playSound();
 }
 
-/** 白屏引导：首次点击任意位置，提供用户手势以解锁音频 */
+/** 白屏引导：首次点击任意位置，提供用户手势以解锁音频并淡入播放 main_bgm */
 async function handleStart() {
   if (hasStarted.value) return;
   hasStarted.value = true;
+  const targetVolume = config.value.main_bgm_volume / 100;
+  void fadeInMainBgm(targetVolume, SPLASH_TIMING.bgmFadeInDuration);
   await startSequence();
 }
 
@@ -38,7 +61,7 @@ function handleGateKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
-  // 仅预加载音效，等待用户手势后再播放
+  void fetchConfig();
   preload();
 });
 </script>
@@ -83,9 +106,42 @@ onMounted(() => {
         :style="{ '--fade-in': `${SPLASH_TIMING.promptFadeIn}ms` }"
         @click="handleActivate"
       >
-        <span class="splash-prompt__label">TOUCH TO START</span>
+        <span class="splash-prompt__label">点击此处进入主界面</span>
       </button>
     </div>
+
+    <!-- 右上角设置按钮：通过 Splash Gate 后常驻 -->
+    <Transition name="fade">
+      <button
+        v-if="hasStarted"
+        type="button"
+        class="splash-settings-btn"
+        aria-label="设置"
+        title="设置"
+        @click="isSettingsOpen = true"
+      >
+        <svg
+          class="splash-settings-btn__icon"
+          viewBox="0 0 24 24"
+          width="22"
+          height="22"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path
+            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+          />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+    </Transition>
+
+    <!-- 设置面板 -->
+    <OASettingsModal v-model:visible="isSettingsOpen" />
 
     <!-- 底部版权与开源声明：白屏引导通过后常驻 -->
     <footer v-show="hasStarted" class="splash-legal">
@@ -303,7 +359,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 980px;
+  max-width: 90%;
   margin: 0 auto;
   padding: 0 24px;
   text-align: center;
@@ -314,7 +370,7 @@ onMounted(() => {
 
 .splash-legal p {
   font-family: var(--oa-font);
-  font-size: clamp(9px, 0.72vw, 11px);
+  font-size: clamp(9px, 0.72vw, 10px);
   line-height: 1.5;
   letter-spacing: 0.03em;
   color: #94a3b8;
@@ -329,6 +385,57 @@ onMounted(() => {
 @keyframes legal-fade-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- 右上角设置按钮 ---------- */
+
+.splash-settings-btn {
+  position: absolute;
+  top: clamp(16px, 3vh, 28px);
+  right: clamp(16px, 3vw, 32px);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(0, 144, 254, 0.22);
+  color: var(--oa-dark-blue);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.splash-settings-btn:hover {
+  border-color: var(--oa-blue);
+  color: var(--oa-blue);
+  box-shadow: 0 6px 20px rgba(0, 144, 254, 0.25);
+  transform: translateY(-1px);
+}
+
+.splash-settings-btn:active {
+  transform: scale(0.95);
+}
+
+.splash-settings-btn__icon {
+  transition: transform 0.4s ease;
+}
+
+.splash-settings-btn:hover .splash-settings-btn__icon {
+  transform: rotate(60deg);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 @media (max-width: 640px) {

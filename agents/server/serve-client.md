@@ -30,15 +30,19 @@
 
 ## banner.ts
 
-`printStartupInfo()` 在 `app.listen()` 回调里打印，**纯输出、无副作用**。输入：`port`、`publicUrl`、`storage`（`StoragePaths`）、`firstRun`、`settingsCount`、`clientDistPath`。
+`printStartupInfo()` 在 `app.listen()` 回调里打印，**纯输出、无副作用**。输入：`port`、`publicUrl`、`networkUrl`、`storage`（`StoragePaths`）、`firstRun`、`settingsCount`、`clientDistPath`、`preload`。
 
 ```
-  ➜  URL:        http://localhost:5173/
+  ➜  Local:      http://localhost:5173/
+  ➜  Network:    http://192.168.1.100:5173/
   ➜  Server:     :5173
   ➜  Platform:   windows
   ➜  Storage:    C:\Users\<用户>\Documents\OurArchive
   ➜  Dirs:       res/  preload/  config/
-  ➜  Config:     config\global_settings.yml  (0 项)
+  ➜  Config:     config\global_config.yml  (1 项)
+  ➜  Preload:    19/19 项就绪
+
+  ★  后端启动完成！可通过局域网在浏览器中打开访问。
 ```
 
-附加提示：`firstRun` 时提示已初始化目录与配置；`clientDistPath === null` 时提示未找到产物及构建命令。用 `picocolors` 着色，`path.relative(rootDir, ...)` 让子目录显示为短路径。
+附加提示：`firstRun` 时提示已初始化目录与配置；`clientDistPath === null` 时提示未找到产物及构建命令。用 `picocolors` 着色，`path.relative(rootDir, ...)` 让子目录显示为短路径。不执行自动唤醒浏览器行为。

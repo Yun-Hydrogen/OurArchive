@@ -9,6 +9,8 @@ export const SPLASH_TIMING = {
   promptRevealDelay: 350,
   /** TOUCH TO START 淡入时长 */
   promptFadeIn: 700,
+  /** 背景音乐（main_bgm）首次播放淡入时长 */
+  bgmFadeInDuration: 2000,
 } as const;
 
 /** 音效音量（0-1） */

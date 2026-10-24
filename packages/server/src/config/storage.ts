@@ -12,37 +12,46 @@ export interface StorageInitResult {
   settings: GlobalSettings;
 }
 
-const EMPTY_SETTINGS = '{}\n';
+const DEFAULT_CONFIG_CONTENT = '# Our Archive 全局配置 (global_config.yml)\nmain_bgm_volume: 50\n';
 
 /**
- * 兼容旧版本布局：早期使用 <root>/configs/global_settings.yml，
- * 现在统一为 <root>/config/global_settings.yml。存在旧文件时迁移其内容。
+ * 兼容旧版本布局：
+ * 1. 早期使用 <root>/configs/
+ * 2. 早期配置文件名为 global_settings.yml，迁移至 global_config.yml
  */
 function migrateLegacyConfigDir(paths: StoragePaths) {
+  // 迁移 configs 目录
   const legacyDir = path.join(paths.rootDir, 'configs');
-  if (!fs.existsSync(legacyDir)) {
-    return;
-  }
-
-  const legacyFile = path.join(legacyDir, SETTINGS_FILE_NAME);
-  const hasNewFile = fs.existsSync(paths.settingsFile);
-
-  if (!hasNewFile && fs.existsSync(legacyFile)) {
+  if (fs.existsSync(legacyDir)) {
+    const legacyFile = path.join(legacyDir, 'global_settings.yml');
+    if (!fs.existsSync(paths.settingsFile) && fs.existsSync(legacyFile)) {
+      try {
+        fs.copyFileSync(legacyFile, paths.settingsFile);
+      } catch (error) {
+        console.warn(
+          `[Our Archive] 旧配置迁移失败: ${legacyFile}`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
     try {
-      fs.copyFileSync(legacyFile, paths.settingsFile);
-    } catch (error) {
-      console.warn(
-        `[Our Archive] 旧配置迁移失败，将使用空配置: ${legacyFile}`,
-        error instanceof Error ? error.message : error
-      );
-      return;
+      fs.rmSync(legacyDir, { recursive: true, force: true });
+    } catch {
+      // 忽略
     }
   }
 
-  try {
-    fs.rmSync(legacyDir, { recursive: true, force: true });
-  } catch {
-    // 迁移失败不影响启动
+  // 迁移 config/global_settings.yml -> config/global_config.yml
+  const legacySettingsFile = path.join(paths.configDir, 'global_settings.yml');
+  if (!fs.existsSync(paths.settingsFile) && fs.existsSync(legacySettingsFile)) {
+    try {
+      fs.copyFileSync(legacySettingsFile, paths.settingsFile);
+    } catch (error) {
+      console.warn(
+        `[Our Archive] 旧配置文件迁移失败: ${legacySettingsFile}`,
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 }
 
@@ -72,7 +81,7 @@ export function initializeStorage(): StorageInitResult {
   migrateLegacyConfigDir(paths);
 
   if (!fs.existsSync(paths.settingsFile)) {
-    fs.writeFileSync(paths.settingsFile, EMPTY_SETTINGS, 'utf-8');
+    fs.writeFileSync(paths.settingsFile, DEFAULT_CONFIG_CONTENT, 'utf-8');
   }
 
   return {
@@ -83,26 +92,40 @@ export function initializeStorage(): StorageInitResult {
 }
 
 /**
- * 读取全局配置。文件缺失或解析失败时返回空配置。
+ * 读取全局配置。文件缺失或解析失败时返回默认配置。
  */
 export function loadSettings(paths: StoragePaths = getStoragePaths()): GlobalSettings {
+  const defaults: GlobalSettings = {
+    main_bgm_volume: 50,
+  };
+
   if (!fs.existsSync(paths.settingsFile)) {
-    return {};
+    return defaults;
   }
 
   try {
     const parsed = parseYaml(fs.readFileSync(paths.settingsFile, 'utf-8'));
     if (parsed && typeof parsed === 'object') {
-      return parsed as GlobalSettings;
+      const merged: GlobalSettings = {
+        ...defaults,
+        ...(parsed as GlobalSettings),
+      };
+      // 确保 main_bgm_volume 为 0-100 的数值
+      if (typeof merged.main_bgm_volume !== 'number' || !Number.isFinite(merged.main_bgm_volume)) {
+        merged.main_bgm_volume = 50;
+      } else {
+        merged.main_bgm_volume = Math.max(0, Math.min(100, Math.round(merged.main_bgm_volume)));
+      }
+      return merged;
     }
   } catch (error) {
     console.warn(
-      `[Our Archive] 配置文件解析失败，将使用空配置: ${paths.settingsFile}`,
+      `[Our Archive] 配置文件解析失败，将使用默认配置: ${paths.settingsFile}`,
       error instanceof Error ? error.message : error
     );
   }
 
-  return {};
+  return defaults;
 }
 
 /**

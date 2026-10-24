@@ -18,9 +18,74 @@ assets:
     file_type: sound
 
   - id: button_bg
-    file: preload/images/button_background.png
+    file: preload/images/uis/button_background.png
     file_type: image
 
+#=========情绪贴图=========
+  - id: emoicon_action
+    file: preload/images/emotions/emoicon_action.png
+    file_type: image
 
+  - id: emoicon_aggro
+    file: preload/images/emotions/emoicon_aggro.png
+    file_type: image
 
+  - id: emoicon_anxiety
+    file: preload/images/emotions/emoicon_anxiety.png
+    file_type: image
 
+  - id: emoicon_balloon_n
+    file: preload/images/emotions/emoicon_balloon_n.png
+    file_type: image
+  
+  - id: emoicon_balloon_t
+    file: preload/images/emotions/emoicon_balloon_t.png
+    file_type: image
+
+  - id: emoicon_chat
+    file: preload/images/emotions/emoicon_chat.png
+    file_type: image
+
+  - id: emoicon_exclamation
+    file: preload/images/emotions/emoicon_exclamation.png
+    file_type: image
+
+  - id: emoicon_exclamationmark
+    file: preload/images/emotions/emoicon_exclamationmark.png
+    file_type: image
+
+  - id: emoicon_heart
+    file: preload/images/emotions/emoicon_heart.png
+    file_type: image
+
+  - id: emoicon_idea
+    file: preload/images/emotions/emoicon_idea.png
+    file_type: image
+
+  - id: emoicon_note
+    file: preload/images/emotions/emoicon_note.png
+    file_type: image
+
+  - id: emoicon_question
+    file: preload/images/emotions/emoicon_question.png
+    file_type: image
+
+  - id: emoicon_questionmark
+    file: preload/images/emotions/emoicon_questionmark.png
+    file_type: image
+
+  - id: emoicon_shy
+    file: preload/images/emotions/emoicon_shy.png
+    file_type: image
+
+  - id: emoicon_sweat_1
+    file: preload/images/emotions/emoicon_sweat_1.png
+    file_type: image
+  
+  - id: emoicon_sweat_2
+    file: preload/images/emotions/emoicon_sweat_2.png
+    file_type: image
+
+  - id: emoicon_twinkle
+    file: preload/images/emotions/emoicon_twinkle.png
+    file_type: image

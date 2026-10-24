@@ -50,7 +50,7 @@ export const SPLASH_ASSETS = { titleSoundUrl } as const;
 
 组件不直接 import 资源路径，一律从 `config/assets.ts` 取用；时长常量只在 `config/splash.ts` 定义。横幅是内联 SVG 组件（[OABannerSvg.vue](../../packages/client/src/components/splash/OABannerSvg.vue)），不走 `assets.ts`。
 
-可用资源（`resources/OurArchive/`）：`OABannerAnim-tp-svg.svg`（自包含动画横幅，当前使用）、`OABannerAnim-wb-svg.svg`（白底版）、`OurArchiveBanner-tp-svg.svg` / `-tight-`（静态横幅）、`OurArchiveIcon-*-svg.svg`（图标，用作 favicon）、`sound.wav`（2.85s）、`LICENSE`。
+可用资源（`resources/OurArchive/`）：`OABannerAnim-tp-svg.svg`（自包含动画横幅，当前使用）、`OABannerAnim-wb-svg.svg`（白底版）、`OurArchiveBanner-tp-svg.svg` / `-tight-`（静态横幅）、`OurArchiveIcon-wb-svg.svg`（白底图标，用作标签页 favicon）、`sound.wav`（2.85s）、`LICENSE`。
 该目录资产为 **CC BY-NC-ND 4.0，不在 AGPLv3 覆盖范围内**。
 
 ## 开发服务器

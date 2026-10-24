@@ -20,9 +20,9 @@ packages/client/src/
 │   ├── routes.ts          # 路由名与路径常量
 │   ├── assets.ts          # SPLASH_ASSETS
 │   └── splash.ts          # SPLASH_TIMING、SPLASH_SOUND_VOLUME
-├── composables/           # useBannerSequence、useSplashAudio、useMouseSpark
+├── composables/           # useBannerSequence、useSplashAudio、useMouseSpark、useGlobalConfig
 ├── components/
-│   ├── common/            # OAMouseSpark.vue（全站交互点击特效 Canvas）
+│   ├── common/            # OAMouseSpark.vue（全站交互点击特效 Canvas）、OASettingsModal.vue（RizUI 设置弹窗）
 │   └── splash/            # OABannerSvg.vue（仅横幅 SVG）
 └── views/SplashView.vue   # splash 整页
 ```

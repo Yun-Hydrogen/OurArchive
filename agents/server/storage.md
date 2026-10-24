@@ -17,20 +17,20 @@
 <root>/
 ├── res/                      # 资源（剧本引用的图片、音频）
 ├── preload/                  # 预加载内容
-└── config/global_settings.yml # 全局配置（首次启动初始化为空对象 {}）
+└── config/global_config.yml  # 全局配置（首次启动初始化包含 main_bgm_volume: 50）
 ```
 
-首次启动后的 `global_settings.yml` 内容为 `{}`，不写入任何业务数据。
+首次启动后的 `global_config.yml` 内容初始化包含 `main_bgm_volume: 50`。
 
 ## paths.ts
 
-导出：`STORAGE_DIRS`（`{res, preload, config}`）、`SETTINGS_FILE_NAME`（`global_settings.yml`）、`PRELOAD_ASSETS_FILE_NAME`（`preload_assets.yml`）、`StoragePaths`、`detectPlatform()`、`getDefaultRootDir()`、`getStorageRootDir()`、`getStoragePaths()`、`resolvePreloadAssetsPath(currentDir)`。
+导出：`STORAGE_DIRS`（`{res, preload, config}`）、`SETTINGS_FILE_NAME`（`global_config.yml`）、`PRELOAD_ASSETS_FILE_NAME`（`preload_assets.yml`）、`StoragePaths`、`detectPlatform()`、`getDefaultRootDir()`、`getStorageRootDir()`、`getStoragePaths()`、`resolvePreloadAssetsPath(currentDir)`。
 
 ```ts
 interface StoragePaths {
   platform: SupportedPlatform;  // windows | linux | android | macos | unknown
   rootDir: string; resDir: string; preloadDir: string; configDir: string;
-  settingsFile: string;         // <root>/config/global_settings.yml
+  settingsFile: string;         // <root>/config/global_config.yml
 }
 ```
 
@@ -47,12 +47,12 @@ interface StoragePaths {
 1. `firstRun = !fs.existsSync(rootDir)`；
 2. `mkdirSync(recursive: true)` 创建根目录 + 三个子目录（已存在则跳过）；
 3. 迁移旧布局（见下）；
-4. `global_settings.yml` 不存在时写入 `{}\n`；
+4. `global_config.yml` 不存在时写入包含默认配置 `main_bgm_volume: 50`；
 5. 读取并返回配置。
 
-失败策略：目录创建失败 → 抛出**带路径 + 原因 + 解决建议**的错误，由启动流程 `exit(1)`；配置解析失败 → 只告警并返回 `{}`，保证服务能起来。
+失败策略：目录创建失败 → 抛出**带路径 + 原因 + 解决建议**的错误，由启动流程 `exit(1)`；配置解析失败 → 只告警并返回默认配置 `{ main_bgm_volume: 50 }`，保证服务能起来。
 
-旧布局迁移：早年配置在 `<root>/configs/`（复数），现统一 `config/`。旧文件存在且新文件不存在时复制，新文件已存在则**不覆盖**；复制失败仅告警；迁移后尝试删除旧目录（失败忽略）。**迁移失败不阻断启动**。
+旧布局迁移：早年配置在 `<root>/configs/`（复数）或旧文件名 `global_settings.yml`，现统一为 `config/global_config.yml`。旧文件存在且新文件不存在时复制，新文件已存在则**不覆盖**；复制失败仅告警；迁移后尝试删除旧目录（失败忽略）。**迁移失败不阻断启动**。
 
 配置读写：`js-yaml` 的 `load`，非对象一律 `{}`；`saveSettings()` 为浅合并 `{ ...loadSettings(), ...patch }` 后 `dump`（`indent: 2`、`lineWidth: -1`、`noRefs: true`），写入前确保 `configDir` 存在。
 
