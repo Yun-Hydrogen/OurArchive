@@ -30,7 +30,7 @@
 
 - 组件一律 `font-family: var(--oa-font)`，禁止硬编码字体族；表单控件已在 `style.css` 统一 `font-family: inherit`。
 - Vite 会把 `UI.ttf` 复制进 `dist/assets/`。
-- 其他变量：`--oa-blue #0090fe`、`--oa-dark-blue #13243f`、`--oa-yellow #f8be00`、`--oa-bg #0b1017`、`--oa-text #e9eef5`、`--oa-border #1e293b`。
+- 其他变量：`--oa-blue #0090fe`、`--oa-dark-blue #13243f`、`--oa-yellow #f8be00`、`--oa-bg #0b1017`、`--oa-text #e9eef5`、`--oa-border #1e293b`、`--rizui_themecolor: var(--oa-blue)`（使引入的 RizUI 组件跟随全站主题色）。
 - `body` 铺全局配色、`#app` 为 `flex column + min-height: 100vh`，页面可用 `flex: 1` 占满。**页面级背景由页面自己覆盖，不要改 `--oa-bg` 适配单页**；组件样式用 `<style scoped>`。
 
 ## 资源引用

@@ -12,6 +12,9 @@ import path from 'node:path';
  */
 export function resolveClientDistPath(currentDir: string): string | null {
   const candidates = [
+    path.resolve(currentDir, './client'),
+    path.resolve(currentDir, '../client'),
+    path.resolve(process.cwd(), 'client'),
     path.resolve(currentDir, '../../client/dist'),
     path.resolve(currentDir, '../client/dist'),
     path.resolve(currentDir, './client/dist'),

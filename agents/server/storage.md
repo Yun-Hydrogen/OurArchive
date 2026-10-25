@@ -60,7 +60,7 @@ interface StoragePaths {
 
 导出：`PreloadAssetItem`、`PreloadCheckResult`、`PRELOAD_INCOMPLETE_WARNING`、`loadPreloadAssets(currentDir, paths?)`、`getPreloadCheckResult()`。
 
-- **清单定位**：`preload_assets.yml` 位于 `resources/preload_assets.yml`，由开发者手动维护并随代码一同打包分发，**不进入用户数据目录**，不需要复杂的动态生成或推断逻辑。通过 `resolvePreloadAssetsPath(currentDir)` 定位随程序打包的文件。
+- **清单定位**：`preload_assets.yml` 位于**项目根目录**，由开发者手动维护并随代码一同打包分发，**不进入用户数据目录**，不需要复杂的动态生成或推断逻辑。通过 `resolvePreloadAssetsPath(currentDir)` 定位随程序打包的文件。详细说明见 [docs/preload-guide.md](../../docs/preload-guide.md)。
 - **配置项格式**：
   - `id`: 开发者定义的全小写字母唯一标识
   - `file`: 以 `preload` 开头的相对路径（如 `preload/xxx.wav` 或 `preload/audio/se/click.wav`）

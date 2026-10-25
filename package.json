@@ -2,6 +2,7 @@
   "name": "our-archive",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Our Archive - Blue Archive visual novel simulator",
   "author": "Yun-Hydrogen",
   "license": "AGPL-3.0-only",
@@ -15,9 +16,11 @@
     "build": "npm run build -w @our-archive/client && npm run build -w @our-archive/server",
     "build:client": "npm run build -w @our-archive/client",
     "build:server": "npm run build -w @our-archive/server",
-    "build:exe": "npm run build:client && npm run build:exe -w @our-archive/server",
-    "start": "npm run start -w @our-archive/server",
-    "package": "npm run build && npm run package -w @our-archive/server"
+    "build:windows": "node scripts/package.js windows",
+    "build:linux": "node scripts/package.js linux",
+    "build:android": "node scripts/package.js android",
+    "build:all": "node scripts/package.js all",
+    "start": "npm run start -w @our-archive/server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

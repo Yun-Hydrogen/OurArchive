@@ -11,7 +11,7 @@ index.ts
   ├─ resolvePublicUrl()                 # config/publicUrl.ts
   ├─ resolveNetworkUrl()                # config/publicUrl.ts —— 解析局域网 IP
   ├─ initializeStorage()                # config/storage.ts —— 失败即 exit(1)
-  ├─ loadPreloadAssets(storage.paths)   # config/preload.ts —— 校验 preload 完整度
+  ├─ loadPreloadAssets(currentDir, ...) # config/preload.ts —— 校验 preload 完整度
   ├─ app.use(express.json())
   ├─ app.use('/api/preload', ...)       # routes/preload.ts
   ├─ app.use('/api/config', ...)        # routes/config.ts

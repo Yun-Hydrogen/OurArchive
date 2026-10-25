@@ -51,6 +51,19 @@ export function getPreloadCheckResult(): PreloadCheckResult | null {
   return cachedPreloadResult;
 }
 
+function extractRawList(parsed: unknown): unknown[] {
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+  if (parsed && typeof parsed === 'object' && 'assets' in parsed) {
+    const assets = (parsed as Record<string, unknown>).assets;
+    if (Array.isArray(assets)) {
+      return assets;
+    }
+  }
+  return [];
+}
+
 /**
  * 读取随代码打包分发的 preload_assets.yml，对照检查用户资源目录下的 preload/ 文件夹。
  *
@@ -103,11 +116,7 @@ export function loadPreloadAssets(
     return result;
   }
 
-  const rawList = Array.isArray(parsed)
-    ? parsed
-    : (parsed && typeof parsed === 'object' && Array.isArray((parsed as Record<string, unknown>).assets))
-      ? (parsed as Record<string, unknown>).assets
-      : [];
+  const rawList = extractRawList(parsed);
 
   const items: PreloadAssetItem[] = [];
   const missingItems: PreloadAssetItem[] = [];

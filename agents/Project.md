@@ -2,7 +2,7 @@
 
 > Blue Archive 视觉小说模拟器（Visual Novel Simulator）
 >
-> 独立的《蔚蓝档案》(Blue Archive) 同人视觉小说模拟器，与任何其他同类项目**毫无关联**：不基于、不复刻、不引用任何第三方同类项目的代码或设计。
+> 独立的《蔚蓝档案》(Blue Archive) 同人视觉小说模拟器，与任何其他同类项目**毫无关联**：不基于、不复刻任何第三方同类项目的代码或设计。
 
 ## 定位
 
@@ -20,26 +20,28 @@
 ## 目录
 
 ```
-OurArchiveStudio/
+OurArchive/
+├── preload_assets.yml      # 预加载资源索引清单（项目根目录）
+├── docs/                   # 开发者文档（preload-guide.md 等）
 ├── agents/                 # Agent 协作文档（Project.md + client/ + server/）
 ├── resources/              # 项目自带美术 / 音频（不进入用户数据目录）
 │   ├── UI.ttf              # 全站字体
-│   ├── preload_assets.yml  # 预加载资源索引清单模板
 │   └── OurArchive/         # banner SVG、音效、LICENSE
 ├── packages/
 │   ├── client/             # Vue 3 前端
 │   │   └── src/
 │   │       ├── main.ts App.vue style.css
 │   │       ├── router/ config/ composables/
-│   │       ├── components/splash/   # OABannerSvg.vue（仅横幅 SVG）
+│   │       ├── components/          # common/ 与 splash/
 │   │       └── views/SplashView.vue # splash 整页
 │   └── server/             # Express 后端
 │       └── src/
 │           ├── index.ts             # 启动编排
 │           ├── app/mountClient.ts   # 静态托管 + SPA fallback
-│           ├── config/              # paths / storage / server / publicUrl
-│           └── utils/               # banner / openBrowser / waitForReachable
-└── scripts/                # 跨平台启动脚本 (bat / sh)
+│           ├── routes/              # preload.ts、config.ts
+│           ├── config/              # paths / storage / server / publicUrl / preload
+│           └── utils/               # banner
+└── scripts/                # 打包脚本与启动脚本 (package.js / bat / sh)
 ```
 
 ## 用户数据目录
@@ -51,7 +53,7 @@ OurArchiveStudio/
 | Android | `/sdcard/OurArchive` |
 
 固定三个子目录：`res/`（素材）、`preload/`（预加载）、`config/`（配置，当前包含 `global_config.yml`）。
-后端启动时由 `initializeStorage()` 创建并加载配置，并对照随代码分发的 `resources/preload_assets.yml` 校验用户 `preload/` 完整度；失败即终止启动；可用 `OUR_ARCHIVE_DATA_DIR` 覆盖根目录。细节见 [server/storage.md](./server/storage.md)。
+后端启动时由 `initializeStorage()` 创建并加载配置，并对照根目录 `preload_assets.yml` 校验用户 `preload/` 完整度；失败则告知用户不完整；可用 `OUR_ARCHIVE_DATA_DIR` 覆盖根目录。细节见 [server/storage.md](./server/storage.md)。
 
 ## 当前状态
 
@@ -66,8 +68,13 @@ npm install          # 安装依赖
 npm run dev          # 前后端同时开发（Vite 5173，后端 3000）
 npm run dev:server   # 仅后端 http://localhost:3000
 npm run dev:client   # 仅前端 http://localhost:5173（/api 代理到 3000）
-npm run build        # 构建前后端
-npm run build:exe    # 构建并打包 Windows 单文件 exe
+npm run build        # 测试编译前后端 (vue-tsc + vite build + tsup)
+npm run build:windows# 打包 Windows 发行包 (单文件 OurArchive.exe，紧凑目录)
+npm run build:linux  # 打包 Linux 发行包 (含 start.sh 启动脚本与独立 server)
+npm run build:android# 打包 Android 发行包 (含 Termux start.sh 启动脚本)
+npm run build:all    # 打包全平台发行包 (产物输出至 dist_release/)
+npm start            # 生产启动：后端监听 5173 并托管前端
+```
 npm start            # 生产启动：后端监听 5173 并托管前端
 ```
 

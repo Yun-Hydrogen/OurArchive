@@ -7,11 +7,14 @@
 `resolveClientDistPath(currentDir)` 按候选路径依次探测，命中条件是**目录内存在 `index.html`**（只判目录存在会被空 `dist/` 骗过）：
 
 ```
+<currentDir>/client              → 紧凑发行包 (Windows 单文件 exe 根目录)
+<currentDir>/../client           → 紧凑发行包 (Linux/Android server/ 上级)
+<cwd>/client
 <currentDir>/../../client/dist   → tsup 产物 (packages/server/dist)
 <currentDir>/../client/dist      → 直跑 src/
 <currentDir>/./client/dist
 <cwd>/packages/client/dist
-<cwd>/client/dist , <cwd>/dist   → pkg 打包 exe
+<cwd>/client/dist , <cwd>/dist
 ```
 
 `mountClient(app, distPath)`：

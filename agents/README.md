@@ -4,15 +4,15 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [Project.md](./Project.md) | 项目定位、目录树、资源目录、命令、环境变量 |
+| [Project.md](./Project.md) | 项目定位、目录树、资源目录、编译打包命令、环境变量 |
 | [client/README.md](./client/README.md) | 前端索引 |
-| [client/app-shell.md](./client/app-shell.md) | 入口、路由、字体、资源别名 |
-| [client/splash.md](./client/splash.md) | 启动画面 |
+| [client/app-shell.md](./client/app-shell.md) | 入口、路由、字体、UI 主题、资源别名 |
+| [client/splash.md](./client/splash.md) | 启动画面与全局设置弹窗 |
+| [client/mouse-spark.md](./client/mouse-spark.md) | 全局鼠标交互与点击粒子动效 |
 | [server/README.md](./server/README.md) | 后端索引 |
-| [server/startup.md](./server/startup.md) | 启动编排、端口、环境变量 |
-| [server/storage.md](./server/storage.md) | 用户目录规范与配置读写 |
-| [server/serve-client.md](./server/serve-client.md) | 静态托管与 SPA fallback |
-| [server/auto-open-browser.md](./server/auto-open-browser.md) | 就绪检测与开浏览器 |
+| [server/startup.md](./server/startup.md) | 启动编排、路由挂载、端口与局域网网络地址解析 |
+| [server/storage.md](./server/storage.md) | 用户数据目录规范、预加载清单比对与配置读写 |
+| [server/serve-client.md](./server/serve-client.md) | 静态托管、SPA fallback 与控制台启动信息 |
 
 ## 硬性约定
 

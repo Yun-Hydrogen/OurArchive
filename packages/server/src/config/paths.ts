@@ -111,16 +111,19 @@ export function getStoragePaths(): StoragePaths {
 
 /**
  * 解析随代码一同分发的预加载资源清单 preload_assets.yml 路径。
+ * 优先级：
+ * 1. 运行目录同级（Windows 单文件 exe 打包根目录）
+ * 2. 运行目录父级（Linux / Android 的 server/ 上级打包根目录）
+ * 3. 项目根目录（开发与构建环境）
  */
 export function resolvePreloadAssetsPath(currentDir: string): string | null {
   const candidates = [
-    path.resolve(currentDir, '../../../resources', PRELOAD_ASSETS_FILE_NAME),
-    path.resolve(currentDir, '../../resources', PRELOAD_ASSETS_FILE_NAME),
-    path.resolve(currentDir, '../resources', PRELOAD_ASSETS_FILE_NAME),
-    path.resolve(currentDir, './resources', PRELOAD_ASSETS_FILE_NAME),
     path.resolve(currentDir, PRELOAD_ASSETS_FILE_NAME),
-    path.resolve(process.cwd(), 'resources', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(currentDir, '..', PRELOAD_ASSETS_FILE_NAME),
     path.resolve(process.cwd(), PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(currentDir, '../../', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(currentDir, '../../../', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(process.cwd(), 'resources', PRELOAD_ASSETS_FILE_NAME),
   ];
 
   return candidates.find((filePath) => fs.existsSync(filePath)) ?? null;

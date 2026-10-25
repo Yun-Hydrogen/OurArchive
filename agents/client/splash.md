@@ -6,10 +6,11 @@
 | --- | --- |
 | [views/SplashView.vue](../../packages/client/src/views/SplashView.vue) | 页面结构、白屏引导、气泡、TOUCH TO START、版权声明、设置入口、全部样式 |
 | [components/splash/OABannerSvg.vue](../../packages/client/src/components/splash/OABannerSvg.vue) | 内联 SVG 动画（34KB 矢量资源，与页面逻辑无关，故独立） |
-| [components/common/OASettingsModal.vue](../../packages/client/src/components/common/OASettingsModal.vue) | 通用设置弹窗面板（当前展示暂无配置项） |
+| [components/common/OASettingsModal.vue](../../packages/client/src/components/common/OASettingsModal.vue) | 基于 RizUI 的全局设置弹窗（包含背景音效卡片与主界面 BGM 音量滑块） |
 | [composables/useBannerSequence.ts](../../packages/client/src/composables/useBannerSequence.ts) | 阶段状态机 `idle → animating → ready` |
-| [composables/useSplashAudio.ts](../../packages/client/src/composables/useSplashAudio.ts) | 音效与背景音乐预加载/播放控制 |
-| [config/splash.ts](../../packages/client/src/config/splash.ts) | 时序与音量常量 |
+| [composables/useSplashAudio.ts](../../packages/client/src/composables/useSplashAudio.ts) | 音效与背景音乐播放控制（含二次缓出淡入与动态音量调节） |
+| [composables/useGlobalConfig.ts](../../packages/client/src/composables/useGlobalConfig.ts) | 全局配置加载与持久化同步（/api/config） |
+| [config/splash.ts](../../packages/client/src/config/splash.ts) | 时序与音量常量（banner 时长、淡入延时、BGM 淡入时长） |
 
 ## 时序
 

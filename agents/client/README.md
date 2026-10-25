@@ -5,7 +5,7 @@
 | 文档 | 覆盖 | 说明 |
 | --- | --- | --- |
 | [app-shell.md](./app-shell.md) | `main.ts`、`App.vue`、`router/`、`style.css`、`config/`、`vite.config.ts` | 入口、路由、字体与全局变量、资源别名 |
-| [splash.md](./splash.md) | `views/SplashView.vue`、`components/splash/`、`composables/` | 启动画面（当前唯一页面） |
+| [splash.md](./splash.md) | `views/SplashView.vue`、`components/splash/`、`components/common/OASettingsModal.vue`、`composables/` | 启动画面与全局设置弹窗（RizUI） |
 | [mouse-spark.md](./mouse-spark.md) | `components/common/OAMouseSpark.vue`、`composables/useMouseSpark.ts` | 全局鼠标交互与点击粒子动效 |
 
 ## 目录
