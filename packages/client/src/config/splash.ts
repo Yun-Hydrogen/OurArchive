@@ -11,6 +11,11 @@ export const SPLASH_TIMING = {
   promptFadeIn: 700,
   /** 背景音乐（main_bgm）首次播放淡入时长 */
   bgmFadeInDuration: 2000,
+  /**
+   * 点击 TOUCH TO START 后延迟多久才 router.push。
+   * 这段时间里 banner 已经开始停靠、底色开始渐变、版权文字正在飞出。
+   */
+  exitDuration: 520,
 } as const;
 
 /** 音效音量（0-1） */

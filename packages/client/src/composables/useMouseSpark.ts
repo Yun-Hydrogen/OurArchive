@@ -218,7 +218,8 @@ export function useMouseSpark(
       return;
     }
 
-    const deltaMs = Math.min(now - lastFrameTime, maxDeltaMs);
+    // rAF 时间戳可能略早于 startAnimationLoop 里的 performance.now()，需夹住负值
+    const deltaMs = Math.max(0, Math.min(now - lastFrameTime, maxDeltaMs));
     lastFrameTime = now;
     const baseScale = deltaMs / baseFrameMs;
     const clickFrameScale = baseScale * clickSpeed;
@@ -311,7 +312,7 @@ export function useMouseSpark(
       const ease = 1 - Math.pow(1 - waveProg, 3);
       w.r = filled.rAddRate * scale * ease;
       const waveAlpha = Math.max(0, 1 - waveProg) * opacity;
-      if (waveAlpha > 0) {
+      if (waveAlpha > 0 && w.r > 0) {
         ctx.beginPath();
         ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${color},${waveAlpha})`;
@@ -370,7 +371,8 @@ export function useMouseSpark(
 
           const wT = getWeightProp(t0);
           const lw = (rings.minW * (1 - wT) + rings.maxW * wT) * lineWidthMul * (scale / 1.5);
-          const radius = w.r + seg.rRoundRate * scale;
+          const radius = Math.max(0, w.r + seg.rRoundRate * scale);
+          if (radius <= 0 || lw <= 0) continue;
 
           ctx.beginPath();
           ctx.arc(w.x, w.y, radius, a0, a1);
