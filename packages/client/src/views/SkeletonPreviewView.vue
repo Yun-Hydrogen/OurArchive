@@ -1,17 +1,35 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { rizui_infobox, rizui_progress } from 'riz-ui';
 import OASpineUploader from '@/components/tools/OASpineUploader.vue';
 import OASpineViewer from '@/components/tools/OASpineViewer.vue';
 import { ROUTE_NAMES } from '@/config/routes';
-import type { OASpineCharacter } from '@/composables/useSpinePackage';
+import {
+  loadSpineCharacterFromPackage,
+  type OASpineCharacter,
+} from '@/composables/useSpinePackage';
 
+const route = useRoute();
 const router = useRouter();
 
 /** 当前预览的立绘包；为空表示停在文件选择阶段 */
 const character = ref<OASpineCharacter | null>(null);
 
+/** 从资源包直接进入时，记录来源以便「返回」回到角色详情 */
+const sourcePackageId = ref('');
+
+const isAutoLoading = ref(false);
+const autoLoadError = ref('');
+
 function backToTools() {
+  if (sourcePackageId.value) {
+    void router.push({
+      name: ROUTE_NAMES.packageCharacter,
+      params: { packageId: sourcePackageId.value, nameId: String(route.query.character ?? '') },
+    });
+    return;
+  }
   void router.push({ name: ROUTE_NAMES.tools });
 }
 
@@ -21,7 +39,36 @@ function handlePick(next: OASpineCharacter) {
 
 function handleChange() {
   character.value = null;
+  sourcePackageId.value = '';
+  void router.replace({ name: ROUTE_NAMES.skeletonPreview });
 }
+
+/** `?package=<id>&skeleton=<立绘 id>` → 直接从资源包加载 */
+async function autoLoad() {
+  const packageId = String(route.query.package ?? '').trim();
+  const skeletonId = String(route.query.skeleton ?? '').trim();
+
+  if (!packageId || !skeletonId) {
+    return;
+  }
+
+  sourcePackageId.value = packageId;
+  isAutoLoading.value = true;
+  autoLoadError.value = '';
+
+  try {
+    character.value = await loadSpineCharacterFromPackage(packageId, skeletonId);
+  } catch (error) {
+    autoLoadError.value = error instanceof Error ? error.message : String(error);
+    sourcePackageId.value = '';
+  } finally {
+    isAutoLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  void autoLoad();
+});
 </script>
 
 <template>
@@ -38,7 +85,7 @@ function handleChange() {
             stroke-linejoin="round"
           />
         </svg>
-        工具
+        {{ sourcePackageId ? '角色详情' : '工具' }}
       </button>
 
       <div class="oa-skeleton__titles">
@@ -50,8 +97,13 @@ function handleChange() {
     </header>
 
     <section class="oa-skeleton__body">
+      <div v-if="isAutoLoading" class="oa-skeleton__picker oa-skeleton__loading">
+        <p class="oa-skeleton__loading-text">正在从资源包载入立绘…</p>
+        <rizui_progress :indeterminate="true" :height="6" rounded theme="Light" />
+      </div>
+
       <OASpineViewer
-        v-if="character"
+        v-else-if="character"
         :key="`${character.id}-${character.skeleton.name}`"
         :character="character"
         @back="backToTools"
@@ -59,6 +111,13 @@ function handleChange() {
       />
 
       <div v-else class="oa-skeleton__picker">
+        <rizui_infobox
+          v-if="autoLoadError"
+          class="oa-skeleton__error"
+          type="error"
+          :text="`自动载入失败：${autoLoadError}`"
+          theme="Light"
+        />
         <OASpineUploader @pick="handlePick" />
       </div>
     </section>
@@ -175,5 +234,21 @@ function handleChange() {
   box-shadow:
     0 12px 26px rgba(36, 92, 138, 0.12),
     inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+}
+
+.oa-skeleton__error {
+  margin-bottom: 12px;
+}
+
+.oa-skeleton__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: fit-content;
+}
+
+.oa-skeleton__loading-text {
+  font-size: 12.5px;
+  color: #6f8ba4;
 }
 </style>

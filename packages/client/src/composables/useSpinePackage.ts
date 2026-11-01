@@ -177,3 +177,43 @@ export async function toSpineFilesFromDrop(transfer: DataTransfer): Promise<OASp
   }
   return collected;
 }
+
+/* ------------------------------ 服务端资源包 ------------------------------ */
+
+/**
+ * 从已安装的资源包直接装配一个立绘包（无需用户选文件）。
+ *
+ * 后端只给出文件清单与 URL，这里把每个文件下载成 Blob 再包成 `File`，
+ * 这样渲染管线与「手动上传」完全共用同一条路径。
+ */
+export async function loadSpineCharacterFromPackage(
+  packageId: string,
+  skeletonId: string
+): Promise<OASpineCharacter> {
+  // 动态引入，避免 useSpinePackage 被纯本地场景也拖上网络依赖
+  const { fetchSkeletonFiles } = await import('@/composables/usePackageContent');
+  const files = await fetchSkeletonFiles(packageId, skeletonId);
+
+  if (!files.length) {
+    throw new Error(`立绘目录为空或不存在：${skeletonId}`);
+  }
+
+  const entries: OASpineFile[] = [];
+  await Promise.all(
+    files.map(async (item) => {
+      const res = await fetch(item.url);
+      if (!res.ok) {
+        throw new Error(`下载失败：${item.name}`);
+      }
+      const blob = await res.blob();
+      entries.push({ file: new File([blob], item.name), path: item.name });
+    })
+  );
+
+  const [character] = toSpineCharacters(entries);
+  if (!character) {
+    throw new Error('这个立绘目录缺少 .skel / .atlas / 贴图三件套。');
+  }
+
+  return { ...character, id: skeletonId };
+}

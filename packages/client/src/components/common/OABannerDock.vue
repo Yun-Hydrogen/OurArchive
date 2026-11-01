@@ -13,11 +13,21 @@ const props = defineProps<{
   playToken: number;
 }>();
 
+const emit = defineEmits<{
+  (e: 'click'): void;
+}>();
+
 const dock = ref<HTMLDivElement | null>(null);
 
 const offsetX = ref(0);
 const offsetY = ref(0);
 const scale = ref(1);
+
+function handleClick() {
+  if (props.docked) {
+    emit('click');
+  }
+}
 
 /**
  * 以「中心点对齐」把舞台中心映射到停靠中心：
@@ -78,7 +88,13 @@ onBeforeUnmount(() => {
       '--fade': `${SHELL_TIMING.bannerCrossfade}ms`,
       '--fade-delay': `${SHELL_TIMING.bannerCrossfadeDelay}ms`,
     }"
-    aria-hidden="true"
+    :role="docked ? 'button' : undefined"
+    :tabindex="docked ? 0 : -1"
+    :aria-label="docked ? '关于 Our Archive (开发与贡献信息)' : undefined"
+    :title="docked ? '点击查看开发与贡献信息' : undefined"
+    @click="handleClick"
+    @keydown.enter.prevent="handleClick"
+    @keydown.space.prevent="handleClick"
   >
     <div class="oa-banner-dock__inner">
       <OABannerSvg :key="playToken" class="oa-banner-dock__anim" />
@@ -106,8 +122,10 @@ onBeforeUnmount(() => {
   pointer-events: none;
   transition:
     transform var(--morph) cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 300ms ease;
+    opacity 300ms ease,
+    filter 0.25s ease;
   will-change: transform, opacity;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .oa-banner-dock.is-visible {
@@ -115,8 +133,27 @@ onBeforeUnmount(() => {
 }
 
 .oa-banner-dock.is-docked {
+  pointer-events: auto;
+  cursor: pointer;
   transform: translate(-50%, -50%) translate(var(--dock-dx), var(--dock-dy))
     scale(var(--dock-scale));
+}
+
+.oa-banner-dock.is-docked:hover {
+  filter: brightness(1.08) drop-shadow(0 4px 14px rgba(0, 144, 254, 0.35));
+  transform: translate(-50%, -50%) translate(var(--dock-dx), var(--dock-dy))
+    scale(calc(var(--dock-scale) * 1.05));
+}
+
+.oa-banner-dock.is-docked:active {
+  transform: translate(-50%, -50%) translate(var(--dock-dx), var(--dock-dy))
+    scale(calc(var(--dock-scale) * 0.97));
+}
+
+.oa-banner-dock.is-docked:focus-visible {
+  outline: 2px solid var(--oa-blue);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 .oa-banner-dock__inner {

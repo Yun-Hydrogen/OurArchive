@@ -26,7 +26,7 @@ interface ToolEntry {
 }
 ```
 
-卡片沿用主界面 `.oa-card` 的质感（白→浅蓝渐变 + 双层阴影），插画走 `OAToolArt.vue` 的内联 SVG。渐变 / pattern 的 ID 带 `variant` 前缀，同页多卡不会互相污染。
+卡片沿用主界面 `.oa-card` 的质感（白→浅蓝渐变 + 双层阴影），插画走 `OAToolArt.vue` 的现代专业级平面矢量设计（去角色/纯技术视口，展现 2D 骨骼关节、网格曲面形变、贴图插槽与动画关键帧轨）。渐变 / pattern 的 ID 带 `variant` 前缀，同页多卡不会互相污染。
 
 新增工具：`TOOL_ENTRIES` 追加一项 → `config/routes.ts` 登记名字与路径 → `router/index.ts` 挂组件 → 在 `OAToolArt` 的 `ART_LABELS` 与模板里补插画变体。
 

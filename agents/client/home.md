@@ -6,7 +6,7 @@
 | --- | --- |
 | [views/HomeView.vue](../../packages/client/src/views/HomeView.vue) | 主界面结构、卡槽叠放与入场动画、全部样式 |
 | [components/home/OACardArt.vue](../../packages/client/src/components/home/OACardArt.vue) | 卡片插图组件：现代软件界面的平面/扁平化矢量设计 (SVG) |
-| [config/home.ts](../../packages/client/src/config/home.ts) | `HOME_MENU`（入口 id、标题与插画变体） |
+| [config/home.ts](../../packages/client/src/config/home.ts) | `HOME_MENU`（入口 id、标题、插画变体与目标路由） |
 | [composables/useBackgroundMusic.ts](../../packages/client/src/composables/useBackgroundMusic.ts) | 全应用单例的 `main_bgm` 播放控制 |
 
 ## 布局
@@ -31,12 +31,14 @@
 ```
 --peek: clamp(44px, 4vw, 64px)
 .oa-slot--mode            grid-area: 1/1; width: calc(100% - var(--peek))
-                          transform: translateX(var(--peek-x)) scale(var(--peek-s))
+                          transform: translateX(var(--peek-x)) scale(var(--peek-s)) translateZ(0)
 .is-active                z-index: 2; --peek-x: 0;     --peek-s: 1
 :not(.is-active)          z-index: 1; --peek-x: peek;  --peek-s: .98
 ```
 
-被压住的卡整体右移并缩小 2%，右侧露出约 46px 窄边（1536 宽）；点击该窄边即完成切换，过渡 `transform .62s cubic-bezier(.34, 1.32, .44, 1)`（轻微过冲，比线性更像卡牌翻面）。同时在 `.oa-slot--mode::after` 上盖一层 34% 白色蒙层，被压住的卡因此显得“退后一层”，切到前景时蒙层淡出。
+被压住的卡整体在右侧（`--peek-x: peek`）并缩小 2%，右侧露出约 46px 窄边（1536 宽）；置顶卡居左（`--peek-x: 0`）。点击右侧窄边切换时，**顶层卡往右移动退至后层，底层卡往左移动翻至顶层**，过渡 `transform .62s cubic-bezier(.34, 1.32, .44, 1)`（轻微过冲，比线性更像卡牌翻面）。同时在 `.oa-slot--mode::after` 上盖一层 34% 白色蒙层，被压住的卡因此显得“退后一层”，插画反向微倾 `1.2deg`，切到前景时蒙层淡出且插画平滑转正。
+
+所有 `.oa-slot` 常驻 `transform: translateZ(0)` 独立 3D 合成层与 `-webkit-font-smoothing: antialiased`，避免入场动画结束后 class 被移除时 GPU 合成层被回收造成卡片重绘与字体抗锯齿跳变。
 
 必须注意的三点：
 
@@ -44,7 +46,7 @@
 2. **入场动画必须用 `animation` + `backwards` 填充**（见下节），不能用 transition，否则延迟会一并拖慢后续切换。
 3. **命中区依赖 z-index 分层**。被压住的卡若加了 `pointer-events: none` 或提高 `z-index`，点击会落到前景卡上，切换失效。
 
-点击置顶卡当前不做任何事：只有「更多功能」接了真实路由（`router.push({ name: 'tools' })` → `/tools`，见 [tools.md](./tools.md)），其余四个入口仍是占位。接入模块时在 `config/routes.ts` 增加路由，再给对应入口补跳转。
+点击置顶卡当前不做任何事。已接真实路由的入口在 `HOME_MENU` 里带 `route` 字段，统一由 `openEntry(route)` 跳转：「资源管理」→ `/resources`（见 [resources.md](./resources.md)），「更多功能」→ `/tools`（见 [tools.md](./tools.md)）。编辑模式 / 阅读模式 / 3D场景 仍是占位（没有 `route`，`is-placeholder` 只去掉指针手势）。接入模块时在 `config/routes.ts` 增加路由，再给对应入口补 `route`。
 
 ## 入场动画
 
@@ -56,13 +58,13 @@
 
 `--enter-delay` 只写在 `animation-delay` 上，**不能写成 `.oa-slot` 的 `transition-delay`**，否则之后每次切换叠卡都会被延迟拖慢。
 
-## 离场动画（去工具页）
+## 离场动画（去子页面）
 
-点「更多功能」不直接 `router.push`：先 `isLeaving = true`，让 `.oa-home.is-leaving .oa-slot` 跑 `oa-slot-out`（`SHELL_TIMING.cardsExit`，向上 46px + 缩到 0.96 + 淡出，`forwards` 保持末帧），`animation-delay: calc(var(--enter-delay) * 0.2)` 让错峰压缩到 80ms 内；`SHELL_TIMING.cardsExitWait`（320ms）后才真正切路由。
+点「资源管理」或「更多功能」不直接 `router.push`：先 `isLeaving = true`，让 `.oa-home.is-leaving .oa-slot` 跑 `oa-slot-out`（`SHELL_TIMING.cardsExit`，向上 46px + 缩到 0.96 + 淡出，`forwards` 保持末帧），`animation-delay: calc(var(--enter-delay) * 0.2)` 让错峰压缩到 80ms 内；`SHELL_TIMING.cardsExitWait`（320ms）后才真正切路由。
 
 - 离场关键帧同样要带 `translateX(var(--peek-x)) scale(var(--peek-s) * k)`，否则被压住的卡会先弹回原位再飞走。
 - `isLeaving` 是幂等闸门，连点只跳一次；`onBeforeUnmount` 清掉 `leaveTimer`。
-- 目标页 `ToolsView` 用同一套缓动与错峰重新飞入，两页串起来像同一组卡在移动；反向（工具页 → 主页）时主页的 `is-entering` 会自然接上。
+- 目标页（`ToolsView` / `ResourcesView`）用同一套缓动与错峰重新飞入，两页串起来像同一组卡在移动；反向（子页面 → 主页）时主页的 `is-entering` 会自然接上。
 
 ## 背景音乐
 

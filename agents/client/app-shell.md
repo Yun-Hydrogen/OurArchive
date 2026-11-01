@@ -15,6 +15,9 @@
 | `/home` | `home` | `views/HomeView.vue`（懒加载） |
 | `/tools` | `tools` | `views/ToolsView.vue`（懒加载，见 [tools.md](./tools.md)） |
 | `/tools/skeleton` | `skeletonPreview` | `views/SkeletonPreviewView.vue`（懒加载，见 [skeleton-preview.md](./skeleton-preview.md)） |
+| `/resources` | `resources` | `views/ResourcesView.vue`（懒加载，见 [resources.md](./resources.md)） |
+| `/resources/:packageId` | `packageDetail` | `views/PackageView.vue`（懒加载，见 [package.md](./package.md)） |
+| `/resources/:packageId/character/:nameId` | `packageCharacter` | `views/PackageCharacterView.vue`（懒加载，见 [package.md](./package.md)） |
 | `/:pathMatch(.*)*` | — | `redirect: () => '/'` |
 
 - `createWebHistory()`：URL 无 `#`，刷新深层路径依赖后端 SPA fallback（见 [serve-client.md](../server/serve-client.md)）。
@@ -28,7 +31,7 @@
 - `router.beforeEach` 拦截所有非 `splash` 路由，未解锁则 `{ name: 'splash', replace: true }`；
 - 状态**不落 sessionStorage**：刷新 `/home`、在地址栏直接输入 `/home`、从外部链接进入，都会被换回 `/` 的 gate；`replace` 保证不在历史栈里留下那条深层地址。
 
-这样入口只有「端口号 + gate」一条路径，也让浏览器返回键的行为可预期（`/home` 返回 → `/`）。`/tools`、`/tools/skeleton` 同样受这条闸门约束，直接访问一律回 `/`。
+这样入口只有「端口号 + gate」一条路径，也让浏览器返回键的行为可预期（`/home` 返回 → `/`）。`/tools`、`/tools/skeleton`、`/resources` 及其子页面同样受这条闸门约束，直接访问一律回 `/`。
 
 ## 应用外壳
 
@@ -36,8 +39,9 @@
 .oa-shell                      flex column, min-height 100vh
 ├── .oa-shell__bg              fixed 底色层：纯白 ↔ 浅蓝渐变（::after 淡入）
 ├── <OABubbles :active>        fixed 气泡背景，全程一个实例
-├── <OABannerDock :visible :docked>
+├── <OABannerDock :visible :docked @click>
 ├── .oa-shell__settings        fixed 右上角设置按钮（gatePassed 后出现）
+├── <OAAboutModal :visible>    关于信息弹窗（开发信息与贡献信息）
 └── .oa-shell__view            z-index 10，内部是 <router-view />
 ```
 
@@ -50,7 +54,7 @@
 | `bannerPlayToken` | 递增即重挂 banner SVG，让内部 CSS 动画从头播放 |
 
 - `App.vue` 用 `watch(() => route.name, { immediate: true })` 把路由同步到 `stage`：进 `home` 调 `enterHome()`，回 `splash` 调 `enterSplash()`（后者同时把 `gatePassed` 复位，避免返回时 banner 压在白屏之上）。
-- **工具页（`tools` / `skeletonPreview`）不匹配这两个分支**，`stage` 保持 `home`：进入工具页时 banner 继续停靠在左下角、底色仍是浅蓝、气泡与 `main_bgm` 全部延续。新增页面若希望沿用主界面外壳，保持这个「不处理即延续」的约定即可。
+- **工具页（`tools` / `skeletonPreview`）与资源管理页（`resources` / `packageDetail` / `packageCharacter`）不匹配这两个分支**，`stage` 保持 `home`：进入这些页面时 banner 继续停靠在左下角、底色仍是浅蓝、气泡与 `main_bgm` 全部延续。新增页面若希望沿用主界面外壳，保持这个「不处理即延续」的约定即可。
 - **不要把这些元素放回页面组件**：一旦随路由卸载重建，气泡动画会重来、banner 会闪一下，看起来就像整页重载。
 
 ## banner 停靠动画
@@ -73,6 +77,7 @@
 - `dx / dy / scale` 由 `updateGeometry()` 按视口实时算出：以「中心点对齐」把舞台中心映射到停靠中心，`scale = dockW / heroW`；监听 `resize` + `ResizeObserver`。
 - 停靠位固定在**左下角**（内层页面同样沿用）：`dockW = clamp(76px, 6.2vw, 104px)`、左边距 `clamp(20px, 3vw, 42px)`、下边距 `clamp(14px, 2.8vh, 30px)`。`dy` 由 `窗口高 - 下边距 - dockH` 反推，所以改尺寸只需动这三处 clamp。
 - 只动 `transform`，全程在合成层，不触发重排；宽度固定为舞台宽度，缩放不改变布局。
+- 停靠态交互：停靠后启用 `pointer-events: auto; cursor: pointer;`，悬停时享有微光与轻微缩放反馈（`scale(1.05)`），点击（或回车）触发 `click` 事件弹出 `<OAAboutModal />`，展示开发信息、开源协议与贡献鸣谢。
 - 内容交叉淡入：`OABannerSvg`（动画版）在停靠后 340ms 淡出，`OurArchiveBanner-tp-tight-svg.svg`（静态版）同时淡入；两者宽高比 1.897 / 1.958 接近，切换几乎看不出来。
 - `bannerPlayToken` 变化时 `:key` 重挂 SVG，动画从头播（与 `useBannerSequence` 的 prompt 计时无关）。
 

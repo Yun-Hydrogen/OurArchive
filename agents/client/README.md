@@ -8,6 +8,8 @@
 | [splash.md](./splash.md) | `views/SplashView.vue`、`components/splash/`、`components/common/OABubbles.vue` | 启动画面：白屏引导、banner、TOUCH TO START、离场过渡 |
 | [home.md](./home.md) | `views/HomeView.vue`、`components/home/OACardArt.vue`、`config/home.ts` | 主界面：卡槽叠放、卡片入场、极简卡片与内联 SVG 插画、背景音乐继承 |
 | [tools.md](./tools.md) | `views/ToolsView.vue`、`components/tools/OAToolArt.vue`、`config/tools.ts` | 工具页：TOOL_ENTRIES、工具卡插画、卡片进出场 |
+| [resources.md](./resources.md) | `views/ResourcesView.vue`、`composables/useResourcePackages.ts` | 资源管理页：资源包 / 工程 / 存档 / 插件四个标签，资源包列表与空态 |
+| [package.md](./package.md) | `views/PackageView.vue`、`views/PackageCharacterView.vue`、`composables/usePackageContent.ts` | 资源包大卡片（左侧分类栏 + 角色列表）、角色详情、骨骼预览的按需加载 |
 | [skeleton-preview.md](./skeleton-preview.md) | `views/SkeletonPreviewView.vue`、`components/tools/OASpine*.vue`、`composables/useSpinePackage.ts`、`composables/useSpineStage.ts` | 立绘骨骼预览：立绘包识别、Spine 4.2 渲染、差分与动作、面板控件 |
 | [mouse-spark.md](./mouse-spark.md) | `components/common/OAMouseSpark.vue`、`composables/useMouseSpark.ts` | 全局鼠标交互与点击粒子动效 |
 
@@ -28,7 +30,7 @@ packages/client/src/
 │   ├── transition.ts      # SHELL_TIMING（banner 停靠 / 卡片入场与离场）
 │   ├── tools.ts           # TOOL_ENTRIES
 │   └── home.ts            # HOME_MENU
-├── composables/           # useAppShell、useBannerSequence、useSplashAudio、useBackgroundMusic、useMouseSpark、useGlobalConfig、useSpinePackage、useSpineStage
+├── composables/           # useAppShell、useBannerSequence、useSplashAudio、useBackgroundMusic、useMouseSpark、useGlobalConfig、useSpinePackage、useSpineStage、useResourcePackages、usePackageContent
 ├── components/
 │   ├── common/            # OAMouseSpark.vue、OABubbles.vue、OABannerDock.vue、OASettingsButton.vue、OASettingsModal.vue
 │   ├── home/              # OACardArt.vue（卡片插画，内联 SVG）
@@ -38,6 +40,9 @@ packages/client/src/
     ├── SplashView.vue     # splash 整页
     ├── HomeView.vue       # 主界面整页
     ├── ToolsView.vue      # 工具列表页
+    ├── ResourcesView.vue  # 资源管理页（资源包 / 工程 / 存档 / 插件）
+    ├── PackageView.vue    # 资源包大卡片（左侧分类 + 右侧内容）
+    ├── PackageCharacterView.vue  # 资源包内的角色详情
     └── SkeletonPreviewView.vue  # 立绘骨骼预览
 ```
 

@@ -9,6 +9,7 @@ import { resolvePublicUrl, resolveNetworkUrl } from './config/publicUrl.js';
 import { mountClient, resolveClientDistPath } from './app/mountClient.js';
 import { createPreloadRouter } from './routes/preload.js';
 import { createConfigRouter } from './routes/config.js';
+import { createPackagesRouter } from './routes/packages.js';
 import { printStartupInfo } from './utils/banner.js';
 
 dotenv.config();
@@ -38,6 +39,7 @@ const clientDistPath = resolveClientDistPath(currentDir);
 app.use(express.json());
 app.use('/api/preload', createPreloadRouter());
 app.use('/api/config', createConfigRouter());
+app.use('/api/packages', createPackagesRouter());
 
 mountClient(app, clientDistPath);
 

@@ -3,7 +3,6 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import OACardArt from '@/components/home/OACardArt.vue';
 import { HOME_MENU } from '@/config/home';
-import { ROUTE_NAMES } from '@/config/routes';
 import { SHELL_TIMING } from '@/config/transition';
 import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
@@ -31,15 +30,15 @@ function handleModeClick(index: number) {
   activeModeIndex.value = index;
 }
 
-/** 「更多功能」进入工具页：先播卡片收起动画再切路由，避免页与页之间硬切 */
-function openMoreTools() {
-  if (isLeaving.value) {
+/** 进入子页面：先播卡片收起动画再切路由，避免页与页之间硬切 */
+function openEntry(route?: string) {
+  if (!route || isLeaving.value) {
     return;
   }
   isLeaving.value = true;
   leaveTimer = setTimeout(() => {
     leaveTimer = null;
-    void router.push({ name: ROUTE_NAMES.tools });
+    void router.push({ name: route });
   }, SHELL_TIMING.cardsExitWait);
 }
 
@@ -123,7 +122,13 @@ onBeforeUnmount(() => {
               class="oa-slot"
               :style="{ '--enter-delay': enterDelay(220 + index * 90) }"
             >
-              <button type="button" class="oa-card" :data-entry="entry.id">
+              <button
+                type="button"
+                class="oa-card"
+                :data-entry="entry.id"
+                :class="{ 'is-placeholder': !entry.route }"
+                @click="openEntry(entry.route)"
+              >
                 <span class="oa-card__frame">
                   <OACardArt :variant="entry.art" />
                 </span>
@@ -138,7 +143,7 @@ onBeforeUnmount(() => {
               type="button"
               class="oa-card oa-card--wide"
               :data-entry="HOME_MENU.more.id"
-              @click="openMoreTools"
+              @click="openEntry(HOME_MENU.more.route)"
             >
               <span class="oa-card__frame">
                 <OACardArt :variant="HOME_MENU.more.art" />
@@ -205,8 +210,8 @@ onBeforeUnmount(() => {
 }
 
 /*
- * 两张模式卡叠放在同一格：置顶卡靠左，另一张整体右移 --peek 并轻微缩小藏到后面，
- * 只露出右侧一条窄边；点击该窄边即把被压住的卡翻到上层。
+ * 两张模式卡叠放在同一格：置顶卡靠左，底层卡整体右移 --peek 并轻微缩小藏到后面，
+ * 露出右侧一条窄边；点击该窄边切换时，顶层卡往右移动退至后层，底层卡往左移动翻至顶层。
  */
 .oa-home__modes {
   position: relative;
@@ -232,32 +237,33 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   min-width: 0;
+  /* 常驻 3D 合成层：避免入场/离场动画结束后图层被回收导致卡片重绘与文字跳动 */
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /*
  * 入场用 animation + backwards 填充：延迟期间保持首帧（透明、下移），
  * 结束后交还给 class 上定义的 transform。
  *
- * 关键帧的首尾都必须带上 var(--peek-x) / var(--peek-s)：被压住的卡在动画结束时
- * 要正好落回 translateX(peek) scale(.98)，否则会从 scale(1) 弹到 scale(.98) —— 也就是
- * 「动画结束后重绘一下」的观感来源。
+ * 关键帧的首尾都带上 var(--peek-x) / var(--peek-s) 与 translateZ(0)：
+ * 卡槽常驻独立合成层，动画结束后不会发生图层反向回收与重绘。
  */
 .oa-home.is-entering .oa-slot {
   animation: oa-slot-in 780ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   animation-delay: var(--enter-delay, 0ms);
-  /* 入场期间保持独立合成层，动画结束不回收，避免末帧闪一下 */
-  will-change: transform, opacity;
 }
 
 @keyframes oa-slot-in {
   from {
     opacity: 0;
-    transform: translateX(var(--peek-x, 0px)) translateY(58px)
+    transform: translateX(var(--peek-x, 0px)) translateY(58px) translateZ(0)
       scale(calc(var(--peek-s, 1) * 0.94));
   }
   to {
     opacity: 1;
-    transform: translateX(var(--peek-x, 0px)) translateY(0) scale(var(--peek-s, 1));
+    transform: translateX(var(--peek-x, 0px)) translateY(0) translateZ(0) scale(var(--peek-s, 1));
   }
 }
 
@@ -268,13 +274,12 @@ onBeforeUnmount(() => {
 .oa-home.is-leaving .oa-slot {
   animation: oa-slot-out var(--cards-exit) cubic-bezier(0.4, 0, 0.8, 0.24) forwards;
   animation-delay: calc(var(--enter-delay, 0ms) * 0.2);
-  will-change: transform, opacity;
 }
 
 @keyframes oa-slot-out {
   to {
     opacity: 0;
-    transform: translateX(var(--peek-x, 0px)) translateY(-46px)
+    transform: translateX(var(--peek-x, 0px)) translateY(-46px) translateZ(0)
       scale(calc(var(--peek-s, 1) * 0.96));
   }
 }
@@ -289,9 +294,8 @@ onBeforeUnmount(() => {
   width: calc(100% - var(--peek));
   --peek-x: 0px;
   --peek-s: 1;
-  transform: translateX(var(--peek-x)) scale(var(--peek-s));
+  transform: translateX(var(--peek-x)) scale(var(--peek-s)) translateZ(0);
   transform-origin: 50% 50%;
-  /* 叠卡切换只动 transform，常驻合成层避免每次切换重绘卡片内容 */
   will-change: transform;
   transition:
     transform 0.62s cubic-bezier(0.34, 1.32, 0.44, 1),
@@ -300,6 +304,8 @@ onBeforeUnmount(() => {
 
 .oa-slot--mode.is-active {
   z-index: 2;
+  --peek-x: 0px;
+  --peek-s: 1;
 }
 
 .oa-slot--mode:not(.is-active) {
@@ -345,6 +351,13 @@ onBeforeUnmount(() => {
   text-align: center;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 还没接页面的入口：保留卡片观感，但不给出可点击的暗示 */
+.oa-card.is-placeholder {
+  cursor: default;
 }
 
 .oa-card:focus-visible {
@@ -360,15 +373,18 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: 6px;
   background: #eaf6ff;
+  transform: translateZ(0);
 }
 
 .oa-card--mode .oa-card__frame {
   min-height: clamp(140px, 22vh, 220px);
+  transform: rotate(0deg) translateZ(0);
+  transition: transform 0.62s cubic-bezier(0.34, 1.32, 0.44, 1);
 }
 
 /* 被压住的卡片插画反向微倾，强化“两张卡叠在一起”的视觉 */
 .oa-slot--mode:not(.is-active) .oa-card__frame {
-  transform: rotate(1.2deg);
+  transform: rotate(1.2deg) translateZ(0);
 }
 
 .oa-card__frame :deep(svg) {
@@ -454,6 +470,10 @@ onBeforeUnmount(() => {
 
   .oa-slot--mode::after {
     display: none;
+  }
+
+  .oa-slot--mode:not(.is-active) .oa-card__frame {
+    transform: none;
   }
 
   .oa-home__features {

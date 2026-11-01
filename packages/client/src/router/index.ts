@@ -28,6 +28,24 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Our Archive - 立绘骨骼预览' },
   },
   {
+    path: ROUTE_PATHS.resources,
+    name: ROUTE_NAMES.resources,
+    component: () => import('@/views/ResourcesView.vue'),
+    meta: { title: 'Our Archive - 资源管理' },
+  },
+  {
+    path: ROUTE_PATHS.packageDetail,
+    name: ROUTE_NAMES.packageDetail,
+    component: () => import('@/views/PackageView.vue'),
+    meta: { title: 'Our Archive - 资源包' },
+  },
+  {
+    path: ROUTE_PATHS.packageCharacter,
+    name: ROUTE_NAMES.packageCharacter,
+    component: () => import('@/views/PackageCharacterView.vue'),
+    meta: { title: 'Our Archive - 角色详情' },
+  },
+  {
     // 未知路径一律回入口，避免深层地址落在一个空页面上
     path: '/:pathMatch(.*)*',
     redirect: () => ROUTE_PATHS.splash,

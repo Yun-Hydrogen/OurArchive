@@ -1,9 +1,11 @@
 /**
  * 主界面（Home）菜单配置。
  *
- * 目前全部入口只做占位：保留点击热区与视觉层级，暂不接入实际页面。
- * 后续接入模块时在 `router` 中新增路由，并在对应入口补充 `to` 即可。
+ * 入口只登记标题、副标题与插画；接入实际页面时在 `router` 中新增路由，
+ * 并在对应入口补上 `route`（目标路由名）。没有 `route` 的入口仍是占位。
  */
+import { ROUTE_NAMES } from '@/config/routes';
+
 export type HomeArtVariant = 'editor' | 'reader' | 'scene3d' | 'assets' | 'more';
 
 export interface HomeMenuEntry {
@@ -15,6 +17,8 @@ export interface HomeMenuEntry {
   subtitle: string;
   /** 卡片插画变体 */
   art: HomeArtVariant;
+  /** 目标路由名；缺省表示尚未接页面 */
+  route?: string;
 }
 
 export const HOME_MENU = {
@@ -26,10 +30,22 @@ export const HOME_MENU = {
   /** 右侧上排：3D场景 / 资源管理 */
   features: [
     { id: 'scene3d', title: '3D场景', subtitle: '编排立体场景脚本(未完成)', art: 'scene3d' },
-    { id: 'assets', title: '资源管理', subtitle: '资源包/工程/剧情/插件管理', art: 'assets' },
+    {
+      id: 'assets',
+      title: '资源管理',
+      subtitle: '资源包/工程/存档/插件管理',
+      art: 'assets',
+      route: ROUTE_NAMES.resources,
+    },
   ],
   /** 右侧下排：更多功能 */
-  more: { id: 'more', title: '更多功能', subtitle: '插件与实用工具入口', art: 'more' },
+  more: {
+    id: 'more',
+    title: '更多功能',
+    subtitle: '插件与实用工具入口',
+    art: 'more',
+    route: ROUTE_NAMES.tools,
+  },
 } satisfies {
   modes: HomeMenuEntry[];
   features: HomeMenuEntry[];

@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import OABannerDock from '@/components/common/OABannerDock.vue';
 import OABubbles from '@/components/common/OABubbles.vue';
 import OASettingsButton from '@/components/common/OASettingsButton.vue';
+import OAAboutModal from '@/components/common/OAAboutModal.vue';
 import OAMouseSpark from '@/components/common/OAMouseSpark.vue';
 import { ROUTE_NAMES } from '@/config/routes';
 import { useAppShell } from '@/composables/useAppShell';
 
 const route = useRoute();
 const { isHome, gatePassed, bannerPlayToken, enterHome, enterSplash } = useAppShell();
+
+/** 关于信息弹窗显示状态 */
+const isAboutOpen = ref(false);
+
+function handleBannerClick() {
+  isAboutOpen.value = true;
+}
 
 // 路由 → 外壳阶段：进主界面停靠 banner，回 splash 复位引导
 watch(
@@ -33,8 +41,13 @@ watch(
     <!-- 常驻气泡背景：只在首次点击后淡入，之后一直存在 -->
     <OABubbles :active="gatePassed" />
 
-    <!-- 常驻 banner：窗口中央 ↔ 左上角，splash 与 home 共用同一个实例 -->
-    <OABannerDock :docked="isHome" :visible="gatePassed" :play-token="bannerPlayToken" />
+    <!-- 常驻 banner：窗口中央 ↔ 左下角，点击可弹出开发与贡献信息 -->
+    <OABannerDock
+      :docked="isHome"
+      :visible="gatePassed"
+      :play-token="bannerPlayToken"
+      @click="handleBannerClick"
+    />
 
     <!-- 常驻设置入口：过了白屏引导后常显，两个页面位置一致 -->
     <div v-if="gatePassed" class="oa-shell__settings">
@@ -45,6 +58,9 @@ watch(
       <router-view />
     </div>
   </div>
+
+  <!-- 开发与贡献信息弹窗 -->
+  <OAAboutModal v-model:visible="isAboutOpen" />
 
   <OAMouseSpark />
 </template>

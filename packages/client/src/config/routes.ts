@@ -7,6 +7,9 @@ export const ROUTE_NAMES = {
   home: 'home',
   tools: 'tools',
   skeletonPreview: 'skeletonPreview',
+  resources: 'resources',
+  packageDetail: 'packageDetail',
+  packageCharacter: 'packageCharacter',
 } as const;
 
 export const ROUTE_PATHS = {
@@ -14,4 +17,9 @@ export const ROUTE_PATHS = {
   home: '/home',
   tools: '/tools',
   skeletonPreview: '/tools/skeleton',
+  resources: '/resources',
+  /** 资源包详情，`packageId` 为 res/ 下的目录名 */
+  packageDetail: '/resources/:packageId',
+  /** 资源包内的角色详情 */
+  packageCharacter: '/resources/:packageId/character/:nameId',
 } as const;

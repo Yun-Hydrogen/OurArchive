@@ -35,13 +35,13 @@ OurArchive/
 │   │       ├── main.ts App.vue style.css
 │   │       ├── router/ config/ composables/
 │   │       ├── components/          # common/ home/ splash/ tools/
-│   │       └── views/               # SplashView.vue、HomeView.vue、ToolsView.vue、SkeletonPreviewView.vue
+│   │       └── views/               # SplashView.vue、HomeView.vue、ToolsView.vue、ResourcesView.vue、SkeletonPreviewView.vue
 │   └── server/             # Express 后端
 │       └── src/
 │           ├── index.ts             # 启动编排
 │           ├── app/mountClient.ts   # 静态托管 + SPA fallback
-│           ├── routes/              # preload.ts、config.ts
-│           ├── config/              # paths / storage / server / publicUrl / preload
+│           ├── routes/              # preload.ts、config.ts、packages.ts
+│           ├── config/              # paths / storage / server / publicUrl / preload / packages
 │           └── utils/               # banner
 └── scripts/                # 打包脚本与启动脚本 (package.js / bat / sh)
 ```
@@ -59,10 +59,12 @@ OurArchive/
 
 ## 当前状态
 
-- **后端**：Express 服务 —— 初始化资源目录、校验预加载资源、托管前端产物、提供预加载与配置 API。启动完成后在控制台输出 Local 与 Network（局域网）访问地址。
-- **前端**：只能从入口 `/` 进入（直接访问 `/home`、`/tools` 等深层地址会被路由守卫 `replace` 回 `/`）。外壳（App.vue）常驻气泡背景、OurArchive banner 与右上角设置按钮；splash 只负责白屏引导、banner 动画触发、TOUCH TO START 与版权声明，点 TOUCH TO START 后 banner 收缩停靠到左下角、版权文字下坠、底色转浅蓝，随后 `/home` 的卡片错峰飞入——全程不重建背景。`/home` 有编辑模式 / 阅读模式叠卡、3D场景、资源管理、更多功能五个入口，`main_bgm` 从 splash 延续；除「更多功能」跳转 `/tools` 外其余仍是占位。
+- **后端**：Express 服务 —— 初始化资源目录、校验预加载资源、索引 `res/` 下的资源包、托管前端产物、提供预加载 / 配置 / 资源包 API。启动完成后在控制台输出 Local 与 Network（局域网）访问地址。
+- **前端**：只能从入口 `/` 进入（直接访问 `/home`、`/tools`、`/resources` 等深层地址会被路由守卫 `replace` 回 `/`）。外壳（App.vue）常驻气泡背景、OurArchive banner 与右上角设置按钮；splash 只负责白屏引导、banner 动画触发、TOUCH TO START 与版权声明，点 TOUCH TO START 后 banner 收缩停靠到左下角、版权文字下坠、底色转浅蓝，随后 `/home` 的卡片错峰飞入——全程不重建背景。`/home` 有编辑模式 / 阅读模式叠卡、3D场景、资源管理、更多功能五个入口，`main_bgm` 从 splash 延续；「更多功能」→ `/tools`、「资源管理」→ `/resources` 已接页面，其余仍是占位。
 - **工具**：`/tools` 列出工具卡（配置在 `config/tools.ts`），目前只有「BA 立绘骨骼预览」→ `/tools/skeleton`：拖入角色文件夹或手动选文件（`.skel` / `.atlas` / 贴图），用 Spine 4.2 运行时在 canvas 上渲染，并按纯数字动画的 `AttachmentTimeline` 提供**立绘差分**选择，可选 `Idle_01` 等动作。工具页不改外壳 `stage`，banner 停靠与底色全部延续。
-- **未实现**：编辑模式 / 阅读模式 / 3D场景 / 资源管理的实际内容、剧本编辑器、角色管理、对话演出。
+- **资源管理**：`/resources` 四个标签（资源包 / 工程 / 存档 / 插件），后三个标「未完成」。资源包标签由后端 `GET /api/packages` 扫描 `<root>/res` 下每个带 `package.yml` 的目录，展示名称、描述、版本、作者与已声明的内容分类（骨骼数 / 角色数）。
+- **资源包详情**：点开资源包进入 `/resources/:packageId` 大卡片——左侧 RizUI 侧边栏列出 `package_content` 里声明可用的分类，右侧「角色」条目展示全部角色（头像 + 名字 + 所属组织 + 是否已绑定骨骼，带搜索）；点角色进 `/resources/:packageId/character/:nameId` 看学院 / 所属组织 / 头像 / 绑定骨骼，点骨骼直接跳到 `/tools/skeleton?package=…&skeleton=…&character=…` 由后端下发文件并在预览页直接渲染。
+- **未实现**：编辑模式 / 阅读模式 / 3D场景、资源包内的其它分类内容（表情 / 音效 / 背景 / 音乐）、工程 / 存档 / 插件分类、剧本编辑器、对话演出。
 
 ## 命令
 
