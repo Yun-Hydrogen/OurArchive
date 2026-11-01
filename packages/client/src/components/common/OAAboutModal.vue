@@ -118,21 +118,6 @@ function handleClose() {
   overflow-y: auto;
   padding: 4px 6px 4px 0;
   color: var(--oa-dark-blue);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 144, 254, 0.28) transparent;
-}
-
-.oa-about::-webkit-scrollbar {
-  width: 6px;
-}
-
-.oa-about::-webkit-scrollbar-thumb {
-  background: rgba(0, 144, 254, 0.28);
-  border-radius: 4px;
-}
-
-.oa-about::-webkit-scrollbar-track {
-  background: transparent;
 }
 
 .oa-about__header {

@@ -101,16 +101,15 @@ function openSkeleton(skeletonId: string) {
 
     <div v-if="loading" class="oa-charview__state">
       <p class="oa-charview__state-text">正在读取角色信息…</p>
-      <rizui_progress :indeterminate="true" :height="12" rounded theme="Light" />
+      <rizui_progress :indeterminate="true" :height="12" rounded />
     </div>
 
-    <rizui_infobox v-else-if="error" type="error" :text="`读取角色失败：${error}`" theme="Light" />
+    <rizui_infobox v-else-if="error" type="error" :text="`读取角色失败：${error}`" />
 
     <rizui_infobox
       v-else-if="!character"
       type="warning"
       :text="`资源包里没有这个角色：${nameId}`"
-      theme="Light"
     />
 
     <section v-else class="oa-charview__card">

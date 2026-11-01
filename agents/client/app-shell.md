@@ -97,6 +97,41 @@
 - 其他变量：`--oa-blue #0090fe`、`--oa-dark-blue #13243f`、`--oa-yellow #f8be00`、`--oa-bg #0b1017`、`--oa-text #e9eef5`、`--oa-border #1e293b`、`--rizui_themecolor: var(--oa-blue)`（使引入的 RizUI 组件跟随全站主题色）。
 - `body` 铺全局配色、`#app` 为 `flex column + min-height: 100vh`，页面可用 `flex: 1` 占满。**页面级背景由页面自己覆盖，不要改 `--oa-bg` 适配单页**；组件样式用 `<style scoped>`。
 
+## RizUI 主题
+
+全站固定**亮色**，通过 `<html data-rizui-theme="light">` 一次性声明，**组件上不要再写 `theme="Light"`**。
+
+- RizUI 的主题解析在 CSS 层：`:root` 是亮色 token，`:root[data-rizui-theme=dark]` 切暗色，并且有一段 `@media (prefers-color-scheme: dark) { :root:not([data-rizui-theme=light]) { …dark… } }`。也就是说**系统开深色模式时，不加属性就会整体变黑**。在 `<html>` 上钉死 `light` 同时躲开两个分支。
+- 属性写在 `index.html` 的 `<html>` 上（不是 `main.ts`），首帧渲染前就生效，没有亮→暗→亮的闪动。
+- 组件级 `theme` prop 默认 `auto`，解析成 `undefined`、不输出 `data-rizui-theme` 属性，因此会继承 `:root` 的亮色 token。
+- `style.css` 的 `:root` 里另有 `color-scheme: light`，把原生控件（滚动条、输入框、下拉箭头）也锁在亮色，否则系统深色模式下这些部件会变灰黑，和白色卡片不搭。
+- `--rizui_themecolor: var(--oa-blue)` 保留，让组件主色跟随全站蓝。
+
+## 滚动条
+
+全站滚动条在 `style.css` 里一次性统一，页面与组件**不要再写自己的 `::-webkit-scrollbar`**。
+
+规格直接对齐 **RizUI 组件内部的滚动条**（`.rzc-pre` / `.inpt-root` / `.imd-body` 用的那套）：
+
+| 项 | 值 |
+| --- | --- |
+| 宽 / 高 | `8px`（`--oa-scroll-size`） |
+| 轨道 track / 转角 corner | `transparent` |
+| 滑块 thumb | `color-mix(in srgb, var(--oa-blue) 28%, transparent)`，`border-radius: 999px` |
+| 滑块 hover | `color-mix(in srgb, var(--oa-blue) 48%, transparent)` |
+
+```css
+:root {
+  --oa-scroll-size: 8px;
+  --oa-scroll-thumb: color-mix(in srgb, var(--oa-blue) 28%, transparent);
+  --oa-scroll-thumb-hover: color-mix(in srgb, var(--oa-blue) 48%, transparent);
+}
+```
+
+- **标准属性与伪元素同时写**：`* { scrollbar-width: thin; scrollbar-color: var(--oa-scroll-thumb) transparent }` + `*::-webkit-scrollbar` 系列。这正是 RizUI 自己的写法：Chrome 121+ 会用标准属性渲染原生细条，老 Chrome / Safari 落到伪元素那套，两端观感一致。
+- **不要用 `@supports not selector(::-webkit-scrollbar)` 把标准属性隔开**：Chrome 121+ 两者都支持，但一旦元素上有 `scrollbar-width` / `scrollbar-color` 就会**忽略 `::-webkit-scrollbar`**；隔开等于让 Chrome 走伪元素、Firefox 走标准属性，反而和 RizUI 组件里的表现不一致。
+- **RizUI 组件自带的滚动条规则带 `data-v` 属性**，特异性高于 `*`，所以伪元素那几条统一加 `!important`，把 `.rnav-body` 的 4px 灰条也拉齐到同一规格。
+
 ## 资源引用
 
 | 类型 | 位置 | 引用方式 | 打包 |

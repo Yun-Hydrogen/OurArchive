@@ -161,26 +161,24 @@ function formatCount(count: number) {
                 <strong>{{ packages.length }}</strong> 个资源包
                 <span class="oa-res__path" :title="resourcesDir">{{ resourcesDir }}</span>
               </p>
-              <rizui_button text="刷新" theme="Light" :disabled="loading" @click="refresh" />
+              <rizui_button text="刷新" :disabled="loading" @click="refresh" />
             </div>
 
             <div v-if="loading" class="oa-res__loading">
               <p class="oa-res__loading-text">正在扫描资源目录…</p>
-              <rizui_progress :indeterminate="true" :height="12" rounded theme="Light" />
+              <rizui_progress :indeterminate="true" :height="12" rounded />
             </div>
 
             <rizui_infobox
               v-else-if="error"
               type="error"
               :text="`扫描资源包失败：${error}`"
-              theme="Light"
             />
 
             <rizui_infobox
               v-else-if="!packages.length"
               type="info"
               :text="`还没有资源包。把带 package.yml 的文件夹放进 ${resourcesDir || 'res 目录'} 后点刷新。`"
-              theme="Light"
             />
 
             <div v-else class="oa-res__grid">
@@ -244,7 +242,6 @@ function formatCount(count: number) {
                     v-if="!pkg.valid"
                     type="warn"
                     :text="`package.yml 解析失败：${pkg.error ?? '未知原因'}`"
-                    theme="Light"
                   />
                 </div>
               </article>
@@ -555,7 +552,6 @@ function formatCount(count: number) {
     0 16px 32px rgba(36, 92, 138, 0.2),
     0 2px 5px rgba(36, 92, 138, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.9);
-  transform: translateY(-2px);
 }
 
 .oa-pack:focus-visible {

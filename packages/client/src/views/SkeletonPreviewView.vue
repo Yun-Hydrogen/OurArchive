@@ -16,21 +16,32 @@ const router = useRouter();
 /** 当前预览的立绘包；为空表示停在文件选择阶段 */
 const character = ref<OASpineCharacter | null>(null);
 
-/** 从资源包直接进入时，记录来源以便「返回」回到角色详情 */
+/** 从资源包直接进入时，记录来源以便「返回」回到角色详情 / 资源包 */
 const sourcePackageId = ref('');
+/** 来源角色；从骨骼列表进入时没有角色，就返回资源包 */
+const sourceCharacterId = ref('');
 
 const isAutoLoading = ref(false);
 const autoLoadError = ref('');
 
-function backToTools() {
-  if (sourcePackageId.value) {
+function backToSource() {
+  if (!sourcePackageId.value) {
+    void router.push({ name: ROUTE_NAMES.tools });
+    return;
+  }
+
+  if (sourceCharacterId.value) {
     void router.push({
       name: ROUTE_NAMES.packageCharacter,
-      params: { packageId: sourcePackageId.value, nameId: String(route.query.character ?? '') },
+      params: { packageId: sourcePackageId.value, nameId: sourceCharacterId.value },
     });
     return;
   }
-  void router.push({ name: ROUTE_NAMES.tools });
+
+  void router.push({
+    name: ROUTE_NAMES.packageDetail,
+    params: { packageId: sourcePackageId.value },
+  });
 }
 
 function handlePick(next: OASpineCharacter) {
@@ -40,6 +51,7 @@ function handlePick(next: OASpineCharacter) {
 function handleChange() {
   character.value = null;
   sourcePackageId.value = '';
+  sourceCharacterId.value = '';
   void router.replace({ name: ROUTE_NAMES.skeletonPreview });
 }
 
@@ -53,6 +65,7 @@ async function autoLoad() {
   }
 
   sourcePackageId.value = packageId;
+  sourceCharacterId.value = String(route.query.character ?? '').trim();
   isAutoLoading.value = true;
   autoLoadError.value = '';
 
@@ -74,7 +87,7 @@ onMounted(() => {
 <template>
   <main class="oa-skeleton">
     <header class="oa-skeleton__head">
-      <button type="button" class="oa-skeleton__back" @click="backToTools">
+      <button type="button" class="oa-skeleton__back" @click="backToSource">
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path
             d="M10 3.5 5.5 8 10 12.5"
@@ -85,7 +98,7 @@ onMounted(() => {
             stroke-linejoin="round"
           />
         </svg>
-        {{ sourcePackageId ? '角色详情' : '工具' }}
+        {{ sourcePackageId ? (sourceCharacterId ? '角色详情' : '资源包') : '工具' }}
       </button>
 
       <div class="oa-skeleton__titles">
@@ -99,14 +112,14 @@ onMounted(() => {
     <section class="oa-skeleton__body">
       <div v-if="isAutoLoading" class="oa-skeleton__picker oa-skeleton__loading">
         <p class="oa-skeleton__loading-text">正在从资源包载入立绘…</p>
-        <rizui_progress :indeterminate="true" :height="6" rounded theme="Light" />
+        <rizui_progress :indeterminate="true" :height="6" rounded />
       </div>
 
       <OASpineViewer
         v-else-if="character"
         :key="`${character.id}-${character.skeleton.name}`"
         :character="character"
-        @back="backToTools"
+        @back="backToSource"
         @change="handleChange"
       />
 
@@ -116,7 +129,6 @@ onMounted(() => {
           class="oa-skeleton__error"
           type="error"
           :text="`自动载入失败：${autoLoadError}`"
-          theme="Light"
         />
         <OASpineUploader @pick="handlePick" />
       </div>

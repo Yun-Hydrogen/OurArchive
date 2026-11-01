@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   readPackageCharacters,
+  readPackageSkeletons,
   readSkeletonFiles,
   resolveInside,
   resolvePackageDir,
@@ -55,6 +56,7 @@ function sendFile(res: Response, target: string | null) {
  * - `GET /api/packages`                         扫描 `res/` 列出全部资源包
  * - `GET /api/packages/:id`                     单包详情
  * - `GET /api/packages/:id/characters`          角色索引（含头像 URL 与骨骼存在性）
+ * - `GET /api/packages/:id/skeletons`           全部立绘目录（含文件清单与体积）
  * - `GET /api/packages/:id/skeleton/:skeletonId` 立绘目录内的文件清单
  * - `GET /api/packages/:id/avatar/*`            头像图片
  * - `GET /api/packages/:id/skeleton/:id/*`      立绘文件（.skel / .atlas / .png）
@@ -103,6 +105,25 @@ export function createPackagesRouter(): Router {
     try {
       const characters = readPackageCharacters(packageDir, pkg);
       res.json({ success: true, total: characters.length, characters });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  // 全部立绘目录（含文件清单与体积）
+  router.get('/:id/skeletons', (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      notFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    try {
+      const skeletons = readPackageSkeletons(packageDir, pkg);
+      res.json({ success: true, total: skeletons.length, skeletons });
     } catch (error) {
       fail(res, error);
     }

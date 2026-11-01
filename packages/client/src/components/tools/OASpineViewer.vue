@@ -87,13 +87,13 @@ watch(
 
       <div v-if="status === 'loading'" class="oa-viewer__overlay">
         <p>正在解析骨骼与图集…</p>
-        <rizui_progress :indeterminate="true" :height="6" rounded theme="Light" />
+        <rizui_progress :indeterminate="true" :height="6" rounded />
       </div>
 
       <div v-else-if="status === 'error'" class="oa-viewer__overlay oa-viewer__overlay--error">
         <p class="oa-viewer__overlay-title">载入失败</p>
         <p class="oa-viewer__overlay-text">{{ error }}</p>
-        <rizui_button text="重新选择文件" theme="Light" @click="emit('change')" />
+        <rizui_button text="重新选择文件" @click="emit('change')" />
       </div>
 
       <p v-else class="oa-viewer__tip">拖动画布平移 · 滚轮缩放</p>
@@ -129,7 +129,6 @@ watch(
           v-else
           type="info"
           text="该骨骼没有数字命名的差分动画，可直接用下方的动作预览。"
-          theme="Light"
         />
       </section>
 
@@ -153,32 +152,29 @@ watch(
       </section>
 
       <section class="oa-viewer__block">
-        <rizui_cfgrow label="缩放" hint="滚轮缩放 · 拖动画布平移" stack theme="Light">
+        <rizui_cfgrow label="缩放" hint="滚轮缩放 · 拖动画布平移" stack>
           <rizui_slider
             v-model="zoomPercent"
             :min="20"
             :max="300"
             :step="5"
             display="%"
-            theme="Light"
           />
         </rizui_cfgrow>
 
-        <rizui_cfgrow label="骨骼调试" hint="叠加显示网格与骨架线" theme="Light">
-          <rizui_switch v-model="debugRendering" theme="Light" />
+        <rizui_cfgrow label="骨骼调试" hint="叠加显示网格与骨架线">
+          <rizui_switch v-model="debugRendering" />
         </rizui_cfgrow>
 
         <div class="oa-viewer__tools">
           <rizui_button
             text="重置视角"
             l-icon="fa-solid fa-arrows-to-dot"
-            theme="Light"
             @click="resetView"
           />
           <rizui_button
             text="更换文件"
             l-icon="fa-solid fa-arrow-right-arrow-left"
-            theme="Light"
             @click="emit('change')"
           />
         </div>
@@ -188,7 +184,6 @@ watch(
         <rizui_button
           text="返回工具"
           l-icon="fa-solid fa-arrow-left"
-          theme="Light"
           @click="emit('back')"
         />
       </footer>

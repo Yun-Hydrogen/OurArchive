@@ -134,21 +134,35 @@
 - `spines[].exists` 逐条探测 `Skeletons` 分类目录下是否存在同名子目录；`hasSkeleton` 是它的「任一」。
 - 结果按 `name_id` 字典序，前端不要再排序（分组时另建 computed）。
 
-### `GET /api/packages/:id/skeleton/:skeletonId` — 立绘文件清单
+### `GET /api/packages/:id/skeletons` — 全部立绘目录
 
 ```json
 {
   "success": true,
-  "id": "ch0069_spr",
-  "files": [
-    { "name": "CH0069_spr.atlas", "url": "/api/packages/DefaultPackage/skeleton/ch0069_spr/CH0069_spr.atlas" },
-    { "name": "CH0069_spr.png", "url": "..." },
-    { "name": "CH0069_spr.skel", "url": "..." }
+  "total": 631,
+  "skeletons": [
+    {
+      "id": "airi_spr",
+      "files": [
+        { "name": "airi_spr.atlas", "ext": ".atlas", "size": 677, "url": "/api/packages/DefaultPackage/skeleton/airi_spr/airi_spr.atlas" },
+        { "name": "airi_spr.png", "ext": ".png", "size": 2238608, "url": "..." },
+        { "name": "airi_spr.skel", "ext": ".skel", "size": 3321, "url": "..." }
+      ],
+      "totalSize": 2242606,
+      "complete": true
+    }
   ]
 }
 ```
 
-立绘目录不存在 → 404。
+- 一次把文件清单与体积都算好下发，前端展开时不再发请求。
+- `complete` = 同时具备 `.skel`/`.json` + `.atlas` + 至少一张贴图，即「可直接预览」。
+- 开销：631 个目录 × 每文件一次 `statSync`（约 2500 次），实测约 **536 ms**、287 KB。所以前端按需加载，不要放进首屏。
+- 目录不存在 / 未声明 `Skeletons` 分类 → `skeletons: []`。
+
+### `GET /api/packages/:id/skeleton/:skeletonId` — 单个立绘的文件清单
+
+返回 `{ success, id, files }`，`files` 结构同上（含 `ext` / `size`）。立绘目录不存在 → 404。
 
 ### 静态资源下发
 
@@ -169,3 +183,4 @@
 | 更多 package.yml 字段 | 在 `ResourcePackage` 与 `readPackage()` 同步补，前端类型在 `useResourcePackages.ts` |
 | 支持多级资源包目录 | 把 `readdirSync` 改为递归，注意跳过 `node_modules` 之类的大目录 |
 | 新增可下发类型 | 往 `MIME_BY_EXTENSION` 加一条即可，同时在 `resolveInside` 的安全边界内 |
+| 立绘清单变慢 | 加「按包 id + 目录 mtime」的内存缓存；不要改成逐项请求，631 次往返更慢 |

@@ -449,14 +449,32 @@ export function readPackageCharacters(
   return entries.sort((a, b) => a.name_id.localeCompare(b.name_id));
 }
 
-/**
- * 列出某个资源包内某个立绘目录下的全部文件。
- */
+/** 立绘目录里的单个文件 */
+export interface PackageSkeletonFile {
+  name: string;
+  /** 小写扩展名，含点（`.skel` / `.atlas` / `.png`） */
+  ext: string;
+  /** 字节数 */
+  size: number;
+  url: string;
+}
+
+/** 一个立绘目录（`skeletons/<id>/`） */
+export interface PackageSkeletonEntry {
+  id: string;
+  files: PackageSkeletonFile[];
+  /** 全部文件体积之和 */
+  totalSize: number;
+  /** 是否同时具备骨骼 + 图集 + 贴图（可直接预览） */
+  complete: boolean;
+}
+
+/** 读取某个立绘目录下的文件；目录不存在或不是骨骼分类时返回 null */
 export function readSkeletonFiles(
   packageDir: string,
   pkg: ResourcePackage,
   skeletonId: string
-): Array<{ name: string; url: string }> | null {
+): PackageSkeletonFile[] | null {
   const content = contentOf(pkg, 'Skeletons');
   if (!content || !content.supported) {
     return null;
@@ -472,17 +490,92 @@ export function readSkeletonFiles(
     return null;
   }
 
-  let names: string[];
+  return listSkeletonDir(pkg.id, skeletonId, dir);
+}
+
+/** 读一个立绘目录里的文件（含体积），失败返回 null */
+function listSkeletonDir(packageId: string, skeletonId: string, dir: string): PackageSkeletonFile[] | null {
+  let entries: fs.Dirent[];
   try {
-    names = fs.readdirSync(dir, { withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .map((entry) => entry.name);
+    entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
     return null;
   }
 
-  return names.sort().map((name) => ({
-    name,
-    url: buildAssetUrl(pkg.id, 'skeleton', `${skeletonId}/${name}`),
-  }));
+  const files: PackageSkeletonFile[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    let size = 0;
+    try {
+      size = fs.statSync(path.join(dir, entry.name)).size;
+    } catch {
+      // 读不到体积就当 0，不影响列表
+    }
+
+    const dot = entry.name.lastIndexOf('.');
+    files.push({
+      name: entry.name,
+      ext: dot < 0 ? '' : entry.name.slice(dot).toLowerCase(),
+      size,
+      url: buildAssetUrl(packageId, 'skeleton', `${skeletonId}/${entry.name}`),
+    });
+  }
+
+  return files.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * 列出资源包里全部立绘目录（`skeletons/` 的一级子目录）。
+ *
+ * 一次把文件清单和体积都算好下发给前端：631 个目录大约 2500 次 stat，
+ * 在本地磁盘上是几十毫秒量级，换来前端展开时不用再发请求。
+ */
+export function readPackageSkeletons(
+  packageDir: string,
+  pkg: ResourcePackage
+): PackageSkeletonEntry[] {
+  const content = contentOf(pkg, 'Skeletons');
+  if (!content || !content.supported) {
+    return [];
+  }
+
+  const root = resolveInside(packageDir, content.path);
+  if (!root) {
+    return [];
+  }
+
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const results: PackageSkeletonEntry[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const dir = path.join(root, entry.name);
+    const files = listSkeletonDir(pkg.id, entry.name, dir) ?? [];
+    const exts = new Set(files.map((file) => file.ext));
+
+    results.push({
+      id: entry.name,
+      files,
+      totalSize: files.reduce((sum, file) => sum + file.size, 0),
+      complete:
+        (exts.has('.skel') || exts.has('.json')) &&
+        exts.has('.atlas') &&
+        (exts.has('.png') || exts.has('.webp') || exts.has('.jpg') || exts.has('.jpeg')),
+    });
+  }
+
+  return results.sort((a, b) => a.id.localeCompare(b.id));
 }

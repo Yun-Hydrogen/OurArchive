@@ -137,19 +137,17 @@ function clearAll() {
           text="选择文件夹"
           l-icon="fa-solid fa-folder-open"
           primary
-          theme="Light"
           @click="dirInput?.click()"
         />
         <rizui_button
           text="手动选择文件"
           l-icon="fa-solid fa-file-import"
-          theme="Light"
           @click="fileInput?.click()"
         />
       </div>
 
       <div v-if="reading" class="oa-upload__reading">
-        <rizui_progress :indeterminate="true" :height="5" rounded theme="Light" />
+        <rizui_progress :indeterminate="true" :height="5" rounded />
         <span>正在读取文件…</span>
       </div>
 
@@ -179,7 +177,6 @@ function clearAll() {
       type="warn"
       :text="error"
       icon="fa-solid fa-triangle-exclamation"
-      theme="Light"
     />
 
     <section v-if="characters.length" class="oa-upload__result">

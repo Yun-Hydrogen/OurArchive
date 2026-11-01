@@ -101,7 +101,34 @@
 
 ### 其它分类
 
-`characters` 以外的分类先给占位面板：`未完成` 徽标 + 分类名 + 「共 N 项，目录 `path`」。
+`characters` 与 `Skeletons` 以外的分类先给占位面板：`未完成` 徽标 + 分类名 + 「共 N 项，目录 `path`」。
+
+## 骨骼列表（Skeletons 分类）
+
+侧边栏切到「骨骼」时渲染，**列式**排布 `/api/packages/:id/skeletons` 返回的全部立绘目录（默认包 631 个）：
+
+- 每行 `.oa-skel` 是一张白卡：
+  - 左侧旋转箭头（`-45deg` → `45deg`）；
+  - 中间是立绘 id + 元信息（`N 个文件 · 体积`），缺必需文件时追加橙色「缺少必需文件」；
+  - **右上角**是「预览」按钮（眼睛图标 + 文字），`complete: false` 时禁用并给出 `title` 说明。
+- 点行首/整行（`role="button"` + Enter/Space）展开文件清单；`预览` 按钮 `@click.stop`，不会误触发展开。
+- 文件清单 `.oa-file-list`：类型标签（骨骼 / 图集 / 贴图）、等宽文件名的、体积、`打开`（新标签直连 `/api/.../skeleton/<id>/<file>`）。
+- 展开动画与学院分组同一套 `grid-template-rows: 0fr → 1fr` + `opacity`；**文件清单只在展开后渲染**（631 × 3 条 DOM 不能全挂上）。
+- 工具栏：`N 个立绘 · 总体积 · N 个匹配` + 按立绘 id 的搜索框。
+
+### 按需加载
+
+`readPackageSkeletons()` 要对 631 个目录做 `readdirSync` + 每个文件 `statSync`（约 2500 次），实测整包约 **536 ms**、响应 287 KB。所以：
+
+- **进页面只拉详情 + 角色**；`watch(activeSection)` 里判断切到 `SECTION_SKELETONS` 才 `loadSkeletons()`；
+- composable 内用 `skeletonsLoaded` 标记，同一页面实例内不重复请求；
+- 首次加载时摘要行换成「正在读取立绘目录…」，列表位置显示 `rizui_progress`。
+
+### 预览跳转
+
+`previewSkeleton(id)` → `/tools/skeleton?package=<包id>&skeleton=<立绘id>`（**不带 `character`**）。
+
+预览页据此判断返回目标：有 `character` 回角色详情，没有就回资源包详情。
 
 ## 角色详情（PackageCharacterView）
 
@@ -114,11 +141,12 @@
 
 ## 数据来源
 
-`usePackageContent(packageId)` 一次请求两个接口：
+`usePackageContent(packageId)` 一次请求两个接口（立绘清单按需）：
 
 ```ts
 GET /api/packages/:id               // 包详情（package_info + contents）
 GET /api/packages/:id/characters    // 角色索引（已补齐 avatarUrl / spines[].exists）
+GET /api/packages/:id/skeletons     // 立绘目录 + 文件清单 + 体积（切到骨骼分类时才拉）
 ```
 
 ```ts
@@ -161,7 +189,7 @@ interface PackageCharacter {
    再交给 `toSpineCharacters()` —— **与手动上传共用同一条渲染管线**。
 
 - 自动加载失败时显示 `rizui_infobox type="error"` 并回到上传器，不会卡在白屏。
-- 顶部返回按钮在自动加载模式下显示「角色详情」并回到 `packageCharacter`（用 query 里的 `character`）。
+- 顶部返回按钮按来源决定去向：`?character=` 存在 → 回角色详情；只有 `?package=`（从骨骼列表点的「预览」）→ 回资源包详情；都没有 → 回工具页。
 
 ## 扩展
 

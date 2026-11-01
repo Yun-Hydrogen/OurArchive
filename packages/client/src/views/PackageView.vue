@@ -11,6 +11,8 @@ import { usePackageContent, type PackageCharacter } from '@/composables/usePacka
 const UNKNOWN_SCHOOL = '未知学院';
 /** 侧边栏里「角色」分类的 id */
 const SECTION_CHARACTERS = 'characters';
+/** 侧边栏里「骨骼」分类的 id（与 package.yml 的键一致） */
+const SECTION_SKELETONS = 'Skeletons';
 /** 侧边栏学院子条目的 id 前缀（只做定位，不切换分类） */
 const SCHOOL_PREFIX = 'school:';
 
@@ -18,7 +20,17 @@ const route = useRoute();
 const router = useRouter();
 
 const packageId = computed(() => String(route.params.packageId ?? ''));
-const { pkg, characters, loading, error, load } = usePackageContent(packageId.value);
+const {
+  pkg,
+  characters,
+  skeletons,
+  loading,
+  error,
+  skeletonsLoading,
+  skeletonsError,
+  load,
+  loadSkeletons,
+} = usePackageContent(packageId.value);
 
 /** 侧边栏当前条目（永远停在分类上，学院子条目只做定位） */
 const activeSection = ref(SECTION_CHARACTERS);
@@ -115,7 +127,6 @@ function handleNavSelect(item: NavItem) {
   if (!id.startsWith(SCHOOL_PREFIX)) {
     return;
   }
-
   const school = id.slice(SCHOOL_PREFIX.length);
   activeSection.value = SECTION_CHARACTERS;
   openSchool(school);
@@ -252,6 +263,97 @@ function collapseAll() {
   expandedSchools.value = new Set();
 }
 
+/* ------------------------------ 骨骼 ------------------------------ */
+
+/** 骨骼列表的搜索词 */
+const skeletonKeyword = ref('');
+/** 已展开文件清单的立绘目录 */
+const expandedSkeletons = ref(new Set<string>());
+
+const filteredSkeletons = computed(() => {
+  const word = skeletonKeyword.value.trim().toLowerCase();
+  const list = skeletons.value;
+  if (!word) {
+    return list;
+  }
+  return list.filter((item) => item.id.toLowerCase().includes(word));
+});
+
+const skeletonTotalSize = computed(() =>
+  skeletons.value.reduce((sum, item) => sum + item.totalSize, 0)
+);
+
+/** 首次加载时整段列表都还没内容，摘要行换成加载文案 */
+const skeletonLoadingFirst = computed(
+  () => skeletonsLoading.value && skeletons.value.length === 0
+);
+
+function isSkeletonOpen(id: string): boolean {
+  return expandedSkeletons.value.has(id);
+}
+
+function toggleSkeleton(id: string) {
+  const next = new Set(expandedSkeletons.value);
+  if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  expandedSkeletons.value = next;
+}
+
+/**
+ * 预览某个立绘：带 package / skeleton 进预览页，
+ * 预览页会用后端下发的文件直接装配，无需用户选文件。
+ */
+function previewSkeleton(id: string) {
+  leaveTo({
+    name: ROUTE_NAMES.skeletonPreview,
+    query: { package: packageId.value, skeleton: id },
+  });
+}
+
+function formatSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/** 文件类型标签：骨骼 / 图集 / 贴图 / 其它 */
+function fileKind(ext: string): string {
+  if (ext === '.skel' || ext === '.json') {
+    return '骨骼';
+  }
+  if (ext === '.atlas') {
+    return '图集';
+  }
+  if (['.png', '.webp', '.jpg', '.jpeg'].includes(ext)) {
+    return '贴图';
+  }
+  return '其它';
+}
+
+/**
+ * 骨骼清单按需加载：631 个目录、2500 次 stat，进页面就拉会拖慢首屏，
+ * 所以等用户真正切到「骨骼」分类再请求。
+ */
+watch(
+  activeSection,
+  (section) => {
+    if (section === SECTION_SKELETONS) {
+      void loadSkeletons();
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   void load();
 
@@ -278,7 +380,11 @@ onBeforeUnmount(() => {
   resizeObserver = null;
 });
 
-function leaveTo(target: { name: string; params?: Record<string, string> }) {
+function leaveTo(target: {
+  name: string;
+  params?: Record<string, string>;
+  query?: Record<string, string>;
+}) {
   if (isLeaving.value) {
     return;
   }
@@ -332,10 +438,10 @@ function openCharacter(character: PackageCharacter) {
 
     <div v-if="loading" class="oa-pkg__state">
       <p class="oa-pkg__state-text">正在读取资源包…</p>
-      <rizui_progress :indeterminate="true" :height="12" rounded theme="Light" />
+      <rizui_progress :indeterminate="true" :height="12" rounded />
     </div>
 
-    <rizui_infobox v-else-if="error" type="error" :text="`读取资源包失败：${error}`" theme="Light" />
+    <rizui_infobox v-else-if="error" type="error" :text="`读取资源包失败：${error}`" />
 
     <section v-else ref="cardEl" class="oa-pkg__card">
       <rizui_sidebar
@@ -347,7 +453,6 @@ function openCharacter(character: PackageCharacter) {
         height="100%"
         :collapsible="false"
         :default-expanded-keys="[SECTION_CHARACTERS]"
-        theme="Light"
         @select="handleNavSelect"
       />
 
@@ -396,7 +501,6 @@ function openCharacter(character: PackageCharacter) {
               <rizui_card
                 :title="group.school"
                 :desc="`${group.list.length} 个角色`"
-                theme="Light"
               >
                 <!-- 内容懒挂载：首次展开才渲染，收起靠 grid 0fr→1fr 过渡 -->
                 <div class="oa-school__collapse" :class="{ 'is-open': isOpen(group.school) }">
@@ -437,6 +541,125 @@ function openCharacter(character: PackageCharacter) {
 
           <div v-else class="oa-pkg__empty">
             <p>{{ keyword ? '没有匹配的角色。' : '这个资源包没有可展示的角色。' }}</p>
+          </div>
+        </template>
+
+        <!-- 骨骼：列式列出全部立绘目录，点开看文件，右侧可预览 -->
+        <template v-else-if="activeSection === SECTION_SKELETONS">
+          <div class="oa-pkg__toolbar">
+            <p class="oa-pkg__summary">
+              <template v-if="skeletonLoadingFirst">
+                正在读取立绘目录…
+              </template>
+              <template v-else>
+                <strong>{{ skeletons.length }}</strong> 个立绘
+                <span class="oa-pkg__dot" aria-hidden="true">·</span>
+                {{ formatSize(skeletonTotalSize) }}
+                <span class="oa-pkg__dot" aria-hidden="true">·</span>
+                {{ filteredSkeletons.length }} 个匹配
+              </template>
+            </p>
+            <div class="oa-pkg__tools">
+              <label class="oa-pkg__search">
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.6" />
+                  <path
+                    d="m10.4 10.4 3 3"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <input v-model="skeletonKeyword" type="search" placeholder="搜索立绘 id" />
+              </label>
+            </div>
+          </div>
+
+          <div v-if="skeletonsLoading" class="oa-pkg__state oa-pkg__state--inline">
+            <p class="oa-pkg__state-text">正在读取立绘目录（约 600 项）…</p>
+            <rizui_progress :indeterminate="true" :height="6" rounded />
+          </div>
+
+          <rizui_infobox
+            v-else-if="skeletonsError"
+            type="error"
+            :text="`读取立绘目录失败：${skeletonsError}`"
+          />
+
+          <div v-else-if="filteredSkeletons.length" class="oa-skel-list">
+            <div
+              v-for="item in filteredSkeletons"
+              :key="item.id"
+              class="oa-skel"
+              :class="{ 'is-open': isSkeletonOpen(item.id) }"
+            >
+              <div
+                class="oa-skel__head"
+                role="button"
+                tabindex="0"
+                @click="toggleSkeleton(item.id)"
+                @keydown.enter.prevent="toggleSkeleton(item.id)"
+                @keydown.space.prevent="toggleSkeleton(item.id)"
+              >
+                <span class="oa-skel__arrow" aria-hidden="true" />
+
+                <span class="oa-skel__names">
+                  <span class="oa-skel__id">{{ item.id }}</span>
+                  <span class="oa-skel__meta">
+                    {{ item.files.length }} 个文件 · {{ formatSize(item.totalSize) }}
+                    <template v-if="!item.complete">
+                      · <span class="oa-skel__warn">缺少必需文件</span>
+                    </template>
+                  </span>
+                </span>
+
+                <button
+                  type="button"
+                  class="oa-skel__preview"
+                  :disabled="!item.complete"
+                  :title="item.complete ? '在骨骼预览里打开' : '缺少 .skel / .atlas / 贴图，无法预览'"
+                  @click.stop="previewSkeleton(item.id)"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                      d="M1.6 8S3.9 3.6 8 3.6 14.4 8 14.4 8 12.1 12.4 8 12.4 1.6 8 1.6 8Z"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.4"
+                      stroke-linejoin="round"
+                    />
+                    <circle cx="8" cy="8" r="1.9" fill="none" stroke="currentColor" stroke-width="1.4" />
+                  </svg>
+                  预览
+                </button>
+              </div>
+
+              <div class="oa-skel__collapse" :class="{ 'is-open': isSkeletonOpen(item.id) }">
+                <div class="oa-skel__collapse-inner">
+                  <ul v-if="isSkeletonOpen(item.id)" class="oa-file-list">
+                    <li v-for="file in item.files" :key="file.name" class="oa-file">
+                      <span class="oa-file__kind">{{ fileKind(file.ext) }}</span>
+                      <span class="oa-file__name">{{ file.name }}</span>
+                      <span class="oa-file__size">{{ formatSize(file.size) }}</span>
+                      <a
+                        class="oa-file__open"
+                        :href="file.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        @click.stop
+                      >
+                        打开
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="oa-pkg__empty">
+            <p>{{ skeletonKeyword ? '没有匹配的立绘。' : '这个资源包没有立绘目录。' }}</p>
           </div>
         </template>
 
@@ -832,7 +1055,6 @@ function openCharacter(character: PackageCharacter) {
 .oa-char:hover {
   border-color: rgba(0, 144, 254, 0.42);
   box-shadow: 0 6px 16px rgba(36, 92, 138, 0.12);
-  transform: translateY(-1px);
 }
 
 .oa-char:focus-visible {
@@ -906,6 +1128,206 @@ function openCharacter(character: PackageCharacter) {
   color: #8aa3b8;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------- 骨骼列表 ---------- */
+
+.oa-skel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 4px;
+}
+
+.oa-skel {
+  border: 1px solid rgba(190, 214, 231, 0.55);
+  border-radius: 10px;
+  background: #ffffff;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.oa-skel.is-open {
+  border-color: rgba(0, 144, 254, 0.32);
+  box-shadow: 0 4px 14px rgba(36, 92, 138, 0.08);
+}
+
+.oa-skel__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.oa-skel__head:focus-visible {
+  outline: 2px solid var(--oa-blue);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.oa-skel__arrow {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-right: 1.8px solid #8aa3b8;
+  border-bottom: 1.8px solid #8aa3b8;
+  transform: rotate(-45deg);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.oa-skel.is-open .oa-skel__arrow {
+  transform: rotate(45deg);
+}
+
+.oa-skel__names {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.oa-skel__id {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1e4b76;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-skel__meta {
+  font-size: 11px;
+  color: #8aa3b8;
+}
+
+.oa-skel__warn {
+  color: #c07a00;
+}
+
+.oa-skel__preview {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px 4px 9px;
+  border: 1px solid rgba(0, 144, 254, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 144, 254, 0.07);
+  font-family: inherit;
+  font-size: 11.5px;
+  color: #1769a8;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.oa-skel__preview svg {
+  width: 13px;
+  height: 13px;
+}
+
+.oa-skel__preview:hover:not(:disabled) {
+  border-color: rgba(0, 144, 254, 0.55);
+  background: rgba(0, 144, 254, 0.14);
+}
+
+.oa-skel__preview:disabled {
+  border-color: rgba(154, 176, 194, 0.4);
+  background: rgba(154, 176, 194, 0.12);
+  color: #a3b6c4;
+  cursor: not-allowed;
+}
+
+/* 与学院分组同一套 grid 0fr→1fr 展开动画 */
+.oa-skel__collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease;
+}
+
+.oa-skel__collapse.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.oa-skel__collapse-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.oa-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 10px 8px 24px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(190, 214, 231, 0.7);
+  list-style: none;
+}
+
+.oa-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11.5px;
+}
+
+.oa-file__kind {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 144, 254, 0.08);
+  font-size: 10px;
+  line-height: 1.7;
+  color: #1769a8;
+}
+
+.oa-file__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #4d7799;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-file__size {
+  flex: 0 0 auto;
+  min-width: 62px;
+  text-align: right;
+  font-size: 10.5px;
+  color: #a3b6c4;
+}
+
+.oa-file__open {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: #0b7ad6;
+  font-size: 10.5px;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.oa-file__open:hover {
+  background: rgba(0, 144, 254, 0.1);
+}
+
+.oa-pkg__state--inline {
+  width: 100%;
+  padding: 14px 2px;
 }
 
 /* ---------- 空态 / 占位 ---------- */

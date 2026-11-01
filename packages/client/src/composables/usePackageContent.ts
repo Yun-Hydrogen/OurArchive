@@ -19,6 +19,24 @@ export interface PackageCharacter {
   hasSkeleton: boolean;
 }
 
+/** 立绘目录里的单个文件 */
+export interface PackageSkeletonFile {
+  name: string;
+  /** 小写扩展名，含点 */
+  ext: string;
+  size: number;
+  url: string;
+}
+
+/** 一个立绘目录（`skeletons/<id>/`） */
+export interface PackageSkeleton {
+  id: string;
+  files: PackageSkeletonFile[];
+  totalSize: number;
+  /** 骨骼 + 图集 + 贴图齐全，可直接预览 */
+  complete: boolean;
+}
+
 interface PackageResponse {
   success: boolean;
   package?: ResourcePackage;
@@ -32,10 +50,17 @@ interface CharactersResponse {
   error?: string;
 }
 
+interface SkeletonsResponse {
+  success: boolean;
+  total?: number;
+  skeletons?: PackageSkeleton[];
+  error?: string;
+}
+
 interface SkeletonFilesResponse {
   success: boolean;
   id?: string;
-  files?: Array<{ name: string; url: string }>;
+  files?: PackageSkeletonFile[];
   error?: string;
 }
 
@@ -50,15 +75,22 @@ async function getJson<T extends { success: boolean; error?: string }>(url: stri
 }
 
 /**
- * 单个资源包的内容：详情 + 角色索引。
+ * 单个资源包的内容：详情 + 角色索引 + 立绘目录。
  *
- * 每次调用都重新请求，资源包内容随时可能被开发者改动。
+ * 详情与角色进页面就拉；立绘目录有 600+ 项、体积也大，
+ * 等用户真正切到「骨骼」分类时再按需加载。
  */
 export function usePackageContent(packageId: string) {
   const pkg = ref<ResourcePackage | null>(null);
   const characters = ref<PackageCharacter[]>([]);
+  const skeletons = ref<PackageSkeleton[]>([]);
   const loading = ref(false);
   const error = ref('');
+
+  /** 立绘清单的加载状态，与页面整体 loading 分开 */
+  const skeletonsLoading = ref(false);
+  const skeletonsError = ref('');
+  let skeletonsLoaded = false;
 
   async function load() {
     loading.value = true;
@@ -79,14 +111,50 @@ export function usePackageContent(packageId: string) {
     }
   }
 
-  return { pkg, characters, loading, error, load };
+  /** 拉取全部立绘目录；成功后不再重复请求（同一个页面实例内） */
+  async function loadSkeletons(force = false) {
+    if (skeletonsLoading.value) {
+      return;
+    }
+    if (skeletonsLoaded && !force) {
+      return;
+    }
+
+    skeletonsLoading.value = true;
+    skeletonsError.value = '';
+
+    try {
+      const data = await getJson<SkeletonsResponse>(
+        `/api/packages/${encodeURIComponent(packageId)}/skeletons`
+      );
+      skeletons.value = data.skeletons ?? [];
+      skeletonsLoaded = true;
+    } catch (err) {
+      skeletonsError.value = err instanceof Error ? err.message : String(err);
+      skeletons.value = [];
+    } finally {
+      skeletonsLoading.value = false;
+    }
+  }
+
+  return {
+    pkg,
+    characters,
+    skeletons,
+    loading,
+    error,
+    skeletonsLoading,
+    skeletonsError,
+    load,
+    loadSkeletons,
+  };
 }
 
-/** 从服务端拉取一个立绘目录下的文件，返回 `name → url` */
+/** 从服务端拉取一个立绘目录下的文件 */
 export async function fetchSkeletonFiles(
   packageId: string,
   skeletonId: string
-): Promise<Array<{ name: string; url: string }>> {
+): Promise<PackageSkeletonFile[]> {
   const data = await getJson<SkeletonFilesResponse>(
     `/api/packages/${encodeURIComponent(packageId)}/skeleton/${encodeURIComponent(skeletonId)}`
   );

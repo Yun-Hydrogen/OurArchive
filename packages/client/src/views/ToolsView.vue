@@ -84,7 +84,7 @@ function backHome() {
 
       <div class="oa-tools__titles">
         <h1 class="oa-tools__title">更多功能</h1>
-        <p class="oa-tools__subtitle">与剧情演出无关的实用工具，全部在本机离线运行</p>
+        <p class="oa-tools__subtitle">更多辅助剧情写作/播放的使用工具</p>
       </div>
     </header>
 
