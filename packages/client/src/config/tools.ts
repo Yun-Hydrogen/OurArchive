@@ -24,7 +24,7 @@ export interface ToolEntry {
 export const TOOL_ENTRIES: ToolEntry[] = [
   {
     id: 'skeleton-preview',
-    title: 'BA 立绘骨骼预览',
+    title: '立绘骨骼预览',
     subtitle: '载入 .skel / .atlas / 贴图，预览并切换立绘差分',
     art: 'skeleton',
     route: ROUTE_NAMES.skeletonPreview,

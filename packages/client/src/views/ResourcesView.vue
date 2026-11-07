@@ -130,7 +130,7 @@ function formatCount(count: number) {
 
       <div class="oa-res__titles">
         <h1 class="oa-res__title">资源管理</h1>
-        <p class="oa-res__subtitle">本机资源索引 · 资源包 / 工程 / 存档 / 插件</p>
+        <p class="oa-res__subtitle">老师可以在此处管理资源包/工程/存档/插件哦~</p>
       </div>
     </header>
 

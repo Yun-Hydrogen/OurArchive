@@ -48,7 +48,7 @@
 />
 ```
 
-- `items` 由 `pkg.contents.filter(c => c.supported)` 生成，`hasCharacter` 的 id 归一为 `characters`，其余直接用 `key`；`badge` 填条目数（0 时不给）。
+- `items` 由 `pkg.contents` 生成 —— **不过滤 `supported`**，`package.yml` 里声明的每个类型都给出入口（不支持的点了显示「此资源包没有该类资源」）。id 用 `navIdOf(key)`：`hasCharacter` → `characters`，其余直接用 `key`（`Skeletons` / `BackgroundMusic` / …）；`badge` 只在 `supported && count > 0` 时给。
 - **「角色」条目下挂学院子条目**（`children`），id 加 `school:` 前缀，`badge` = 该学院人数。`default-expanded-keys` 让「角色」默认展开，学院列表直接可见（超长时 `.rnav-body` 自身滚动）。
 - **`v-model` 不能直接绑 `activeSection`**：rizui_nav 在选中子条目时会把 `modelValue` 改成子条目 id，`activeSection` 会被污染成 `school:…`，`v-if` 分支立刻失效。所以用 `navModel` 这个带写入闸门的 computed —— 带 `school:` 前缀的值直接丢弃，分类永远停在有效值上。
 - 「点学院才加载并展开」由 `handleNavSelect` 完成：取 `select` 事件的 item → 剥前缀 → `openSchool()` 挂载并展开 → `nextTick` 后在 `.oa-pkg__content` 里按 `data-school` 定位并 `scrollTo({ behavior: 'smooth' })`，最后高亮该卡片 1.2s（`.is-highlight` 描边）。
@@ -56,6 +56,14 @@
 - `:inset="0"` 让导航容器不再额外留 12px 外边距，否则卡片里会多出一圈空白。
 - `height="100%"` 撑满卡片；`rizui_nav` 对非 `100vh` 的字符串高度是直接透传的。
 - **观察器要跟着 `cardEl` 挂载**：卡片的 `v-if` 会随 `loading` 卸载重挂，`onMounted` 里一次性绑定会绑到马上被移除的节点上（回调拿到宽度 0，被 clamp 到下限）。用 `watch(cardEl, …, { flush: 'post' })` 并在 `<= 0` 时直接 return。
+
+### 卡片外的搜索框
+
+三个分类的搜索框**统一放在页头右上角、整张卡片之外**（`.oa-pkg__search--head`），不在内容区里各放一个：
+
+- `activeKeyword` 是可写 computed，按 `activeSection` 代理到 `keyword` / `skeletonKeyword` / `musicKeyword` —— 三个分类各有独立搜索词，切分类不会串味。
+- `searchPlaceholder` 同时承担「占位文案」和「要不要显示搜索框」两个职责：未声明支持的分类或占位面板返回空串 → `v-if` 直接不渲染。
+- 页头是 `flex` 两端对齐：左边 `.oa-pkg__head-main`（返回按钮 + 标题），右边搜索框 `align-self: flex-end`，与标题行底部对齐。
 
 ### 角色条目
 
@@ -99,9 +107,23 @@
 - 页面左右内边距压到 `clamp(14px, 2.4vw, 44px)`，标题与卡片统一 `min(1320px, 100%)`。
 - 卡片高度 `clamp(420px, calc(100vh - 196px), 1000px)`，视口越高卡片越大，内容区内部滚动。
 
+### 分类分支与「未包含」提示
+
+右侧内容按 `activeSection` 分支，**每个分支都带 `activeContent?.supported` 前置判断**：
+
+| 分支 | 条件 |
+| --- | --- |
+| 角色 | `activeSection === 'characters' && activeContent?.supported` |
+| 骨骼 | `activeSection === 'Skeletons' && activeContent?.supported` |
+| 背景音乐 | `activeSection === 'BackgroundMusic' && activeContent?.supported` |
+| 「未包含」占位 | `activeContent && !activeContent.supported` → 灰徽标 `未包含` + 分类名 + 「此资源包没有该类资源。」 |
+| 「未完成」占位 | 其余（已声明支持但内容还没做）→ 黄徽标 `未完成` + 条目数与目录 |
+
+`activeContent` 按 `navIdOf` 反查：`characters` → `hasCharacter`，其它直接用 id。
+
 ### 其它分类
 
-`characters` 与 `Skeletons` 以外的分类先给占位面板：`未完成` 徽标 + 分类名 + 「共 N 项，目录 `path`」。
+`characters` / `Skeletons` / `BackgroundMusic` 之外的类型：支持但未实现时给「未完成」占位面板（`未完成` 徽标 + 分类名 + 「共 N 项，目录 `path`」），未声明支持时给「未包含」面板。
 
 ## 骨骼列表（Skeletons 分类）
 
@@ -130,6 +152,39 @@
 
 预览页据此判断返回目标：有 `character` 回角色详情，没有就回资源包详情。
 
+## 背景音乐（BackgroundMusic 分类）
+
+侧边栏切到「背景音乐」时渲染 `/api/packages/:id/music` 返回的曲目（读 `<path>/index/music_info.json`）：
+
+- 工具栏：`N 首曲目 · N 个匹配`（搜索框在**卡片外的页头右上角**，见下文）。**不显示体积**——列表也不取体积。
+- 每条 `.oa-music`：
+  - 左侧圆形播放按钮（播放 ▶ / 暂停 ⏸ 图标随 `isMusicPlaying` 切换）；
+  - 标题 + 作曲（`artist` 为空不显示）+ 文件缺失时的橙色「文件缺失」；
+  - **描述默认折叠成两行**（`-webkit-line-clamp: 2`），`white-space: pre-line` 保留索引里的换行与编号；
+  - 描述超长（`length > 42` 或含换行）时，折叠段落下面给一个「查看详细」文字按钮；
+  - 底行 `name_id` 胶囊 + 等宽 `filename`；
+  - 正在播放的条目额外展开 **`rizui_timeline`（RizUI 坐标轴）** 做进度条 + 右侧总时长。
+- **完整描述走 `rizui_dialog`**：`descDialogItem` 持有当前曲目，`isDescDialogOpen` 是可写 computed（`v-model:show` 需要 setter，关闭时置 `null`）。弹窗里显示作曲 + `name_id` + 全文（`max-height: min(52vh, 420px)` 内部滚动）。描述已经在列表里，所以弹窗**不额外发请求**。
+- **进度条用 `rizui_timeline`**（不是 `input[type=range]`）：`:model-value="musicCurrent"`、`:min="0"`、`:max="musicDuration || 1"`、`:step="1"`，`@update:model-value="seekMusic"` 直接把新的秒数写回 `audio.currentTime`。
+- **全页只有一个 `<audio>` 实例**（`preload="metadata"`）：换曲只改 `src`，避免多路同时出声；`play` / `pause` / `ended` / `timeupdate` / `loadedmetadata` 事件驱动 `isMusicPlaying` / `musicCurrent` / `musicDuration`。
+- 后端用 `res.sendFile()` 下发音频，带 `Accept-Ranges`，所以拖动进度条是真正的 seek。
+- 懒加载策略与骨骼一致：`watch(activeSection)` 切到 `SECTION_MUSIC` 才 `loadMusic()`，composable 内用 `musicLoaded` 去重。
+
+### 与主界面背景音乐互斥
+
+试听会和 `main_bgm` 撞车，所以用 `useBackgroundMusic()` 的 `suspend()` / `resume()`：
+
+| 时机 | 动作 |
+| --- | --- |
+| 开始播放（或从暂停继续） | `suspendMainBgm()` —— **淡出** `main_bgm` 并暂停，记住进度 |
+| 暂停试听 / 自然播完（`@ended` → `handleMusicEnded`） | `resumeMainBgm()` —— **淡入**恢复 |
+| 切分类 / 离开页面（`stopMusic()`） | `resumeMainBgm()` |
+
+- 两个方法内部幂等（模块级 `suspended` 标记），重复调用不会叠加状态。
+- **不要用 `<audio>` 的 `@pause` 事件触发恢复**：换曲时改 `src` 也会触发 `pause`，会先恢复再压住，造成闪断。恢复只走上面三个显式路径，`@pause` 只负责 `isMusicPlaying = false`。
+- **音量跟随设置里的「预览音频 / 音效音量」**：`watch([audioEl, () => config.preview_volume])` 在元素挂载与设置改动时都同步 `el.volume = preview_volume / 100`。
+- `main_bgm` 的 `suspend` / `resume` 细节见 [home.md](./home.md#让位给其它音频)。
+
 ## 角色详情（PackageCharacterView）
 
 - 左侧方头像 + 名字 + 所属组织；窄屏（`<=720px`）纵向排列。
@@ -147,6 +202,7 @@
 GET /api/packages/:id               // 包详情（package_info + contents）
 GET /api/packages/:id/characters    // 角色索引（已补齐 avatarUrl / spines[].exists）
 GET /api/packages/:id/skeletons     // 立绘目录 + 文件清单 + 体积（切到骨骼分类时才拉）
+GET /api/packages/:id/music         // 背景音乐曲目（切到音乐分类时才拉；含 description，不含 size）
 ```
 
 ```ts
@@ -195,8 +251,11 @@ interface PackageCharacter {
 
 | 需求 | 做法 |
 | --- | --- |
-| 新分类内容页 | 在 `PackageView` 的 `activeSection` 分支里加 `<template v-else-if="activeSection === 'Sounds'">`，数据走新的 `/api/packages/:id/<kind>` |
+| 新分类内容页 | 在 `PackageView` 的 `activeSection` 分支里加 `<template v-else-if="activeSection === 'Sounds' && activeContent?.supported">`，数据走新的 `/api/packages/:id/<kind>` |
 | 角色排序 / 分组 | 改 `schoolGroups` 的 computed；分组顺序也在那里，后端顺序（按 `name_id`）只作为组内顺序 |
 | 侧边栏加更多子条目 | 在 `navItems` 对应分类里补 `children`，并在 `handleNavSelect` 里按前缀分支处理（记得别让 `navModel` 收下子条目 id） |
+| 音乐播完后自动下一首 | 在 `<audio>` 的 `@ended` 里改 `playingMusicId` 与 `src`，注意沿用 `filteredMusic` 的顺序 |
+| 描述改成默认展开 | 去掉 `.oa-music__desc.is-folded` 的 `line-clamp` 与「查看详细」按钮即可；不建议，长描述会把列表撑得很高 |
+| 新增分类的懒加载 | 照抄 `loadMusic` 的写法：独立的 `xxxLoading` / `xxxError` / `xxxLoaded`，在同一个 `watch(activeSection)` 里分支 |
 | 角色立绘大图 | 后端已能下发立绘文件；新增 `GET /api/packages/:id/avatar` 之外的大图目录即可 |
 | 骨骼预览页内切换立绘 | 预览页已带 `package` query，加一个立绘选择器后 `router.replace` 换 `skeleton` 即可 |

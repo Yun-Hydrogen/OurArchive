@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { rizui_card, rizui_infobox, rizui_progress, rizui_sidebar } from 'riz-ui';
+import { rizui_card, rizui_dialog, rizui_infobox, rizui_progress, rizui_sidebar, rizui_timeline } from 'riz-ui';
 import type { NavItem } from 'riz-ui';
 import { ROUTE_NAMES } from '@/config/routes';
 import { SHELL_TIMING } from '@/config/transition';
-import { usePackageContent, type PackageCharacter } from '@/composables/usePackageContent';
+import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
+import { useGlobalConfig } from '@/composables/useGlobalConfig';
+import {
+  usePackageContent,
+  type PackageCharacter,
+  type PackageMusic,
+} from '@/composables/usePackageContent';
 
 /** 学院为空时的兜底分组名 */
 const UNKNOWN_SCHOOL = '未知学院';
@@ -13,8 +19,15 @@ const UNKNOWN_SCHOOL = '未知学院';
 const SECTION_CHARACTERS = 'characters';
 /** 侧边栏里「骨骼」分类的 id（与 package.yml 的键一致） */
 const SECTION_SKELETONS = 'Skeletons';
+/** 侧边栏里「背景音乐」分类的 id */
+const SECTION_MUSIC = 'BackgroundMusic';
 /** 侧边栏学院子条目的 id 前缀（只做定位，不切换分类） */
 const SCHOOL_PREFIX = 'school:';
+
+/** package.yml 的键 → 侧边栏 id（只有 hasCharacter 需要归一） */
+function navIdOf(key: string): string {
+  return key === 'hasCharacter' ? SECTION_CHARACTERS : key;
+}
 
 const route = useRoute();
 const router = useRouter();
@@ -24,12 +37,16 @@ const {
   pkg,
   characters,
   skeletons,
+  music,
   loading,
   error,
   skeletonsLoading,
   skeletonsError,
+  musicLoading,
+  musicError,
   load,
   loadSkeletons,
+  loadMusic,
 } = usePackageContent(packageId.value);
 
 /** 侧边栏当前条目（永远停在分类上，学院子条目只做定位） */
@@ -78,30 +95,32 @@ let enterTimer: ReturnType<typeof setTimeout> | null = null;
 const isLeaving = ref(false);
 let leaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** 侧边栏条目：只列出 package.yml 里声明可用的分类，「角色」下挂学院快速定位 */
+/** 侧边栏条目：列出 package_content 里的全部类型，不支持的也保留入口 */
 const navItems = computed<NavItem[]>(() => {
-  const items: NavItem[] = (pkg.value?.contents ?? [])
-    .filter((content) => content.supported)
-    .map((content) => {
-      if (content.key === 'hasCharacter' && schoolGroups.value.length) {
-        return {
-          id: SECTION_CHARACTERS,
-          label: content.label,
-          badge: content.count > 0 ? content.count : undefined,
-          children: schoolGroups.value.map((group) => ({
-            id: `${SCHOOL_PREFIX}${group.school}`,
-            label: group.school,
-            badge: group.list.length,
-          })),
-        };
-      }
-
+  const items: NavItem[] = (pkg.value?.contents ?? []).map((content) => {
+    if (
+      content.key === 'hasCharacter' &&
+      content.supported &&
+      schoolGroups.value.length
+    ) {
       return {
-        id: content.key === 'hasCharacter' ? SECTION_CHARACTERS : content.key,
+        id: SECTION_CHARACTERS,
         label: content.label,
         badge: content.count > 0 ? content.count : undefined,
+        children: schoolGroups.value.map((group) => ({
+          id: `${SCHOOL_PREFIX}${group.school}`,
+          label: group.school,
+          badge: group.list.length,
+        })),
       };
-    });
+    }
+
+    return {
+      id: navIdOf(content.key),
+      label: content.label,
+      badge: content.supported && content.count > 0 ? content.count : undefined,
+    };
+  });
 
   return items.length ? items : [{ id: 'empty', label: '暂无内容' }];
 });
@@ -178,6 +197,48 @@ const filteredCharacters = computed(() => {
       field.toLowerCase().includes(word)
     )
   );
+});
+
+/**
+ * 搜索框固定在卡片外右上角，绑到「当前分类」的搜索词上：
+ * 三个分类各有自己的 keyword，切分类不会串味。
+ */
+const activeKeyword = computed({
+  get: () => {
+    if (activeSection.value === SECTION_SKELETONS) {
+      return skeletonKeyword.value;
+    }
+    if (activeSection.value === SECTION_MUSIC) {
+      return musicKeyword.value;
+    }
+    return keyword.value;
+  },
+  set: (value: string) => {
+    if (activeSection.value === SECTION_SKELETONS) {
+      skeletonKeyword.value = value;
+    } else if (activeSection.value === SECTION_MUSIC) {
+      musicKeyword.value = value;
+    } else {
+      keyword.value = value;
+    }
+  },
+});
+
+/** 占位文案同时决定搜索框显不显示（占位面板不需要搜索） */
+const searchPlaceholder = computed(() => {
+  if (!activeContent.value?.supported) {
+    return '';
+  }
+  if (activeSection.value === SECTION_CHARACTERS) {
+    return '搜索名字 / 社团 / 学院';
+  }
+  if (activeSection.value === SECTION_SKELETONS) {
+    return '搜索立绘 id';
+  }
+  if (activeSection.value === SECTION_MUSIC) {
+    return '搜索曲名 / 作曲 / id';
+  }
+  return '';
 });
 
 const boundCount = computed(() => characters.value.filter((item) => item.hasSkeleton).length);
@@ -349,10 +410,163 @@ watch(
   (section) => {
     if (section === SECTION_SKELETONS) {
       void loadSkeletons();
+    } else if (section === SECTION_MUSIC) {
+      void loadMusic();
     }
   },
   { immediate: true }
 );
+
+/* ------------------------------ 背景音乐 ------------------------------ */
+
+/** 音乐搜索词 */
+const musicKeyword = ref('');
+
+/** 资源包试听时压住主界面背景音乐，停止后恢复 */
+const { suspend: suspendMainBgm, resume: resumeMainBgm } = useBackgroundMusic();
+
+/** 试听音量跟随设置里的「预览音频 / 音效音量」 */
+const { config: globalConfig } = useGlobalConfig();
+
+/** 只有一个 Audio 实例：换曲就改 src，避免多路同时出声 */
+const audioEl = ref<HTMLAudioElement | null>(null);
+const playingMusicId = ref('');
+const isMusicPlaying = ref(false);
+const musicCurrent = ref(0);
+const musicDuration = ref(0);
+
+/** 元素挂载和设置改动都同步一次音量 */
+watch(
+  [audioEl, () => globalConfig.value.preview_volume],
+  ([el, volume]) => {
+    if (el) {
+      el.volume = Math.max(0, Math.min(1, volume / 100));
+    }
+  },
+  { immediate: true, flush: 'post' }
+);
+
+const filteredMusic = computed(() => {
+  const word = musicKeyword.value.trim().toLowerCase();
+  if (!word) {
+    return music.value;
+  }
+  return music.value.filter((item) =>
+    [item.title, item.artist, item.name_id, item.filename].some((field) =>
+      field.toLowerCase().includes(word)
+    )
+  );
+});
+
+/* ---------------------- 曲目描述（折叠 + 详情弹窗） ---------------------- */
+
+/** 详情弹窗当前展示的曲目；null 表示关闭 */
+const descDialogItem = ref<PackageMusic | null>(null);
+
+const isDescDialogOpen = computed({
+  get: () => descDialogItem.value !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      descDialogItem.value = null;
+    }
+  },
+});
+
+/** 两行装不下的描述才给「查看详细」按钮 */
+function hasMoreDescription(item: PackageMusic): boolean {
+  return item.description.length > 42 || item.description.includes('\n');
+}
+
+function openMusicDetail(item: PackageMusic) {
+  descDialogItem.value = item;
+}
+
+function closeMusicDetail() {
+  descDialogItem.value = null;
+}
+
+function toggleMusic(item: PackageMusic) {
+  const el = audioEl.value;
+  if (!el || !item.url) {
+    return;
+  }
+
+  // 同一首：只在播放 / 暂停之间切换
+  if (playingMusicId.value === item.name_id) {
+    if (el.paused) {
+      // 继续试听 → 再次压住主界面背景音乐
+      suspendMainBgm();
+      void el.play().catch(() => {
+        isMusicPlaying.value = false;
+        void resumeMainBgm();
+      });
+    } else {
+      el.pause();
+      // 暂停试听 → 恢复主界面背景音乐
+      void resumeMainBgm();
+    }
+    return;
+  }
+
+  // 换曲：先压住主界面背景音乐，再切 src
+  suspendMainBgm();
+  playingMusicId.value = item.name_id;
+  musicCurrent.value = 0;
+  musicDuration.value = 0;
+  el.src = item.url;
+  void el.play().catch(() => {
+    playingMusicId.value = '';
+    isMusicPlaying.value = false;
+    void resumeMainBgm();
+  });
+}
+
+/** 试听自然播完：恢复主界面背景音乐 */
+function handleMusicEnded() {
+  isMusicPlaying.value = false;
+  void resumeMainBgm();
+}
+
+function seekMusic(value: number) {
+  const el = audioEl.value;
+  if (!el || !Number.isFinite(value)) {
+    return;
+  }
+  el.currentTime = value;
+  musicCurrent.value = value;
+}
+
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return '0:00';
+  }
+  const total = Math.floor(seconds);
+  const mm = Math.floor(total / 60);
+  const ss = total % 60;
+  return `${mm}:${String(ss).padStart(2, '0')}`;
+}
+
+/** 切换分类 / 离开页面时停掉音乐，并恢复主界面背景音乐 */
+function stopMusic() {
+  const el = audioEl.value;
+  if (!el) {
+    return;
+  }
+  el.pause();
+  el.removeAttribute('src');
+  playingMusicId.value = '';
+  isMusicPlaying.value = false;
+  musicCurrent.value = 0;
+  musicDuration.value = 0;
+  void resumeMainBgm();
+}
+
+watch(activeSection, (section) => {
+  if (section !== SECTION_MUSIC) {
+    stopMusic();
+    closeMusicDetail();
+  }
+});
 
 onMounted(() => {
   void load();
@@ -376,6 +590,7 @@ onBeforeUnmount(() => {
     clearTimeout(highlightTimer);
     highlightTimer = null;
   }
+  stopMusic();
   resizeObserver?.disconnect();
   resizeObserver = null;
 });
@@ -414,26 +629,43 @@ function openCharacter(character: PackageCharacter) {
     :style="{ '--cards-exit': `${SHELL_TIMING.cardsExit}ms` }"
   >
     <header class="oa-pkg__head">
-      <button type="button" class="oa-pkg__back" @click="backToResources">
+      <div class="oa-pkg__head-main">
+        <button type="button" class="oa-pkg__back" @click="backToResources">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M10 3.5 5.5 8 10 12.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          资源管理
+        </button>
+
+        <div class="oa-pkg__titles">
+          <h1 class="oa-pkg__title">{{ pkg?.name || packageId }}</h1>
+          <p class="oa-pkg__subtitle">
+            {{ pkg?.description || '这个资源包还没有填写描述。' }}
+          </p>
+        </div>
+      </div>
+
+      <!-- 搜索固定在整张卡片之外的右上角，内容随当前分类切换 -->
+      <label v-if="searchPlaceholder" class="oa-pkg__search oa-pkg__search--head">
         <svg viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.6" />
           <path
-            d="M10 3.5 5.5 8 10 12.5"
+            d="m10.4 10.4 3 3"
             fill="none"
             stroke="currentColor"
-            stroke-width="1.8"
+            stroke-width="1.6"
             stroke-linecap="round"
-            stroke-linejoin="round"
           />
         </svg>
-        资源管理
-      </button>
-
-      <div class="oa-pkg__titles">
-        <h1 class="oa-pkg__title">{{ pkg?.name || packageId }}</h1>
-        <p class="oa-pkg__subtitle">
-          {{ pkg?.description || '这个资源包还没有填写描述。' }}
-        </p>
-      </div>
+        <input v-model="activeKeyword" type="search" :placeholder="searchPlaceholder" />
+      </label>
     </header>
 
     <div v-if="loading" class="oa-pkg__state">
@@ -458,7 +690,7 @@ function openCharacter(character: PackageCharacter) {
 
       <div ref="contentEl" class="oa-pkg__content">
         <!-- 角色 -->
-        <template v-if="activeSection === SECTION_CHARACTERS">
+        <template v-if="activeSection === SECTION_CHARACTERS && activeContent?.supported">
           <div class="oa-pkg__toolbar">
             <p class="oa-pkg__summary">
               <strong>{{ characters.length }}</strong> 个角色
@@ -470,19 +702,6 @@ function openCharacter(character: PackageCharacter) {
             <div class="oa-pkg__tools">
               <button type="button" class="oa-pkg__mini" @click="expandAll">全部展开</button>
               <button type="button" class="oa-pkg__mini" @click="collapseAll">全部收起</button>
-              <label class="oa-pkg__search">
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.6" />
-                  <path
-                    d="m10.4 10.4 3 3"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                  />
-                </svg>
-                <input v-model="keyword" type="search" placeholder="搜索名字 / 社团 / 学院" />
-              </label>
             </div>
           </div>
 
@@ -545,7 +764,7 @@ function openCharacter(character: PackageCharacter) {
         </template>
 
         <!-- 骨骼：列式列出全部立绘目录，点开看文件，右侧可预览 -->
-        <template v-else-if="activeSection === SECTION_SKELETONS">
+        <template v-else-if="activeSection === SECTION_SKELETONS && activeContent?.supported">
           <div class="oa-pkg__toolbar">
             <p class="oa-pkg__summary">
               <template v-if="skeletonLoadingFirst">
@@ -559,21 +778,6 @@ function openCharacter(character: PackageCharacter) {
                 {{ filteredSkeletons.length }} 个匹配
               </template>
             </p>
-            <div class="oa-pkg__tools">
-              <label class="oa-pkg__search">
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.6" />
-                  <path
-                    d="m10.4 10.4 3 3"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                  />
-                </svg>
-                <input v-model="skeletonKeyword" type="search" placeholder="搜索立绘 id" />
-              </label>
-            </div>
           </div>
 
           <div v-if="skeletonsLoading" class="oa-pkg__state oa-pkg__state--inline">
@@ -663,6 +867,118 @@ function openCharacter(character: PackageCharacter) {
           </div>
         </template>
 
+        <!-- 背景音乐 -->
+        <template v-else-if="activeSection === SECTION_MUSIC && activeContent?.supported">
+          <div class="oa-pkg__toolbar">
+            <p class="oa-pkg__summary">
+              <template v-if="musicLoading && !music.length">正在读取曲目索引…</template>
+              <template v-else>
+                <strong>{{ music.length }}</strong> 首曲目
+                <span class="oa-pkg__dot" aria-hidden="true">·</span>
+                {{ filteredMusic.length }} 个匹配
+              </template>
+            </p>
+          </div>
+
+          <div v-if="musicLoading && !music.length" class="oa-pkg__state oa-pkg__state--inline">
+            <p class="oa-pkg__state-text">正在读取背景音乐索引…</p>
+            <rizui_progress :indeterminate="true" :height="6" rounded />
+          </div>
+
+          <rizui_infobox
+            v-else-if="musicError"
+            type="error"
+            :text="`读取背景音乐失败：${musicError}`"
+          />
+
+          <div v-else-if="filteredMusic.length" class="oa-music-list">
+            <article
+              v-for="item in filteredMusic"
+              :key="item.name_id"
+              class="oa-music"
+              :class="{ 'is-active': playingMusicId === item.name_id }"
+            >
+              <button
+                type="button"
+                class="oa-music__play"
+                :disabled="!item.exists"
+                :title="item.exists ? '播放 / 暂停' : '音频文件缺失'"
+                @click="toggleMusic(item)"
+              >
+                <svg v-if="playingMusicId === item.name_id && isMusicPlaying" viewBox="0 0 16 16" aria-hidden="true">
+                  <rect x="4.4" y="3.2" width="2.6" height="9.6" rx="1" fill="currentColor" />
+                  <rect x="9" y="3.2" width="2.6" height="9.6" rx="1" fill="currentColor" />
+                </svg>
+                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M5.2 3.4 12.4 8l-7.2 4.6Z" fill="currentColor" />
+                </svg>
+              </button>
+
+              <div class="oa-music__body">
+                <div class="oa-music__head">
+                  <span class="oa-music__title">{{ item.title }}</span>
+                  <span v-if="item.artist" class="oa-music__artist">{{ item.artist }}</span>
+                  <span v-if="!item.exists" class="oa-music__miss">文件缺失</span>
+                </div>
+
+                <!-- 描述默认折叠两行，超出才给「查看详细」 -->
+                <template v-if="item.description">
+                  <p class="oa-music__desc" :class="{ 'is-folded': hasMoreDescription(item) }">
+                    {{ item.description }}
+                  </p>
+                  <button
+                    v-if="hasMoreDescription(item)"
+                    type="button"
+                    class="oa-music__more"
+                    @click.stop="openMusicDetail(item)"
+                  >
+                    查看详细
+                  </button>
+                </template>
+
+                <div class="oa-music__meta">
+                  <code class="oa-music__id">{{ item.name_id }}</code>
+                  <span class="oa-music__file">{{ item.filename }}</span>
+                </div>
+
+                <div v-if="playingMusicId === item.name_id" class="oa-music__progress">
+                  <rizui_timeline
+                    class="oa-music__timeline"
+                    :model-value="musicCurrent"
+                    :min="0"
+                    :max="musicDuration || 1"
+                    :step="1"
+                    @update:model-value="seekMusic"
+                  />
+                  <span class="oa-music__time">{{ formatTime(musicDuration) }}</span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div v-else class="oa-pkg__empty">
+            <p>{{ musicKeyword ? '没有匹配的曲目。' : '索引里没有曲目。' }}</p>
+          </div>
+
+          <audio
+            ref="audioEl"
+            class="oa-music__audio"
+            preload="metadata"
+            @play="isMusicPlaying = true"
+            @pause="isMusicPlaying = false"
+            @ended="handleMusicEnded"
+            @timeupdate="musicCurrent = audioEl?.currentTime ?? 0"
+            @loadedmetadata="musicDuration = audioEl?.duration ?? 0"
+          />
+        </template>
+
+        <!-- 未声明该分类：统一提示 -->
+        <div v-else-if="activeContent && !activeContent.supported" class="oa-pkg__placeholder">
+          <span class="oa-pkg__placeholder-badge oa-pkg__placeholder-badge--off">未包含</span>
+          <p class="oa-pkg__placeholder-title">{{ activeContent.label }}</p>
+          <p class="oa-pkg__placeholder-text">此资源包没有该类资源。</p>
+        </div>
+
         <!-- 其它分类：先给出索引信息，具体浏览后续接入 -->
         <div v-else class="oa-pkg__placeholder">
           <span class="oa-pkg__placeholder-badge">未完成</span>
@@ -674,6 +990,23 @@ function openCharacter(character: PackageCharacter) {
         </div>
       </div>
     </section>
+
+    <!-- 曲目完整描述：rizui_dialog 自带 Teleport，放页面根部避免随分类卸载 -->
+    <rizui_dialog
+      v-model:show="isDescDialogOpen"
+      :title="descDialogItem?.title || '曲目描述'"
+      width="min(620px, 88vw)"
+      mask-close
+      @close="closeMusicDetail"
+    >
+      <div class="oa-music-detail">
+        <p class="oa-music-detail__meta">
+          <span v-if="descDialogItem?.artist">{{ descDialogItem.artist }}</span>
+          <code>{{ descDialogItem?.name_id }}</code>
+        </p>
+        <p class="oa-music-detail__text">{{ descDialogItem?.description }}</p>
+      </div>
+    </rizui_dialog>
   </main>
 </template>
 
@@ -696,10 +1029,19 @@ function openCharacter(character: PackageCharacter) {
 
 .oa-pkg__head {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px clamp(14px, 2vw, 28px);
   width: min(1320px, 100%);
   margin: 0 auto;
+}
+
+/* 左侧：返回 + 标题，右侧留给卡片外的搜索框 */
+.oa-pkg__head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .oa-pkg__back {
@@ -1000,6 +1342,27 @@ function openCharacter(character: PackageCharacter) {
   background: rgba(255, 255, 255, 0.9);
   color: #8aa3b8;
   transition: border-color 0.2s ease;
+}
+
+/* 卡片外右上角的那一份：略高、略宽，跟随页头对齐 */
+.oa-pkg__search--head {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  margin-bottom: 2px;
+  padding: 6px 14px;
+  border-color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
+}
+
+.oa-pkg__search--head svg {
+  width: 14px;
+  height: 14px;
+}
+
+.oa-pkg__search--head input {
+  width: clamp(160px, 18vw, 230px);
+  font-size: 13px;
 }
 
 .oa-pkg__search:focus-within {
@@ -1328,6 +1691,225 @@ function openCharacter(character: PackageCharacter) {
 .oa-pkg__state--inline {
   width: 100%;
   padding: 14px 2px;
+}
+
+/* ---------- 背景音乐 ---------- */
+
+.oa-music-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 4px;
+}
+
+.oa-music {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(190, 214, 231, 0.55);
+  border-radius: 10px;
+  background: #ffffff;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.oa-music.is-active {
+  border-color: rgba(0, 144, 254, 0.42);
+  box-shadow: 0 4px 14px rgba(36, 92, 138, 0.1);
+}
+
+.oa-music__play {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 1px;
+  border: 1px solid rgba(0, 144, 254, 0.28);
+  border-radius: 50%;
+  background: rgba(0, 144, 254, 0.08);
+  color: #1769a8;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.oa-music__play svg {
+  width: 13px;
+  height: 13px;
+}
+
+.oa-music__play:hover:not(:disabled) {
+  border-color: rgba(0, 144, 254, 0.55);
+  background: rgba(0, 144, 254, 0.16);
+}
+
+.oa-music__play:disabled {
+  border-color: rgba(154, 176, 194, 0.4);
+  background: rgba(154, 176, 194, 0.12);
+  color: #a3b6c4;
+  cursor: not-allowed;
+}
+
+.oa-music__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.oa-music__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.oa-music__title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1e4b76;
+  overflow-wrap: anywhere;
+}
+
+/* 描述：默认只露两行，余下靠「查看详细」弹窗 */
+.oa-music__desc {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: #6f8ba4;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.oa-music__desc.is-folded {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.oa-music__more {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  color: #0b7ad6;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.oa-music__more:hover {
+  color: var(--oa-blue);
+  text-decoration: underline;
+}
+
+.oa-music-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.oa-music-detail__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #7c99b0;
+}
+
+.oa-music-detail__meta code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(0, 144, 254, 0.08);
+  font-size: 11px;
+  color: #1769a8;
+}
+
+.oa-music-detail__text {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: #4d7799;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.oa-music__artist {
+  font-size: 11.5px;
+  color: #7c99b0;
+}
+
+.oa-music__miss {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(192, 122, 0, 0.14);
+  font-size: 10px;
+  line-height: 1.7;
+  color: #a47500;
+}
+
+.oa-music__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10.5px;
+  color: #a3b6c4;
+}
+
+.oa-music__id {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: rgba(0, 144, 254, 0.08);
+  font-size: 10.5px;
+  color: #1769a8;
+}
+
+.oa-music__file {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #8aa3b8;
+}
+
+.oa-music__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  padding-right: 4px;
+}
+
+.oa-music__timeline {
+  flex: 1;
+  min-width: 0;
+}
+
+.oa-music__time {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: #8aa3b8;
+}
+
+.oa-music__audio {
+  display: none;
+}
+
+.oa-music__audio {
+  display: none;
+}
+
+.oa-pkg__placeholder-badge--off {
+  background: rgba(154, 176, 194, 0.2);
+  color: #7c99b0;
 }
 
 /* ---------- 空态 / 占位 ---------- */

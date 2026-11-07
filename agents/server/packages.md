@@ -65,6 +65,7 @@
 | 分类键 | `count` 含义 |
 | --- | --- |
 | `hasCharacter` | 读该目录下的索引文件（`index`，缺省 `characters.json`）并取数组长度 = 角色条数；读不到则退回一级条目数 |
+| `BackgroundMusic` | 读 `<path>/index/music_info.json` 取数组长度 = 曲目数；读不到则退回一级条目数（会把 `index/` 也数进去，仅作兜底） |
 | 其它 | 目录下一级条目数（`Skeletons` 即立绘目录数） |
 
 - 只有 `supported: true` 才统计，且 `path` 必须落在资源包目录内部（`path.resolve` 后校验前缀），避免 `../` 穿越。
@@ -160,6 +161,48 @@
 - 开销：631 个目录 × 每文件一次 `statSync`（约 2500 次），实测约 **536 ms**、287 KB。所以前端按需加载，不要放进首屏。
 - 目录不存在 / 未声明 `Skeletons` 分类 → `skeletons: []`。
 
+### `GET /api/packages/:id/music` — 背景音乐曲目
+
+`BackgroundMusic.supported` 为 `false` 时直接返回空数组。
+
+```json
+{
+  "success": true,
+  "total": 394,
+  "music": [
+    {
+      "name_id": "theme_01",
+      "filename": "Theme_01.ogg",
+      "title": "Constant Moderato",
+      "artist": "Mitsukiyo",
+      "description": "蔚蓝档案的标题曲…",
+      "url": "/api/packages/DefaultPackage/music/Theme_01.ogg",
+      "exists": true
+    }
+  ]
+}
+```
+
+约定与实现：
+
+- 曲目索引是 **`<BackgroundMusic.path>/index/music_info.json`**（常量 `MUSIC_INDEX_DIR` / `MUSIC_INDEX_FILE`），数组元素字段：`name_id` / `original_filename` / `title` / `artist` / `description`。缺失字段一律回退空串，`title` 回退 `name_id`。
+- 音频文件直接放在 `<path>/` 下（与 `index/` 同级）：
+  ```
+  background_music/
+  ├── index/music_info.json
+  ├── Theme_01.ogg
+  └── Theme_02.ogg
+  ```
+- 实际音频按 `original_filename` 查找；找不到时依次回退「`name_id` + 同后缀」「忽略大小写全名」「`name_id.` 前缀匹配」。都找不到 → `exists: false, url: ""`，前端禁用播放。
+- **`description` 随列表下发**（卡片需要折叠显示两行），但 **`size` 不下发、也不 `statSync`**：体积对播放毫无用处。全量 394 首实测响应约 **366 KB**。
+- `exists` 用 `fs.existsSync()`（不是 `statSync`），只判断文件在不在。
+
+### `GET /api/packages/:id/music/:file(*)` — 音频本体
+
+- 只允许 `AUDIO_EXTENSIONS`（`.ogg` / `.opus` / `.mp3` / `.wav` / `.m4a` / `.aac` / `.flac` / `.webm`），其它扩展名 404。
+- `MIME_BY_EXTENSION` 里补齐了对应 `Content-Type`（`.ogg` / `.opus` → `audio/ogg`）。
+- 用 `res.sendFile()` 下发，**自带 `Accept-Ranges: bytes` 与 `206 Partial Content`**，浏览器可以拖动进度条。
+
 ### `GET /api/packages/:id/skeleton/:skeletonId` — 单个立绘的文件清单
 
 返回 `{ success, id, files }`，`files` 结构同上（含 `ext` / `size`）。立绘目录不存在 → 404。
@@ -170,8 +213,9 @@
 | --- | --- |
 | `GET /api/packages/:id/avatar/*` | `hasCharacter.path` / `hasCharacter.avatar` |
 | `GET /api/packages/:id/skeleton/:skeletonId/*` | `Skeletons.path` / `:skeletonId` |
+| `GET /api/packages/:id/music/*` | `BackgroundMusic.path` |
 
-- 只下发白名单扩展名：`.png` / `.jpg` / `.jpeg` / `.webp` / `.skel` / `.atlas` / `.json`，其它一律 404。
+- 只下发白名单扩展名：`.png` / `.jpg` / `.jpeg` / `.webp` / `.skel` / `.atlas` / `.json` 与全部音频后缀，其它一律 404。
 - 所有路径都过 `resolveInside()` 归一化，拒绝 `..` 段与前缀逃逸。
 - `packageId` 只允许一级目录名（含 `/`、`\`、`.`、`..` 直接判非法），由 `resolvePackageDir()` 保证。
 

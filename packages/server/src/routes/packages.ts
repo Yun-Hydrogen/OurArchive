@@ -3,9 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   readPackageCharacters,
+  readPackageMusic,
   readPackageSkeletons,
   readSkeletonFiles,
   resolveInside,
+  resolveMusicFile,
   resolvePackageDir,
   scanResourcePackages,
 } from '../config/packages.js';
@@ -20,6 +22,14 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.skel': 'application/octet-stream',
   '.atlas': 'text/plain; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.ogg': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.flac': 'audio/flac',
+  '.webm': 'audio/webm',
 };
 
 function notFound(res: Response, message: string) {
@@ -58,6 +68,8 @@ function sendFile(res: Response, target: string | null) {
  * - `GET /api/packages/:id/characters`          角色索引（含头像 URL 与骨骼存在性）
  * - `GET /api/packages/:id/skeletons`           全部立绘目录（含文件清单与体积）
  * - `GET /api/packages/:id/skeleton/:skeletonId` 立绘目录内的文件清单
+ * - `GET /api/packages/:id/music`               背景音乐曲目（读 index/music_info.json，含 description）
+ * - `GET /api/packages/:id/music/*`             背景音乐音频本体
  * - `GET /api/packages/:id/avatar/*`            头像图片
  * - `GET /api/packages/:id/skeleton/:id/*`      立绘文件（.skel / .atlas / .png）
  */
@@ -110,9 +122,41 @@ export function createPackagesRouter(): Router {
     }
   });
 
-  // 全部立绘目录（含文件清单与体积）
-  router.get('/:id/skeletons', (req: Request, res: Response) => {
+  // 背景音乐曲目列表（读 <path>/index/music_info.json）
+  router.get('/:id/music', (req: Request, res: Response) => {
     const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      notFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    try {
+      const music = readPackageMusic(packageDir, pkg);
+      res.json({ success: true, total: music.length, music });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  // 背景音乐音频本体
+  router.get('/:id/music/:file(*)', (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      notFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    sendFile(res, resolveMusicFile(packageDir, pkg, String(req.params.file ?? '')));
+  });
+
+  // 全部立绘目录（含文件清单与体积）
+  router.get('/:id/skeletons', (req: Request, res: Response) => {    const id = String(req.params.id ?? '');
     const packageDir = resolvePackageDir(id);
     const pkg = scanResourcePackages().find((item) => item.id === id);
 

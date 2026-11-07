@@ -7,7 +7,8 @@
 | [views/HomeView.vue](../../packages/client/src/views/HomeView.vue) | 主界面结构、卡槽叠放与入场动画、全部样式 |
 | [components/home/OACardArt.vue](../../packages/client/src/components/home/OACardArt.vue) | 卡片插图组件：现代软件界面的平面/扁平化矢量设计 (SVG) |
 | [config/home.ts](../../packages/client/src/config/home.ts) | `HOME_MENU`（入口 id、标题、插画变体与目标路由） |
-| [composables/useBackgroundMusic.ts](../../packages/client/src/composables/useBackgroundMusic.ts) | 全应用单例的 `main_bgm` 播放控制 |
+| [composables/useBackgroundMusic.ts](../../packages/client/src/composables/useBackgroundMusic.ts) | 全应用单例的 `main_bgm` 播放控制，含 `suspend()` / `resume()` 淡出淡入让位给试听 |
+| [components/common/OASettingsModal.vue](../../packages/client/src/components/common/OASettingsModal.vue) | 设置弹窗：`main_bgm_volume` 与 `preview_volume` 两个音量滑条 |
 
 ## 布局
 
@@ -74,6 +75,22 @@
 - 换页不会重新触发淡入（`fadeIn` 只在 splash 首次点击时调用一次）；
 - `ensurePlaying()` 是兜底：若音频已被暂停（例如浏览器回收了播放），在首次 `pointerdown` 时恢复，不重置进度；正常从 splash 进入时它直接返回 true，不做任何事；
 - 设置面板改动 `main_bgm_volume` 时，`useBackgroundMusic` 内的 `watch` 立即同步音量（淡入过程中则改写目标音量而不中断动画）。
+
+### 让位给其它音频
+
+资源包里的曲目试听会和 `main_bgm` 撞车，所以 composable 还提供一对方法：
+
+| 方法 | 行为 |
+| --- | --- |
+| `suspend(durationMs = 480)` | **淡出到 0 再暂停**，并记住 `currentTime`；本来就没在播则返回 `false` |
+| `resume(durationMs = 620)` | 从 0 **淡入**到当前音量并回到被压住的位置；没被 `suspend` 过则什么都不做 |
+
+- 内部用模块级 `suspended` 标记 + `suspendedAt` 进度，**幂等**：重复调用不会叠加状态。
+- 淡出用 `startFade(..., onDone)`：**只有淡出真正结束才 `pause()`**，`onDone` 回调里会再检查一次 `suspended`，所以「淡出途中就恢复」不会误暂停。
+- 恢复时只在 `currentTime` 被外部改动超过 0.25s 时才写回 `suspendedAt`，避免打断正常的播放进度。
+- `setVolume()` 遇到 `fade.onDone` 存在（正在淡出到 0）会**忽略改动**，否则拖音量条会把淡出目标改回有声；被 `suspend` 期间则只更新 `volume`，留待 `resume` 淡入到该值。
+- `play()` / `ensurePlaying()` / `stop()` 都会把 `element.volume` 复位成 `volume.value`，防止上一次淡出把音量留在 0。
+- 调用方是资源包的试听逻辑（[package.md](./package.md#背景音乐backgroundmusic-分类)）：开始播放 → `suspend()`，暂停 / 播完 / 切分类 / 离开页面 → `resume()`。
 
 `splash` 的标题音效仍然用 `useSplashAudio`（单次播放、不循环），两者互不影响。
 

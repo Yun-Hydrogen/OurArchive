@@ -37,6 +37,19 @@ export interface PackageSkeleton {
   complete: boolean;
 }
 
+/** 一首背景音乐 */
+export interface PackageMusic {
+  name_id: string;
+  filename: string;
+  title: string;
+  artist: string;
+  /** 完整描述：卡片折叠两行，详情弹窗显示全文 */
+  description: string;
+  /** 音频 URL；文件缺失时为空串 */
+  url: string;
+  exists: boolean;
+}
+
 interface PackageResponse {
   success: boolean;
   package?: ResourcePackage;
@@ -54,6 +67,13 @@ interface SkeletonsResponse {
   success: boolean;
   total?: number;
   skeletons?: PackageSkeleton[];
+  error?: string;
+}
+
+interface MusicResponse {
+  success: boolean;
+  total?: number;
+  music?: PackageMusic[];
   error?: string;
 }
 
@@ -84,6 +104,7 @@ export function usePackageContent(packageId: string) {
   const pkg = ref<ResourcePackage | null>(null);
   const characters = ref<PackageCharacter[]>([]);
   const skeletons = ref<PackageSkeleton[]>([]);
+  const music = ref<PackageMusic[]>([]);
   const loading = ref(false);
   const error = ref('');
 
@@ -91,6 +112,11 @@ export function usePackageContent(packageId: string) {
   const skeletonsLoading = ref(false);
   const skeletonsError = ref('');
   let skeletonsLoaded = false;
+
+  /** 音乐清单同理 */
+  const musicLoading = ref(false);
+  const musicError = ref('');
+  let musicLoaded = false;
 
   async function load() {
     loading.value = true;
@@ -137,16 +163,46 @@ export function usePackageContent(packageId: string) {
     }
   }
 
+  /** 拉取背景音乐曲目（读 index/music_info.json），同样按需且只拉一次 */
+  async function loadMusic(force = false) {
+    if (musicLoading.value) {
+      return;
+    }
+    if (musicLoaded && !force) {
+      return;
+    }
+
+    musicLoading.value = true;
+    musicError.value = '';
+
+    try {
+      const data = await getJson<MusicResponse>(
+        `/api/packages/${encodeURIComponent(packageId)}/music`
+      );
+      music.value = data.music ?? [];
+      musicLoaded = true;
+    } catch (err) {
+      musicError.value = err instanceof Error ? err.message : String(err);
+      music.value = [];
+    } finally {
+      musicLoading.value = false;
+    }
+  }
+
   return {
     pkg,
     characters,
     skeletons,
+    music,
     loading,
     error,
     skeletonsLoading,
     skeletonsError,
+    musicLoading,
+    musicError,
     load,
     loadSkeletons,
+    loadMusic,
   };
 }
 

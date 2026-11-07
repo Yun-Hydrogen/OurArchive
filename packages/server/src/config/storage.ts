@@ -12,7 +12,8 @@ export interface StorageInitResult {
   settings: GlobalSettings;
 }
 
-const DEFAULT_CONFIG_CONTENT = '# Our Archive 全局配置 (global_config.yml)\nmain_bgm_volume: 50\n';
+const DEFAULT_CONFIG_CONTENT =
+  '# Our Archive 全局配置 (global_config.yml)\nmain_bgm_volume: 50\npreview_volume: 60\n';
 
 /**
  * 兼容旧版本布局：
@@ -97,6 +98,7 @@ export function initializeStorage(): StorageInitResult {
 export function loadSettings(paths: StoragePaths = getStoragePaths()): GlobalSettings {
   const defaults: GlobalSettings = {
     main_bgm_volume: 50,
+    preview_volume: 60,
   };
 
   if (!fs.existsSync(paths.settingsFile)) {
@@ -110,11 +112,14 @@ export function loadSettings(paths: StoragePaths = getStoragePaths()): GlobalSet
         ...defaults,
         ...(parsed as GlobalSettings),
       };
-      // 确保 main_bgm_volume 为 0-100 的数值
-      if (typeof merged.main_bgm_volume !== 'number' || !Number.isFinite(merged.main_bgm_volume)) {
-        merged.main_bgm_volume = 50;
-      } else {
-        merged.main_bgm_volume = Math.max(0, Math.min(100, Math.round(merged.main_bgm_volume)));
+      // 音量项统一收敛到 0-100 的整数
+      for (const key of ['main_bgm_volume', 'preview_volume'] as const) {
+        const value = merged[key];
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          merged[key] = defaults[key];
+        } else {
+          merged[key] = Math.max(0, Math.min(100, Math.round(value)));
+        }
       }
       return merged;
     }

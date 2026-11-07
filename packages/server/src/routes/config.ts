@@ -25,10 +25,14 @@ export function createConfigRouter(): Router {
 
     const patch: Record<string, unknown> = {};
 
-    if ('main_bgm_volume' in body) {
-      const vol = Number(body.main_bgm_volume);
-      if (Number.isFinite(vol)) {
-        patch.main_bgm_volume = Math.max(0, Math.min(100, Math.round(vol)));
+    // 两个音量项规则一致：0-100 的整数
+    for (const key of ['main_bgm_volume', 'preview_volume'] as const) {
+      if (!(key in body)) {
+        continue;
+      }
+      const value = Number(body[key]);
+      if (Number.isFinite(value)) {
+        patch[key] = Math.max(0, Math.min(100, Math.round(value)));
       }
     }
 

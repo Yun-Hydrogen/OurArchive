@@ -18,7 +18,7 @@ const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
-const { config, setMainBgmVolume, fetchConfig } = useGlobalConfig();
+const { config, setMainBgmVolume, setPreviewVolume, fetchConfig } = useGlobalConfig();
 
 function handleClose() {
   emit('update:visible', false);
@@ -56,6 +56,17 @@ watch(
             :step="1"
             display="%"
             @update:model-value="setMainBgmVolume"
+          />
+        </rizui_cfgrow>
+
+        <rizui_cfgrow label="预览音频 / 音效音量" hint="资源包试听与界面音效，范围 0 - 100">
+          <rizui_slider
+            :model-value="config.preview_volume"
+            :min="0"
+            :max="100"
+            :step="1"
+            display="%"
+            @update:model-value="setPreviewVolume"
           />
         </rizui_cfgrow>
       </rizui_card>

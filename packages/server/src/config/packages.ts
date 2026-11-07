@@ -10,11 +10,19 @@ export const PACKAGE_MANIFEST_FILE_NAME = 'package.yml';
 export const DEFAULT_CHARACTER_INDEX = 'characters.json';
 export const DEFAULT_AVATAR_DIR = 'avatars';
 
+/** BackgroundMusic 分类的曲目索引：`<path>/index/music_info.json` */
+export const MUSIC_INDEX_DIR = 'index';
+export const MUSIC_INDEX_FILE = 'music_info.json';
+
 /**
  * 资源包内静态资源的访问前缀。
  * 与 `routes/packages.ts` 里挂载的路由保持一致。
  */
-export function buildAssetUrl(packageId: string, kind: 'avatar' | 'skeleton', relative: string): string {
+export function buildAssetUrl(
+  packageId: string,
+  kind: 'avatar' | 'skeleton' | 'music',
+  relative: string
+): string {
   const encoded = relative
     .replace(/\\/g, '/')
     .split('/')
@@ -118,6 +126,19 @@ function countEntries(dir: string, key: string): { exists: boolean; count: numbe
       } catch {
         // 索引坏了就退回目录条目数
       }
+    }
+  }
+
+  // 背景音乐按曲目索引计条目数，不把 index/ 与音频文件混起来数
+  if (key === 'BackgroundMusic') {
+    const musicIndex = path.join(dir, MUSIC_INDEX_DIR, MUSIC_INDEX_FILE);
+    try {
+      const parsed = JSON.parse(fs.readFileSync(musicIndex, 'utf-8').replace(/^\uFEFF/, ''));
+      if (Array.isArray(parsed)) {
+        return { exists: true, count: parsed.length };
+      }
+    } catch {
+      // 没有索引文件就退回目录条目数
     }
   }
 
@@ -447,6 +468,157 @@ export function readPackageCharacters(
   }
 
   return entries.sort((a, b) => a.name_id.localeCompare(b.name_id));
+}
+
+/** 一首背景音乐（`background_music/index/music_info.json` 的一条） */
+export interface PackageMusicEntry {
+  /** 曲目 id，如 `theme_01` */
+  name_id: string;
+  /** 实际文件名，如 `Theme_01.ogg` */
+  filename: string;
+  title: string;
+  artist: string;
+  /** 完整描述（可能是多行剧情注释），卡片折叠两行、详情弹窗显示全文 */
+  description: string;
+  /** 音频可访问 URL（文件缺失时为空串） */
+  url: string;
+  /** 音频文件是否真的存在 */
+  exists: boolean;
+}
+
+const AUDIO_EXTENSIONS = new Set([
+  '.ogg',
+  '.mp3',
+  '.wav',
+  '.m4a',
+  '.aac',
+  '.flac',
+  '.opus',
+  '.webm',
+]);
+
+/**
+ * 读取 BackgroundMusic 分类的曲目列表。
+ *
+ * 约定：`<path>/index/music_info.json` 是曲目索引，音频文件直接放在 `<path>/` 下。
+ * 索引里的 `original_filename` 决定播放哪个文件；缺失时退回「同名 + 任意音频后缀」。
+ */
+export function readPackageMusic(
+  packageDir: string,
+  pkg: ResourcePackage
+): PackageMusicEntry[] {
+  const content = contentOf(pkg, 'BackgroundMusic');
+  if (!content || !content.supported) {
+    return [];
+  }
+
+  const audioDir = resolveInside(packageDir, content.path);
+  if (!audioDir) {
+    return [];
+  }
+
+  const indexFile = resolveInside(audioDir, `${MUSIC_INDEX_DIR}/${MUSIC_INDEX_FILE}`);
+  if (!indexFile || !fs.existsSync(indexFile)) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(indexFile, 'utf-8').replace(/^\uFEFF/, ''));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  // 目录里的音频文件清单，用于「只给了 name_id」时兜底匹配
+  let audioFiles: string[] = [];
+  try {
+    audioFiles = fs
+      .readdirSync(audioDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && AUDIO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
+      .map((entry) => entry.name);
+  } catch {
+    audioFiles = [];
+  }
+
+  /** 在磁盘上找实际音频：优先 original_filename，否则按 name_id 模糊匹配 */
+  function resolveAudio(nameId: string, filename: string): string | null {
+    const candidates = [
+      filename,
+      `${nameId}${path.extname(filename) || '.ogg'}`,
+      ...audioFiles.filter(
+        (name) => name.toLowerCase() === `${nameId}${path.extname(name)}`.toLowerCase()
+      ),
+      ...audioFiles.filter(
+        (name) => name.toLowerCase().startsWith(`${nameId.toLowerCase()}.`)
+      ),
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      const full = resolveInside(audioDir, candidate);
+      if (full && fs.existsSync(full)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  const entries: PackageMusicEntry[] = [];
+
+  for (const raw of parsed) {
+    if (!raw || typeof raw !== 'object') {
+      continue;
+    }
+    const record = raw as Record<string, unknown>;
+    const nameId = asText(record.name_id);
+    if (!nameId) {
+      continue;
+    }
+
+    const declared = asText(record.original_filename);
+    const resolved = resolveAudio(nameId, declared);
+    const filename = resolved ?? declared;
+
+    entries.push({
+      name_id: nameId,
+      filename,
+      title: asText(record.title) || nameId,
+      artist: asText(record.artist),
+      description: asText(record.description),
+      url: resolved ? buildAssetUrl(pkg.id, 'music', resolved) : '',
+      exists: Boolean(resolved),
+    });
+  }
+
+  return entries;
+}
+
+/** 在 BackgroundMusic 目录里定位一个音频文件，越界或不存在返回 null */
+export function resolveMusicFile(
+  packageDir: string,
+  pkg: ResourcePackage,
+  filename: string
+): string | null {
+  const content = contentOf(pkg, 'BackgroundMusic');
+  if (!content || !content.supported) {
+    return null;
+  }
+
+  const audioDir = resolveInside(packageDir, content.path);
+  if (!audioDir) {
+    return null;
+  }
+
+  const target = resolveInside(audioDir, filename);
+  if (!target || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
+    return null;
+  }
+  if (!AUDIO_EXTENSIONS.has(path.extname(target).toLowerCase())) {
+    return null;
+  }
+  return target;
 }
 
 /** 立绘目录里的单个文件 */
