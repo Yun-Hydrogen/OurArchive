@@ -82,7 +82,8 @@ function handleClose() {
             <span class="oa-tag oa-tag--wiki">Wiki</span>
           </div>
           <p class="oa-contrib-item__desc">
-            《蔚蓝档案》剧情、设定、音频与视觉资料索引与内容参考。
+            《蔚蓝档案》剧情、设定、音频与视觉资料索引与内容参考，Our Archive也参考了其骨骼和3d、光环的实现方式。
+            在此感谢基沃托斯古书馆。
           </p>
           <a
             class="oa-contrib-item__link"

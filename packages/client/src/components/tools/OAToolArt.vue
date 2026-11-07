@@ -7,7 +7,7 @@ const props = defineProps<{
 }>();
 
 const ART_LABELS: Record<ToolArtVariant, string> = {
-  skeleton: 'Spine 立绘骨骼与差分插槽预览插图',
+  skeleton: 'Spine 2D 立绘骨骼绑定与差分插槽检视插图',
 };
 
 const label = computed(() => ART_LABELS[props.variant]);
@@ -31,281 +31,539 @@ const uid = computed(() => `oa-tool-art-${props.variant}`);
         <!-- 现代清爽微蓝渐变底 -->
         <linearGradient :id="`${uid}-bg`" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#f8fcff" />
-          <stop offset="100%" stop-color="#ebf5fd" />
+          <stop offset="100%" stop-color="#edf6fd" />
         </linearGradient>
 
-        <!-- 品牌主蓝渐变 -->
+        <!-- 主品牌蓝渐变 -->
         <linearGradient :id="`${uid}-blue`" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#0284c7" />
           <stop offset="100%" stop-color="#0090fe" />
         </linearGradient>
 
-        <!-- 骨骼渐变：高饱和蓝青渐变 -->
+        <!-- 骨骼渐变：高饱和高透蓝青渐变 -->
         <linearGradient :id="`${uid}-bone`" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#0090fe" />
           <stop offset="100%" stop-color="#38bdf8" />
         </linearGradient>
 
-        <!-- 投影滤镜 -->
-        <filter :id="`${uid}-shadow`" x="-8%" y="-8%" width="120%" height="120%">
-          <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#144270" flood-opacity="0.07" />
+        <!-- 立绘素体剪影渐变：半透明高级浅冰蓝 -->
+        <linearGradient :id="`${uid}-mannequin`" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85" />
+          <stop offset="100%" stop-color="#dbeafe" stop-opacity="0.6" />
+        </linearGradient>
+
+        <!-- 悬浮阴影滤镜 -->
+        <filter :id="`${uid}-shadow`" x="-10%" y="-10%" width="124%" height="124%">
+          <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#144270" flood-opacity="0.08" />
         </filter>
 
-        <!-- 点阵背景 -->
+        <!-- 柔和微光滤镜 -->
+        <filter :id="`${uid}-glow`" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#38bdf8" flood-opacity="0.5" />
+        </filter>
+
+        <!-- 点阵背景图案 -->
         <pattern :id="`${uid}-dots`" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
-          <circle cx="2" cy="2" r="1.1" fill="#c3e1f7" opacity="0.65" />
+          <circle cx="2" cy="2" r="1.1" fill="#c3e1f7" opacity="0.6" />
         </pattern>
       </defs>
 
-      <!-- 底板背景与点阵画布 -->
+      <!-- 底板背景与点阵视口画布 -->
       <rect width="400" height="260" :fill="`url(#${uid}-bg)`" />
       <rect width="400" height="260" :fill="`url(#${uid}-dots)`" />
 
-      <!-- 取景框四角标 -->
+      <!-- 取景框四角精准裁切标 -->
       <g stroke="#93c5fd" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.65">
-        <path d="M 20 20 h 14 M 20 20 v 14" />
-        <path d="M 380 20 h -14 M 380 20 v 14" />
-        <path d="M 20 240 h 14 M 20 240 v -14" />
-        <path d="M 380 240 h -14 M 380 240 v -14" />
+        <path d="M 18 18 h 12 M 18 18 v 12" />
+        <path d="M 382 18 h -12 M 382 18 v 12" />
+        <path d="M 18 242 h 12 M 18 242 v -12" />
+        <path d="M 382 242 h -12 M 382 242 v -12" />
       </g>
 
-      <!-- 顶部信息栏 -->
+      <!-- ======================================================== -->
+      <!-- 顶部 HUD 状态栏与工程模式徽章 -->
+      <!-- ======================================================== -->
       <g>
         <!-- 骨骼立绘工程状态胶囊 -->
         <g :filter="`url(#${uid}-shadow)`">
-          <rect x="24" y="14" width="156" height="22" rx="11" fill="#ffffff" stroke="#cde4f7" stroke-width="1.2" />
-          <circle cx="36" cy="25" r="3.5" fill="#10b981" />
-          <rect x="46" y="22" width="80" height="6" rx="3" fill="#1e293b" />
-          <rect x="132" y="22" width="36" height="6" rx="3" fill="#0090fe" />
+          <rect x="22" y="14" width="126" height="22" rx="11" fill="#ffffff" stroke="#cfe4f7" stroke-width="1.2" />
+          <circle cx="34" cy="25" r="3.5" fill="#10b981" />
+          <text
+            x="44"
+            y="28.5"
+            fill="#0f172a"
+            font-size="9.5"
+            font-weight="700"
+            font-family="system-ui, -apple-system, sans-serif"
+            letter-spacing="0.02em"
+          >
+            SPINE 2D RIG
+          </text>
+          <rect x="110" y="19" width="30" height="12" rx="3" fill="#e0f2fe" />
+          <text
+            x="116"
+            y="28"
+            fill="#0284c7"
+            font-size="8"
+            font-weight="700"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            4.2
+          </text>
         </g>
 
-        <!-- 格式与模式徽标 -->
-        <g transform="translate(262, 14)">
-          <rect x="0" y="0" width="46" height="20" rx="5" fill="#e0f2fe" stroke="#bae6fd" stroke-width="1" />
-          <rect x="8" y="7" width="30" height="6" rx="2" fill="#0284c7" />
-
-          <rect x="52" y="0" width="48" height="20" rx="5" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
-          <rect x="60" y="7" width="32" height="6" rx="2" fill="#64748b" />
-
-          <rect x="106" y="0" width="22" height="20" rx="5" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1" />
-          <circle cx="117" cy="10" r="3" fill="#16a34a" />
+        <!-- 格式徽标 -->
+        <g :filter="`url(#${uid}-shadow)`" transform="translate(288, 14)">
+          <rect x="0" y="0" width="88" height="22" rx="11" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2" />
+          <text
+            x="11"
+            y="14.5"
+            fill="#64748b"
+            font-size="9"
+            font-weight="600"
+            font-family="system-ui, -apple-system, sans-serif"
+            letter-spacing="0.04em"
+          >
+            .SKEL / .ATLAS
+          </text>
         </g>
       </g>
 
       <!-- ======================================================== -->
-      <!-- 中央与左侧：完整的 2D Spine 立绘人偶、骨骼链与形变网格 -->
+      <!-- 中央与左侧：2D Spine 立绘人偶、骨骼链与形变网格 -->
       <!-- ======================================================== -->
       <g>
-        <!-- 立绘投影地台 / 底盘 (Stage Pedestal) -->
-        <g transform="translate(142, 230)">
-          <!-- 外圈透视投影圆环 -->
-          <ellipse cx="0" cy="0" rx="64" ry="14" fill="#e0f2fe" fill-opacity="0.5" stroke="#93c5fd" stroke-width="1.2" stroke-dasharray="4 2" />
-          <!-- 内圈高亮环 -->
-          <ellipse cx="0" cy="0" rx="42" ry="9" fill="none" stroke="#0090fe" stroke-width="1.2" opacity="0.65" />
-          <!-- 舞台中心定位十字 -->
-          <line x1="-8" y1="0" x2="8" y2="0" stroke="#0284c7" stroke-width="1.2" />
-          <line x1="0" y1="-5" x2="0" y2="5" stroke="#0284c7" stroke-width="1.2" />
+        <!-- 立绘投影地台 / 舞台底盘 (Stage Pedestal) -->
+        <g transform="translate(136, 230)">
+          <!-- 外圈透视投影圆环 (带刻度感) -->
+          <ellipse
+            cx="0"
+            cy="0"
+            rx="68"
+            ry="15"
+            fill="#e0f2fe"
+            fill-opacity="0.45"
+            stroke="#93c5fd"
+            stroke-width="1.2"
+            stroke-dasharray="4 2"
+          />
+          <!-- 内圈高亮舞台环 -->
+          <ellipse cx="0" cy="0" rx="46" ry="10" fill="#ffffff" fill-opacity="0.7" stroke="#0090fe" stroke-width="1.4" />
+          <!-- 舞台中心十字瞄准准星 -->
+          <line x1="-12" y1="0" x2="12" y2="0" stroke="#0284c7" stroke-width="1.2" stroke-linecap="round" />
+          <line x1="0" y1="-6" x2="0" y2="6" stroke="#0284c7" stroke-width="1.2" stroke-linecap="round" />
+          <!-- 角度参考标记点 -->
+          <circle cx="-38" cy="0" r="1.5" fill="#38bdf8" />
+          <circle cx="38" cy="0" r="1.5" fill="#38bdf8" />
         </g>
 
-        <!-- 立绘身形外框半透明假人假体 (Standing Portrait Mannequin Silhouette) -->
-        <g fill="#e0f2fe" fill-opacity="0.4" stroke="#7dd3fc" stroke-width="1.2">
-          <!-- 头部轮廓 -->
-          <ellipse cx="142" cy="62" rx="17" ry="20" />
-          <!-- 颈肩胸躯干 -->
-          <path d="M 136 82 L 148 82 L 158 98 L 152 134 L 132 134 L 126 98 Z" />
-          <!-- 裙摆 / 外袍下摆 (带轻微飘逸感) -->
-          <path d="M 132 134 L 152 134 L 166 166 L 118 166 Z" />
-          <!-- 左手臂轮廓 (微屈垂下) -->
-          <path d="M 126 98 L 110 126 L 104 154 L 110 156 L 118 128 L 132 104 Z" />
-          <!-- 右手臂轮廓 (叉腰/微展姿态) -->
-          <path d="M 158 98 L 174 122 L 170 148 L 164 148 L 166 124 L 154 104 Z" />
-          <!-- 左腿与鞋底 -->
-          <path d="M 132 166 L 130 200 L 128 230 L 136 230 L 138 200 L 140 166 Z" />
-          <!-- 右腿与鞋底 -->
-          <path d="M 144 166 L 146 200 L 148 230 L 156 230 L 154 200 L 152 166 Z" />
+        <!-- 立绘身形外框优雅二次元剪影 (Anime Standee Silhouette) -->
+        <g :fill="`url(#${uid}-mannequin)`" stroke="#7dd3fc" stroke-width="1.2" stroke-linejoin="round">
+          <!-- 头部与面部轮廓 (优雅二次元微下颌弧线) -->
+          <path
+            d="M 124 64 C 124 50, 148 50, 148 64 C 148 76, 143 85, 136 88 C 129 85, 124 76, 124 64 Z"
+          />
+
+          <!-- 二次元飘逸发丝外廓 (两侧鬓角与顶部呆毛剪影) -->
+          <path
+            d="M 136 46 C 132 38, 140 33, 138 44 C 137 46, 136 46, 136 46 Z"
+            fill="#bae6fd"
+            stroke="#60a5fa"
+          />
+          <path
+            d="M 124 58 C 116 66, 112 84, 110 102 C 114 100, 118 94, 120 88 C 122 78, 120 68, 124 58 Z"
+            fill="#bae6fd"
+            fill-opacity="0.7"
+          />
+          <path
+            d="M 148 58 C 156 66, 160 84, 162 102 C 158 100, 154 94, 152 88 C 150 78, 152 68, 148 58 Z"
+            fill="#bae6fd"
+            fill-opacity="0.7"
+          />
+
+          <!-- 领口、制服与胸腔躯干 -->
+          <path d="M 128 88 L 144 88 L 152 100 L 146 134 L 126 134 L 120 100 Z" />
+
+          <!-- 优雅飘逸的百褶裙摆 (立绘下摆) -->
+          <path d="M 126 134 L 146 134 L 160 166 L 112 166 Z" />
+
+          <!-- 左手臂 (自然垂落微曲立姿) -->
+          <path d="M 120 100 L 108 124 L 104 150 L 109 152 L 116 128 L 126 104 Z" />
+
+          <!-- 右手臂 (微展叉腰姿态) -->
+          <path d="M 152 100 L 164 122 L 160 146 L 155 146 L 156 124 L 146 104 Z" />
+
+          <!-- 修长腿部与鞋履 (立于投影地台) -->
+          <!-- 左腿 -->
+          <path d="M 125 166 L 124 196 L 122 228 L 129 228 L 131 196 L 132 166 Z" />
+          <!-- 右腿 -->
+          <path d="M 140 166 L 141 196 L 143 228 L 150 228 L 148 196 L 147 166 Z" />
         </g>
 
-        <!-- 网格面多边形细分 (Spine 2D Mesh Triangulation) -->
-        <g fill="#38bdf8" fill-opacity="0.08" stroke="#38bdf8" stroke-width="0.9" stroke-dasharray="2 2" opacity="0.8">
-          <!-- 躯干到裙摆网格 -->
-          <polygon points="126,98 142,86 158,98" />
-          <polygon points="126,98 142,118 158,98" />
-          <polygon points="126,98 132,134 142,118" />
-          <polygon points="158,98 152,134 142,118" />
-          <polygon points="132,134 152,134 142,148" />
-          <polygon points="132,134 118,166 142,148" />
-          <polygon points="152,134 166,166 142,148" />
-          <polygon points="118,166 142,166 142,148" />
-          <polygon points="166,166 142,166 142,148" />
-          <!-- 网格控制顶点 (Vertices) -->
-          <circle cx="142" cy="86" r="2" fill="#0284c7" />
-          <circle cx="142" cy="118" r="2" fill="#0284c7" />
-          <circle cx="142" cy="148" r="2.5" fill="#0090fe" />
-          <circle cx="118" cy="166" r="2" fill="#0284c7" />
-          <circle cx="166" cy="166" r="2" fill="#0284c7" />
-          <circle cx="142" cy="166" r="2" fill="#0284c7" />
+        <!-- 百褶裙褶裥线条 (增加二次元立绘服装精美度) -->
+        <g stroke="#93c5fd" stroke-width="0.9" opacity="0.6">
+          <line x1="126" y1="134" x2="120" y2="166" />
+          <line x1="136" y1="134" x2="136" y2="166" />
+          <line x1="146" y1="134" x2="152" y2="166" />
+        </g>
+
+        <!-- 网格面三角剖分细分 (Spine 2D Mesh Triangulation) -->
+        <g fill="#38bdf8" fill-opacity="0.08" stroke="#38bdf8" stroke-width="0.9" stroke-dasharray="2 2" opacity="0.75">
+          <polygon points="126,134 146,134 136,150" />
+          <polygon points="126,134 112,166 136,150" />
+          <polygon points="146,134 160,166 136,150" />
+          <polygon points="112,166 136,166 136,150" />
+          <polygon points="160,166 136,166 136,150" />
+          <!-- 形变控制顶点 (Mesh Vertices) -->
+          <circle cx="136" cy="150" r="2.2" fill="#0090fe" />
+          <circle cx="112" cy="166" r="2" fill="#0284c7" />
+          <circle cx="136" cy="166" r="2" fill="#0284c7" />
+          <circle cx="160" cy="166" r="2" fill="#0284c7" />
         </g>
 
         <!-- 骨骼系统 (Spine Bone Hierarchy) -->
         <g>
-          <!-- 1. 骨盆/根骨骼 -> 胸腔骨骼 (Torso Bone) -->
-          <polygon points="139,138 145,138 144,98 140,98" :fill="`url(#${uid}-bone)`" opacity="0.9" />
+          <!-- 1. 根骨/骨盆 -> 胸腔骨骼 (Torso Bone) -->
+          <polygon points="134,134 138,134 137,98 135,98" :fill="`url(#${uid}-bone)`" opacity="0.9" />
 
           <!-- 2. 胸腔骨骼 -> 头部骨骼 (Head Bone) -->
-          <polygon points="140,98 144,98 143,62 141,62" :fill="`url(#${uid}-bone)`" opacity="0.9" />
+          <polygon points="135,98 137,98 137,68 135,68" :fill="`url(#${uid}-bone)`" opacity="0.9" />
 
           <!-- 3. 左手臂骨骼 (臂 -> 肘 -> 腕) -->
-          <polygon points="136,98 114,127 111,124 135,96" :fill="`url(#${uid}-bone)`" opacity="0.85" />
-          <polygon points="114,127 107,152 104,150 111,124" :fill="`url(#${uid}-bone)`" opacity="0.85" />
+          <polygon points="121,99 119,97 109,123 111,125" :fill="`url(#${uid}-bone)`" opacity="0.85" />
+          <polygon points="111,125 109,123 105,149 107,151" :fill="`url(#${uid}-bone)`" opacity="0.85" />
 
-          <!-- 4. 右手臂骨骼 -->
-          <polygon points="148,98 168,123 171,121 149,96" :fill="`url(#${uid}-bone)`" opacity="0.85" />
-          <polygon points="168,123 166,146 163,145 171,121" :fill="`url(#${uid}-bone)`" opacity="0.85" />
+          <!-- 4. 右手臂骨骼 (臂 -> 肘 -> 腕) -->
+          <polygon points="151,99 153,97 163,121 161,123" :fill="`url(#${uid}-bone)`" opacity="0.85" />
+          <polygon points="161,123 163,121 159,145 157,147" :fill="`url(#${uid}-bone)`" opacity="0.85" />
 
           <!-- 5. 双腿骨骼 (髋 -> 膝 -> 踝) -->
-          <polygon points="138,142 134,198 131,198 136,142" :fill="`url(#${uid}-bone)`" opacity="0.85" />
-          <polygon points="134,198 132,228 129,228 131,198" :fill="`url(#${uid}-bone)`" opacity="0.85" />
+          <polygon points="128,136 126,194 124,194 126,136" :fill="`url(#${uid}-bone)`" opacity="0.85" />
+          <polygon points="126,194 124,226 122,226 124,194" :fill="`url(#${uid}-bone)`" opacity="0.85" />
 
-          <polygon points="146,142 150,198 153,198 148,142" :fill="`url(#${uid}-bone)`" opacity="0.85" />
-          <polygon points="150,198 152,228 155,228 153,198" :fill="`url(#${uid}-bone)`" opacity="0.85" />
+          <polygon points="144,136 146,194 148,194 146,136" :fill="`url(#${uid}-bone)`" opacity="0.85" />
+          <polygon points="146,194 148,226 150,226 148,194" :fill="`url(#${uid}-bone)`" opacity="0.85" />
 
-          <!-- 骨骼关节控制圆环 (Joint Nodes) -->
+          <!-- 骨骼关节控制圆环 (Joint Handles) -->
           <!-- 头部关节点与脸部定位十字 -->
-          <circle cx="142" cy="62" r="5" fill="#ffffff" stroke="#0090fe" stroke-width="2" />
-          <circle cx="142" cy="62" r="2" fill="#0090fe" />
-          <line x1="135" y1="62" x2="149" y2="62" stroke="#0284c7" stroke-width="1" stroke-dasharray="1 1" />
-          <line x1="142" y1="55" x2="142" y2="69" stroke="#0284c7" stroke-width="1" stroke-dasharray="1 1" />
+          <circle cx="136" cy="68" r="5" fill="#ffffff" stroke="#0090fe" stroke-width="2" />
+          <circle cx="136" cy="68" r="2" fill="#0090fe" />
+          <line x1="130" y1="68" x2="142" y2="68" stroke="#0284c7" stroke-width="1" stroke-dasharray="1 1" />
+          <line x1="136" y1="62" x2="136" y2="74" stroke="#0284c7" stroke-width="1" stroke-dasharray="1 1" />
 
           <!-- 躯干关节点 -->
-          <circle cx="142" cy="98" r="4.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.8" />
-          <circle cx="142" cy="138" r="5.5" fill="#ffffff" stroke="#0090fe" stroke-width="2" />
-          <circle cx="142" cy="138" r="2.2" fill="#0090fe" />
+          <circle cx="136" cy="98" r="4.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.8" />
+          <circle cx="136" cy="134" r="5.5" fill="#ffffff" stroke="#0090fe" stroke-width="2" />
+          <circle cx="136" cy="134" r="2.2" fill="#0090fe" />
 
           <!-- 肩、肘、腕关节 -->
-          <circle cx="136" cy="98" r="3.5" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" />
-          <circle cx="112" cy="126" r="3.5" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" />
-          <circle cx="106" cy="151" r="3" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
+          <circle cx="120" cy="98" r="3.5" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" />
+          <circle cx="110" cy="124" r="3.5" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" />
+          <circle cx="106" cy="150" r="3" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
 
-          <circle cx="148" cy="98" r="3.5" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" />
-          <circle cx="170" cy="122" r="3.5" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" />
-          <circle cx="165" cy="146" r="3" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
+          <circle cx="152" cy="98" r="3.5" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" />
+          <circle cx="162" cy="122" r="3.5" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" />
+          <circle cx="158" cy="146" r="3" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
 
           <!-- 膝、踝关节 -->
-          <circle cx="132.5" cy="198" r="3.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
-          <circle cx="130.5" cy="228" r="3" fill="#ffffff" stroke="#0090fe" stroke-width="1.5" />
+          <circle cx="125" cy="195" r="3.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
+          <circle cx="123" cy="226" r="3" fill="#ffffff" stroke="#0090fe" stroke-width="1.5" />
 
-          <circle cx="151.5" cy="198" r="3.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
-          <circle cx="153.5" cy="228" r="3" fill="#ffffff" stroke="#0090fe" stroke-width="1.5" />
+          <circle cx="147" cy="195" r="3.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
+          <circle cx="149" cy="226" r="3" fill="#ffffff" stroke="#0090fe" stroke-width="1.5" />
 
-          <!-- 光环挂点插槽 (Halo Attachment Bone & Socket) -->
+          <!-- 基沃托斯特色光环挂点插槽 (Halo Attachment Bone & Socket) -->
           <g>
             <!-- 头部向上到光环骨骼的虚线连线 -->
-            <line x1="142" y1="46" x2="142" y2="30" stroke="#0090fe" stroke-width="1.5" stroke-dasharray="2 2" />
-            <!-- 光环插槽多边形/椭圆 -->
-            <ellipse cx="142" cy="28" rx="24" ry="6" fill="none" stroke="#0090fe" stroke-width="1.8" />
-            <circle cx="142" cy="28" r="3" fill="#38bdf8" stroke="#ffffff" stroke-width="1" />
-            <!-- 插槽标签 -->
-            <rect x="116" y="14" width="52" height="10" rx="3" fill="#e0f2fe" opacity="0.85" />
-            <rect x="122" y="17" width="40" height="4" rx="2" fill="#0284c7" />
+            <line x1="136" y1="52" x2="136" y2="34" stroke="#0090fe" stroke-width="1.5" stroke-dasharray="2 2" />
+            <!-- 光环插槽几何圆环与十字星 (蔚蓝档案光环精髓) -->
+            <ellipse
+              cx="136"
+              cy="26"
+              rx="26"
+              ry="7"
+              fill="none"
+              stroke="#0090fe"
+              stroke-width="1.8"
+              :filter="`url(#${uid}-glow)`"
+            />
+            <!-- 光环中心十字星核 -->
+            <polygon
+              points="136,18 138,24 144,26 138,28 136,34 134,28 128,26 134,24"
+              fill="#38bdf8"
+              stroke="#0090fe"
+              stroke-width="0.8"
+            />
+            <circle cx="136" cy="26" r="2" fill="#ffffff" />
+            <!-- 光环插槽文本标签 -->
+            <rect x="104" y="11" width="64" height="11" rx="3" fill="#e0f2fe" opacity="0.9" />
+            <text
+              x="109"
+              y="19.5"
+              fill="#0284c7"
+              font-size="7.5"
+              font-weight="700"
+              font-family="system-ui, -apple-system, sans-serif"
+            >
+              [HALO_BONE]
+            </text>
           </g>
 
-          <!-- 旋转关节角度测量弧 (Rotation Arc) -->
-          <path d="M 124 114 A 16 16 0 0 1 120 134" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" />
-          <polygon points="120,134 116,128 124,129" fill="#10b981" />
-          <rect x="94" y="120" width="18" height="10" rx="2.5" fill="#dcfce7" />
-          <rect x="97" y="123" width="12" height="4" rx="1.5" fill="#15803d" />
+          <!-- 关节旋转角度测量弧 (Rotation Arc) -->
+          <path
+            d="M 170 114 A 12 12 0 0 1 170 130"
+            fill="none"
+            stroke="#10b981"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+          <polygon points="170,130 166,124 173,126" fill="#10b981" />
+          <rect x="175" y="117" width="28" height="12" rx="3" fill="#dcfce7" />
+          <text
+            x="178"
+            y="126"
+            fill="#15803d"
+            font-size="7.5"
+            font-weight="700"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            32.5°
+          </text>
         </g>
       </g>
 
-      <!-- 头部骨骼到差分图层的连线 (Attachment Link) -->
+      <!-- 头部骨骼到差分图层的连线 (Attachment Slot Link) -->
       <path
-        d="M 142 62 C 180 62, 195 90, 238 90"
+        d="M 136 68 C 174 68, 194 82, 232 82"
         fill="none"
         stroke="#0090fe"
         stroke-width="1.8"
         stroke-linecap="round"
         stroke-dasharray="3 3"
       />
-      <circle cx="238" cy="90" r="3.5" fill="#0090fe" stroke="#ffffff" stroke-width="1.2" />
+      <circle cx="232" cy="82" r="3.5" fill="#0090fe" stroke="#ffffff" stroke-width="1.2" />
 
       <!-- ======================================================== -->
       <!-- 右侧：立绘差分图层与表情插槽面板 (Expression Variants Panel) -->
       <!-- ======================================================== -->
       <g :filter="`url(#${uid}-shadow)`">
         <!-- 外层卡片容器 -->
-        <rect x="238" y="44" width="138" height="194" rx="8" fill="#ffffff" stroke="#d5ebfb" stroke-width="1.2" />
+        <rect x="232" y="32" width="148" height="204" rx="10" fill="#ffffff" stroke="#cfe4f7" stroke-width="1.2" />
 
         <!-- 标题栏 -->
-        <rect x="238" y="44" width="138" height="24" rx="8" fill="#f8fafc" />
-        <rect x="238" y="58" width="138" height="10" fill="#f8fafc" />
-        <circle cx="250" cy="56" r="2.5" fill="#0090fe" />
-        <rect x="258" y="53" width="65" height="6" rx="3" fill="#1e293b" />
-        <circle cx="362" cy="56" r="2.5" fill="#94a3b8" />
+        <path d="M 232 42 A 10 10 0 0 1 242 32 L 370 32 A 10 10 0 0 1 380 42 L 380 58 L 232 58 Z" fill="#f8fcff" />
+        <line x1="232" y1="58" x2="380" y2="58" stroke="#e2e8f0" stroke-width="1" />
+        <!-- 图标：图层叠加图标 -->
+        <path d="M 242 45 L 247 42 L 252 45 L 247 48 Z" fill="#0090fe" />
+        <path d="M 242 48 L 247 51 L 252 48" fill="none" stroke="#0284c7" stroke-width="1.2" />
+        <text
+          x="256"
+          y="49"
+          fill="#1e293b"
+          font-size="9.5"
+          font-weight="700"
+          font-family="system-ui, -apple-system, sans-serif"
+          letter-spacing="0.02em"
+        >
+          立绘差分 VARIANTS
+        </text>
+        <rect x="350" y="39" width="22" height="13" rx="3" fill="#e0f2fe" />
+        <text
+          x="354"
+          y="49"
+          fill="#0284c7"
+          font-size="8"
+          font-weight="700"
+          font-family="system-ui, -apple-system, sans-serif"
+        >
+          3/12
+        </text>
 
-        <!-- 差分 1 (激活态：默认微笑表情) -->
-        <g transform="translate(246, 74)">
-          <rect x="0" y="0" width="122" height="38" rx="6" fill="#f0f9ff" stroke="#0090fe" stroke-width="1.5" />
+        <!-- 差分 1 (激活态：默认微笑表情 Face_Smile) -->
+        <g transform="translate(239, 64)">
+          <rect x="0" y="0" width="134" height="42" rx="7" fill="#f0f9ff" stroke="#0090fe" stroke-width="1.5" />
           <!-- 差分立绘微缩图框 -->
-          <rect x="6" y="6" width="26" height="26" rx="4" fill="#ffffff" stroke="#bae6fd" stroke-width="1" />
-          <!-- 微笑表情简笔画符号 -->
-          <path d="M 11 16 Q 14 13 17 16" fill="none" stroke="#0284c7" stroke-width="1.4" stroke-linecap="round" />
-          <path d="M 21 16 Q 24 13 27 16" fill="none" stroke="#0284c7" stroke-width="1.4" stroke-linecap="round" />
-          <path d="M 16 23 Q 19 26 22 23" fill="none" stroke="#0284c7" stroke-width="1.4" stroke-linecap="round" />
-          <!-- 差分插槽文本标签 -->
-          <rect x="38" y="11" width="56" height="6" rx="3" fill="#1e293b" />
-          <rect x="38" y="21" width="36" height="5" rx="2.5" fill="#0284c7" />
+          <rect x="5" y="5" width="32" height="32" rx="5" fill="#ffffff" stroke="#bae6fd" stroke-width="1" />
+          <!-- 微笑表情简笔矢量 (二次元弯眉、笑眼与软萌腮红) -->
+          <path d="M 12 18 Q 15 15 18 18" fill="none" stroke="#0284c7" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M 24 18 Q 27 15 30 18" fill="none" stroke="#0284c7" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M 19 25 Q 21 28 23 25" fill="none" stroke="#0284c7" stroke-width="1.4" stroke-linecap="round" />
+          <ellipse cx="13" cy="22" rx="2.5" ry="1.2" fill="#fda4af" opacity="0.9" />
+          <ellipse cx="29" cy="22" rx="2.5" ry="1.2" fill="#fda4af" opacity="0.9" />
+
+          <!-- 差分信息文本 -->
+          <text
+            x="42"
+            y="18"
+            fill="#0f172a"
+            font-size="9.5"
+            font-weight="700"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            Face_Smile
+          </text>
+          <text
+            x="42"
+            y="29"
+            fill="#0284c7"
+            font-size="8"
+            font-weight="600"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            [head_slot: on]
+          </text>
+
           <!-- 激活标记勾 -->
-          <circle cx="110" cy="19" r="6" fill="#0090fe" />
-          <path d="M 108 19 L 110 21 L 113 17" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="122" cy="21" r="6" fill="#0090fe" />
+          <path
+            d="M 119.5 21 L 121.5 23 L 124.5 19"
+            fill="none"
+            stroke="#ffffff"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </g>
 
-        <!-- 差分 2 (未激活：惊讶表情) -->
-        <g transform="translate(246, 118)">
-          <rect x="0" y="0" width="122" height="34" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
-          <rect x="6" y="5" width="24" height="24" rx="4" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
-          <!-- 惊讶表情简笔画符号 -->
-          <circle cx="13" cy="14" r="2" fill="#475569" />
-          <circle cx="23" cy="14" r="2" fill="#475569" />
-          <ellipse cx="18" cy="21" rx="2.2" ry="3" fill="none" stroke="#475569" stroke-width="1.2" />
+        <!-- 差分 2 (未激活：惊讶表情 Face_Surprise) -->
+        <g transform="translate(239, 110)">
+          <rect x="0" y="0" width="134" height="38" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+          <rect x="5" y="4" width="30" height="30" rx="5" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+          <!-- 惊讶表情矢量 (圆圆大眼与小 O 嘴) -->
+          <circle cx="14" cy="16" r="2.2" fill="#475569" />
+          <circle cx="26" cy="16" r="2.2" fill="#475569" />
+          <ellipse cx="20" cy="23" rx="2" ry="2.8" fill="none" stroke="#475569" stroke-width="1.3" />
+
           <!-- 文本条 -->
-          <rect x="38" y="10" width="50" height="5" rx="2.5" fill="#475569" />
-          <rect x="38" y="19" width="30" height="4" rx="2" fill="#94a3b8" />
-          <circle cx="110" cy="17" r="2.5" fill="#cbd5e1" />
+          <text
+            x="42"
+            y="17"
+            fill="#334155"
+            font-size="9"
+            font-weight="600"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            Face_Surprise
+          </text>
+          <text
+            x="42"
+            y="27"
+            fill="#94a3b8"
+            font-size="8"
+            font-weight="500"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            [head_slot]
+          </text>
+          <circle cx="122" cy="19" r="2.5" fill="#cbd5e1" />
         </g>
 
-        <!-- 差分 3 (未激活：闭眼笑 / 眨眼) -->
-        <g transform="translate(246, 158)">
-          <rect x="0" y="0" width="122" height="34" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
-          <rect x="6" y="5" width="24" height="24" rx="4" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
-          <!-- 闭眼表情简笔画符号 -->
-          <path d="M 11 16 L 14 13 L 11 10" fill="none" stroke="#64748b" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M 25 16 L 22 13 L 25 10" fill="none" stroke="#64748b" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M 16 21 Q 18 24 20 21" fill="none" stroke="#64748b" stroke-width="1.2" stroke-linecap="round" />
+        <!-- 差分 3 (未激活：眨眼/自信表情 Face_Wink) -->
+        <g transform="translate(239, 152)">
+          <rect x="0" y="0" width="134" height="38" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+          <rect x="5" y="4" width="30" height="30" rx="5" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+          <!-- 闭眼/眨眼表情简笔画符号 -->
+          <path
+            d="M 12 16 L 16 19 L 12 22"
+            fill="none"
+            stroke="#64748b"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle cx="26" cy="17" r="2.2" fill="#475569" />
+          <path d="M 18 24 Q 21 27 24 24" fill="none" stroke="#64748b" stroke-width="1.3" stroke-linecap="round" />
+
           <!-- 文本条 -->
-          <rect x="38" y="10" width="54" height="5" rx="2.5" fill="#475569" />
-          <rect x="38" y="19" width="26" height="4" rx="2" fill="#94a3b8" />
-          <circle cx="110" cy="17" r="2.5" fill="#cbd5e1" />
+          <text
+            x="42"
+            y="17"
+            fill="#334155"
+            font-size="9"
+            font-weight="600"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            Face_Wink
+          </text>
+          <text
+            x="42"
+            y="27"
+            fill="#94a3b8"
+            font-size="8"
+            font-weight="500"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            [head_slot]
+          </text>
+          <circle cx="122" cy="19" r="2.5" fill="#cbd5e1" />
         </g>
 
         <!-- 底部插槽分类切换栏 -->
-        <g transform="translate(246, 202)">
-          <rect x="0" y="0" width="56" height="18" rx="4" fill="#e0f2fe" />
-          <rect x="8" y="6" width="40" height="5" rx="2.5" fill="#0284c7" />
-          <rect x="62" y="0" width="60" height="18" rx="4" fill="#f1f5f9" />
-          <rect x="70" y="6" width="44" height="5" rx="2.5" fill="#64748b" />
+        <g transform="translate(239, 196)">
+          <rect x="0" y="0" width="64" height="24" rx="5" fill="#e0f2fe" />
+          <text
+            x="11"
+            y="16"
+            fill="#0284c7"
+            font-size="8.5"
+            font-weight="700"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            表情 FACES
+          </text>
+
+          <rect x="70" y="0" width="64" height="24" rx="5" fill="#f1f5f9" />
+          <text
+            x="78"
+            y="16"
+            fill="#64748b"
+            font-size="8.5"
+            font-weight="600"
+            font-family="system-ui, -apple-system, sans-serif"
+          >
+            配件 PROPS
+          </text>
         </g>
       </g>
 
-      <!-- 左下角：立绘视口控制器与动作播放 (Viewport Controller) -->
+      <!-- ======================================================== -->
+      <!-- 左下角：立绘动作播放与时间轴控制器 (Animation Controller) -->
+      <!-- ======================================================== -->
       <g :filter="`url(#${uid}-shadow)`">
-        <rect x="24" y="200" width="94" height="38" rx="6" fill="#ffffff" stroke="#d5ebfb" stroke-width="1.2" />
-        <!-- 动作播放图标与名称 -->
-        <circle cx="36" cy="214" r="6" fill="#f0f9ff" stroke="#0090fe" stroke-width="1" />
-        <polygon points="35,211 35,217 39,214" fill="#0090fe" />
-        <rect x="48" y="211" width="44" height="6" rx="3" fill="#1e293b" />
-        <!-- 缩放度与帧率 -->
-        <rect x="30" y="225" width="24" height="5" rx="2.5" fill="#64748b" />
-        <rect x="60" y="225" width="22" height="5" rx="2.5" fill="#10b981" />
+        <rect x="22" y="206" width="134" height="36" rx="7" fill="#ffffff" stroke="#cfe4f7" stroke-width="1.2" />
+        <!-- 动作播放按钮 -->
+        <circle cx="36" cy="224" r="7.5" fill="#f0f9ff" stroke="#0090fe" stroke-width="1.2" />
+        <polygon points="34,220 34,228 40,224" fill="#0090fe" />
+
+        <!-- 动作名称与播放轨 -->
+        <text
+          x="48"
+          y="221"
+          fill="#0f172a"
+          font-size="9"
+          font-weight="700"
+          font-family="system-ui, -apple-system, sans-serif"
+        >
+          Track 0 : Idle_01
+        </text>
+        <text
+          x="116"
+          y="221"
+          fill="#10b981"
+          font-size="7.5"
+          font-weight="700"
+          font-family="system-ui, -apple-system, sans-serif"
+        >
+          60 FPS
+        </text>
+
+        <!-- 进度条与关键帧菱形标记 -->
+        <rect x="48" y="228" width="98" height="3" rx="1.5" fill="#e2e8f0" />
+        <rect x="48" y="228" width="56" height="3" rx="1.5" fill="#0090fe" />
+        <!-- 关键帧菱形 -->
+        <polygon points="56,227 58,229.5 56,232 54,229.5" fill="#0090fe" />
+        <polygon points="78,227 80,229.5 78,232 76,229.5" fill="#0090fe" />
+        <polygon points="104,227 106,229.5 104,232 102,229.5" fill="#94a3b8" />
       </g>
     </svg>
   </div>

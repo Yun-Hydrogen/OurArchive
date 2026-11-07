@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { loadSettings, saveSettings } from '../config/storage.js';
+import { isSpineRendererMode, loadSettings, saveSettings } from '../config/storage.js';
 
 export function createConfigRouter(): Router {
   const router = Router();
@@ -34,6 +34,11 @@ export function createConfigRouter(): Router {
       if (Number.isFinite(value)) {
         patch[key] = Math.max(0, Math.min(100, Math.round(value)));
       }
+    }
+
+    // 立绘渲染器模式：只接受三个已知取值
+    if ('spine_renderer' in body && isSpineRendererMode(body.spine_renderer)) {
+      patch.spine_renderer = body.spine_renderer;
     }
 
     const updated = saveSettings(patch);

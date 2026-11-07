@@ -6,8 +6,11 @@ import {
   rizui_cfgrow,
   rizui_slider,
   rizui_button,
+  rizui_dropdown,
+  rizui_infobox,
 } from 'riz-ui';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
+import { SPINE_RENDERER_OPTIONS, type SpineRendererMode } from '@/composables/spine/mode';
 
 const props = defineProps<{
   visible: boolean;
@@ -18,7 +21,17 @@ const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
-const { config, setMainBgmVolume, setPreviewVolume, fetchConfig } = useGlobalConfig();
+const { config, setMainBgmVolume, setPreviewVolume, setSpineRenderer, fetchConfig } =
+  useGlobalConfig();
+
+const RENDERER_OPTIONS = SPINE_RENDERER_OPTIONS.map((option) => ({
+  value: option.value,
+  label: option.label,
+}));
+
+function handleRendererChange(value: string | number) {
+  setSpineRenderer(String(value) as SpineRendererMode);
+}
 
 function handleClose() {
   emit('update:visible', false);
@@ -69,6 +82,25 @@ watch(
             @update:model-value="setPreviewVolume"
           />
         </rizui_cfgrow>
+      </rizui_card>
+
+      <rizui_card title="立绘渲染" desc="BA 立绘的骨骼渲染后端，切换后下次载入生效">
+        <rizui_cfgrow
+          label="立绘渲染器"
+          hint="激进：仅 WebGL；稳定：优先 WebGL，不可用时回退 Canvas 2D；保守：仅 Canvas 2D"
+          stack
+        >
+          <rizui_dropdown
+            :model-value="config.spine_renderer"
+            :options="RENDERER_OPTIONS"
+            @update:model-value="handleRendererChange"
+          />
+        </rizui_cfgrow>
+
+        <rizui_infobox
+          type="info"
+          text="阿罗娜、普拉娜这类高密度形变立绘在 Canvas 2D 下会明显掉帧，建议保持「稳定」或「激进」。"
+        />
       </rizui_card>
     </div>
 

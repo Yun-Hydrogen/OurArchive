@@ -8,7 +8,7 @@
 | [components/home/OACardArt.vue](../../packages/client/src/components/home/OACardArt.vue) | 卡片插图组件：现代软件界面的平面/扁平化矢量设计 (SVG) |
 | [config/home.ts](../../packages/client/src/config/home.ts) | `HOME_MENU`（入口 id、标题、插画变体与目标路由） |
 | [composables/useBackgroundMusic.ts](../../packages/client/src/composables/useBackgroundMusic.ts) | 全应用单例的 `main_bgm` 播放控制，含 `suspend()` / `resume()` 淡出淡入让位给试听 |
-| [components/common/OASettingsModal.vue](../../packages/client/src/components/common/OASettingsModal.vue) | 设置弹窗：`main_bgm_volume` 与 `preview_volume` 两个音量滑条 |
+| [components/common/OASettingsModal.vue](../../packages/client/src/components/common/OASettingsModal.vue) | 设置弹窗：`main_bgm_volume` / `preview_volume` 两个音量滑条，以及 `spine_renderer` 立绘渲染器选择（`rizui_dropdown`） |
 
 ## 布局
 

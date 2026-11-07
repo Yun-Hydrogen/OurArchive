@@ -10,7 +10,7 @@
 | [tools.md](./tools.md) | `views/ToolsView.vue`、`components/tools/OAToolArt.vue`、`config/tools.ts` | 工具页：TOOL_ENTRIES、工具卡插画、卡片进出场 |
 | [resources.md](./resources.md) | `views/ResourcesView.vue`、`composables/useResourcePackages.ts` | 资源管理页：资源包 / 工程 / 存档 / 插件四个标签，资源包列表与空态 |
 | [package.md](./package.md) | `views/PackageView.vue`、`views/PackageCharacterView.vue`、`composables/usePackageContent.ts` | 资源包大卡片（左侧分类栏 + 角色列表）、角色详情、骨骼预览的按需加载 |
-| [skeleton-preview.md](./skeleton-preview.md) | `views/SkeletonPreviewView.vue`、`components/tools/OASpine*.vue`、`composables/useSpinePackage.ts`、`composables/useSpineStage.ts` | 立绘骨骼预览：立绘包识别、Spine 4.2 渲染、差分与动作、面板控件 |
+| [skeleton-preview.md](./skeleton-preview.md) | `views/SkeletonPreviewView.vue`、`components/tools/OASpine*.vue`、`composables/useSpinePackage.ts`、`composables/useSpineStage.ts`、`composables/spine/` | 立绘骨骼预览：立绘包识别、WebGL / Canvas 2D 双渲染后端与 `spine_renderer` 模式、预乘 alpha、差分与动作、按需重绘、面板控件 |
 | [mouse-spark.md](./mouse-spark.md) | `components/common/OAMouseSpark.vue`、`composables/useMouseSpark.ts` | 全局鼠标交互与点击粒子动效 |
 
 ## 目录
@@ -31,6 +31,7 @@ packages/client/src/
 │   ├── tools.ts           # TOOL_ENTRIES
 │   └── home.ts            # HOME_MENU
 ├── composables/           # useAppShell、useBannerSequence、useSplashAudio、useBackgroundMusic、useMouseSpark、useGlobalConfig、useSpinePackage、useSpineStage、useResourcePackages、usePackageContent
+│   └── spine/             # 立绘渲染后端：backend（工厂 + 契约）、webglBackend、canvasBackend、mode
 ├── components/
 │   ├── common/            # OAMouseSpark.vue、OABubbles.vue、OABannerDock.vue、OASettingsButton.vue、OASettingsModal.vue
 │   ├── home/              # OACardArt.vue（卡片插画，内联 SVG）

@@ -17,10 +17,10 @@
 <root>/
 ├── res/                      # 资源（剧本引用的图片、音频）
 ├── preload/                  # 预加载内容
-└── config/global_config.yml  # 全局配置（首次启动初始化包含 main_bgm_volume / preview_volume）
+└── config/global_config.yml  # 全局配置（首次启动初始化包含 main_bgm_volume / preview_volume / spine_renderer）
 ```
 
-首次启动后的 `global_config.yml` 初始化包含 `main_bgm_volume: 50`（主界面背景音乐音量）与 `preview_volume: 60`（预览音频 / 音效音量）。
+首次启动后的 `global_config.yml` 初始化包含 `main_bgm_volume: 50`（主界面背景音乐音量）、`preview_volume: 60`（预览音频 / 音效音量）与 `spine_renderer: stable`（立绘渲染器模式）。
 
 ## paths.ts
 
@@ -40,19 +40,21 @@ interface StoragePaths {
 
 ## storage.ts
 
-导出：`GlobalSettings`（`Record<string, unknown>`）、`StorageInitResult`（`{ paths, firstRun, settings }`）、`initializeStorage()`、`loadSettings(paths?)`、`saveSettings(settings, paths?)`。
+导出：`GlobalSettings`（`Record<string, unknown>`）、`StorageInitResult`（`{ paths, firstRun, settings }`）、`SPINE_RENDERER_MODES`、`SpineRendererMode`、`DEFAULT_SPINE_RENDERER`、`isSpineRendererMode()`、`initializeStorage()`、`loadSettings(paths?)`、`saveSettings(settings, paths?)`。
 
 `initializeStorage()` 顺序：
 
 1. `firstRun = !fs.existsSync(rootDir)`；
 2. `mkdirSync(recursive: true)` 创建根目录 + 三个子目录（已存在则跳过）；
 3. 迁移旧布局（见下）；
-4. `global_config.yml` 不存在时写入默认配置 `main_bgm_volume: 50` / `preview_volume: 60`；
+4. `global_config.yml` 不存在时写入默认配置 `main_bgm_volume: 50` / `preview_volume: 60` / `spine_renderer: stable`；
 5. 读取并返回配置。
 
-失败策略：目录创建失败 → 抛出**带路径 + 原因 + 解决建议**的错误，由启动流程 `exit(1)`；配置解析失败 → 只告警并返回默认配置 `{ main_bgm_volume: 50, preview_volume: 60 }`，保证服务能起来。
+失败策略：目录创建失败 → 抛出**带路径 + 原因 + 解决建议**的错误，由启动流程 `exit(1)`；配置解析失败 → 只告警并返回默认配置 `{ main_bgm_volume: 50, preview_volume: 60, spine_renderer: 'stable' }`，保证服务能起来。
 
 音量项校验：`main_bgm_volume` 与 `preview_volume` 共用一套规则 —— 不是有限数值就回退默认值，否则 `Math.max(0, Math.min(100, Math.round(v)))`。
+
+立绘渲染器校验：`spine_renderer` 只接受 `aggressive` / `stable` / `conservative`，其余一律回退 `stable`（`isSpineRendererMode()` 同时给 `routes/config.ts` 的 PUT 复用）。
 
 旧布局迁移：早年配置在 `<root>/configs/`（复数）或旧文件名 `global_settings.yml`，现统一为 `config/global_config.yml`。旧文件存在且新文件不存在时复制，新文件已存在则**不覆盖**；复制失败仅告警；迁移后尝试删除旧目录（失败忽略）。**迁移失败不阻断启动**。
 

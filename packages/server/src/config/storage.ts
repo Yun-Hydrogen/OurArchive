@@ -13,7 +13,16 @@ export interface StorageInitResult {
 }
 
 const DEFAULT_CONFIG_CONTENT =
-  '# Our Archive 全局配置 (global_config.yml)\nmain_bgm_volume: 50\npreview_volume: 60\n';
+  '# Our Archive 全局配置 (global_config.yml)\nmain_bgm_volume: 50\npreview_volume: 60\nspine_renderer: stable\n';
+
+/** 立绘渲染器模式，与客户端 `SpineRendererMode` 保持一致 */
+export const SPINE_RENDERER_MODES = ['aggressive', 'stable', 'conservative'] as const;
+export type SpineRendererMode = (typeof SPINE_RENDERER_MODES)[number];
+export const DEFAULT_SPINE_RENDERER: SpineRendererMode = 'stable';
+
+export function isSpineRendererMode(value: unknown): value is SpineRendererMode {
+  return SPINE_RENDERER_MODES.includes(value as SpineRendererMode);
+}
 
 /**
  * 兼容旧版本布局：
@@ -99,6 +108,7 @@ export function loadSettings(paths: StoragePaths = getStoragePaths()): GlobalSet
   const defaults: GlobalSettings = {
     main_bgm_volume: 50,
     preview_volume: 60,
+    spine_renderer: DEFAULT_SPINE_RENDERER,
   };
 
   if (!fs.existsSync(paths.settingsFile)) {
@@ -120,6 +130,9 @@ export function loadSettings(paths: StoragePaths = getStoragePaths()): GlobalSet
         } else {
           merged[key] = Math.max(0, Math.min(100, Math.round(value)));
         }
+      }
+      if (!isSpineRendererMode(merged.spine_renderer)) {
+        merged.spine_renderer = DEFAULT_SPINE_RENDERER;
       }
       return merged;
     }

@@ -3,9 +3,9 @@
 本项目自身代码以 AGPL-3.0-only 分发（见根目录 [LICENSE](../LICENSE)）。
 下列第三方组件随程序一同分发，其许可独立于本项目代码。
 
-## @esotericsoftware/spine-canvas / @esotericsoftware/spine-core
+## @esotericsoftware/spine-webgl / @esotericsoftware/spine-canvas / @esotericsoftware/spine-core
 
-用于「立绘骨骼预览」工具的 Spine 运行时（`packages/client` 依赖）。
+用于「立绘骨骼预览」工具的 Spine 运行时（`packages/client` 依赖）：`spine-webgl` 为默认渲染路径，`spine-canvas` 为保守 / 回退路径，两者共用 `spine-core`。
 
 ```
 Spine Runtimes License Agreement

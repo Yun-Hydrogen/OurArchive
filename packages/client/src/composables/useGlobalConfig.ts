@@ -1,15 +1,27 @@
 import { ref } from 'vue';
+import {
+  normalizeSpineRendererMode,
+  type SpineRendererMode,
+} from '@/composables/spine/mode';
 
 export interface GlobalConfig {
   /** 主界面背景音乐音量，0-100 */
   main_bgm_volume: number;
   /** 预览音频（资源包试听）与音效音量，0-100 */
   preview_volume: number;
+  /**
+   * 立绘渲染器模式：
+   *   - aggressive：仅 WebGL
+   *   - stable：优先 WebGL，失败回退 canvas 2d
+   *   - conservative：仅 canvas 2d
+   */
+  spine_renderer: SpineRendererMode;
 }
 
 const config = ref<GlobalConfig>({
   main_bgm_volume: 50,
   preview_volume: 60,
+  spine_renderer: 'stable',
 });
 
 const isLoaded = ref(false);
@@ -37,6 +49,7 @@ export function useGlobalConfig() {
           config.value = {
             main_bgm_volume: clampVolume(data.config.main_bgm_volume, 50),
             preview_volume: clampVolume(data.config.preview_volume, 60),
+            spine_renderer: normalizeSpineRendererMode(data.config.spine_renderer),
           };
           isLoaded.value = true;
         }
@@ -62,6 +75,7 @@ export function useGlobalConfig() {
           body: JSON.stringify({
             main_bgm_volume: config.value.main_bgm_volume,
             preview_volume: config.value.preview_volume,
+            spine_renderer: config.value.spine_renderer,
           }),
         });
       } catch (error) {
@@ -80,11 +94,17 @@ export function useGlobalConfig() {
     persist();
   }
 
+  function setSpineRenderer(mode: SpineRendererMode) {
+    config.value.spine_renderer = normalizeSpineRendererMode(mode);
+    persist();
+  }
+
   return {
     config,
     isLoaded,
     fetchConfig,
     setMainBgmVolume,
     setPreviewVolume,
+    setSpineRenderer,
   };
 }

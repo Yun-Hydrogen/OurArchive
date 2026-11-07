@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { rizui_button, rizui_cfgrow, rizui_infobox, rizui_progress, rizui_slider, rizui_switch } from 'riz-ui';
 import { useSpineStage } from '@/composables/useSpineStage';
+import { useGlobalConfig } from '@/composables/useGlobalConfig';
 import type { OASpineCharacter } from '@/composables/useSpinePackage';
 
 const props = defineProps<{
@@ -15,6 +16,9 @@ const emit = defineEmits<{
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 
+const { config, isLoaded, fetchConfig } = useGlobalConfig();
+const rendererMode = computed(() => config.value.spine_renderer);
+
 const {
   status,
   error,
@@ -23,6 +27,8 @@ const {
   activeVariant,
   actions,
   activeAction,
+  backendKind,
+  canvasKey,
   zoom,
   debugRendering,
   load,
@@ -34,7 +40,7 @@ const {
   onPointerMove,
   onPointerUp,
   onWheel,
-} = useSpineStage(canvas);
+} = useSpineStage(canvas, rendererMode);
 
 /** 缩放走百分比滑条，内部仍换算成倍率 */
 const zoomPercent = computed({
@@ -51,10 +57,14 @@ const summary = computed(() => {
   if (!info.value) {
     return '';
   }
-  return `Spine ${info.value.version} · 骨骼 ${info.value.bones} · 槽位 ${info.value.slots} · 动画 ${info.value.animations}`;
+  const renderer = backendKind.value === 'webgl' ? 'WebGL' : 'Canvas 2D';
+  return `Spine ${info.value.version} · 骨骼 ${info.value.bones} · 槽位 ${info.value.slots} · 动画 ${info.value.animations} · ${renderer}`;
 });
 
 async function start() {
+  if (!isLoaded.value) {
+    await fetchConfig();
+  }
   await load(props.character);
 }
 
@@ -75,6 +85,7 @@ watch(
     <section class="oa-viewer__stage">
       <canvas
         ref="canvas"
+        :key="canvasKey"
         class="oa-viewer__canvas"
         :class="{ 'is-loading': status === 'loading' }"
         @pointerdown="onPointerDown"
