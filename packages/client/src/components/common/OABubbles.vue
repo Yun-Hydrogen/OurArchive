@@ -22,13 +22,13 @@ const BUBBLES = [
 </script>
 
 <template>
-  <div class="oa-bubbles__bubbles" :class="{ 'is-active': active }" aria-hidden="true">
+  <div class="oa-bubbles" :class="{ 'is-active': active }" aria-hidden="true">
     <span v-for="bubble in BUBBLES" :key="bubble" class="oa-bubbles__bub" :class="bubble" />
   </div>
 </template>
 
 <style scoped>
-.oa-bubbles__bubbles {
+.oa-bubbles {
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -39,7 +39,7 @@ const BUBBLES = [
   transition: opacity 1.6s ease;
 }
 
-.oa-bubbles__bubbles.is-active {
+.oa-bubbles.is-active {
   opacity: 1;
 }
 
