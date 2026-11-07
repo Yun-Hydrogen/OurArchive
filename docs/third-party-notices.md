@@ -42,6 +42,4 @@ THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 具体见 [resources/OurArchive/LICENSE](../resources/OurArchive/LICENSE)。
 
 ## 关于《蔚蓝档案》游戏资源
-
-本项目源码与发行版本**不附带**任何《蔚蓝档案》受版权保护的游戏专有资源。
-立绘骨骼预览工具只负责读取使用者自行提供的本地文件，不内置、不下载、不收集任何游戏资产。
+项目不会包含任何游戏内的文件，请自行处理。

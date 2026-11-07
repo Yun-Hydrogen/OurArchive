@@ -3,15 +3,15 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { rizui_button, rizui_cfgrow, rizui_infobox, rizui_progress, rizui_slider, rizui_switch } from 'riz-ui';
 import { useSpineStage } from '@/composables/useSpineStage';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
-import type { OASpineCharacter } from '@/composables/useSpinePackage';
+import type { SpineCharacter } from '@/spinePackage';
 
 const props = defineProps<{
-  character: OASpineCharacter;
+  character: SpineCharacter;
 }>();
 
 const emit = defineEmits<{
   (e: 'back'): void;
-  (e: 'change'): void;
+  (e: 'reselect'): void;
 }>();
 
 const canvas = ref<HTMLCanvasElement | null>(null);
@@ -81,12 +81,12 @@ watch(
 </script>
 
 <template>
-  <div class="oa-viewer">
-    <section class="oa-viewer__stage">
+  <div class="oa-spine-viewer">
+    <section class="oa-spine-viewer__stage">
       <canvas
         ref="canvas"
         :key="canvasKey"
-        class="oa-viewer__canvas"
+        class="oa-spine-viewer__canvas"
         :class="{ 'is-loading': status === 'loading' }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
@@ -96,39 +96,39 @@ watch(
         @wheel.prevent="onWheel"
       />
 
-      <div v-if="status === 'loading'" class="oa-viewer__overlay">
+      <div v-if="status === 'loading'" class="oa-spine-viewer__overlay">
         <p>正在解析骨骼与图集…</p>
         <rizui_progress :indeterminate="true" :height="6" rounded />
       </div>
 
-      <div v-else-if="status === 'error'" class="oa-viewer__overlay oa-viewer__overlay--error">
-        <p class="oa-viewer__overlay-title">载入失败</p>
-        <p class="oa-viewer__overlay-text">{{ error }}</p>
-        <rizui_button text="重新选择文件" @click="emit('change')" />
+      <div v-else-if="status === 'error'" class="oa-spine-viewer__overlay oa-spine-viewer__overlay--error">
+        <p class="oa-spine-viewer__overlay-title">载入失败</p>
+        <p class="oa-spine-viewer__overlay-text">{{ error }}</p>
+        <rizui_button text="重新选择文件" @click="emit('reselect')" />
       </div>
 
-      <p v-else class="oa-viewer__tip">拖动画布平移 · 滚轮缩放</p>
+      <p v-else class="oa-spine-viewer__tip">拖动画布平移 · 滚轮缩放</p>
     </section>
 
-    <aside class="oa-viewer__panel">
-      <header class="oa-viewer__head">
-        <div class="oa-viewer__names">
-          <h2 class="oa-viewer__id">{{ character.id }}</h2>
-          <p class="oa-viewer__summary">{{ summary }}</p>
+    <aside class="oa-spine-viewer__panel">
+      <header class="oa-spine-viewer__head">
+        <div class="oa-spine-viewer__names">
+          <h2 class="oa-spine-viewer__id">{{ character.id }}</h2>
+          <p class="oa-spine-viewer__summary">{{ summary }}</p>
         </div>
       </header>
 
-      <section class="oa-viewer__block">
-        <div class="oa-viewer__block-head">
-          <span class="oa-viewer__label">立绘差分</span>
-          <span class="oa-viewer__count">{{ variants.length }} 项</span>
+      <section class="oa-spine-viewer__block">
+        <div class="oa-spine-viewer__block-head">
+          <span class="oa-spine-viewer__label">立绘差分</span>
+          <span class="oa-spine-viewer__count">{{ variants.length }} 项</span>
         </div>
-        <div v-if="variants.length" class="oa-viewer__chips">
+        <div v-if="variants.length" class="oa-spine-viewer__chips">
           <button
             v-for="variant in variants"
             :key="variant.name"
             type="button"
-            class="oa-chip"
+            class="oa-spine-viewer__chip"
             :class="{ 'is-active': variant.name === activeVariant }"
             :title="variant.label"
             @click="setVariant(variant.name)"
@@ -143,17 +143,17 @@ watch(
         />
       </section>
 
-      <section class="oa-viewer__block">
-        <div class="oa-viewer__block-head">
-          <span class="oa-viewer__label">动作</span>
-          <span class="oa-viewer__count">循环播放</span>
+      <section class="oa-spine-viewer__block">
+        <div class="oa-spine-viewer__block-head">
+          <span class="oa-spine-viewer__label">动作</span>
+          <span class="oa-spine-viewer__count">循环播放</span>
         </div>
-        <div class="oa-viewer__chips oa-viewer__chips--actions">
+        <div class="oa-spine-viewer__chips oa-spine-viewer__chips--actions">
           <button
             v-for="option in actionOptions"
             :key="option.value || 'static'"
             type="button"
-            class="oa-chip"
+            class="oa-spine-viewer__chip"
             :class="{ 'is-active': option.value === activeAction }"
             @click="setAction(option.value)"
           >
@@ -162,7 +162,7 @@ watch(
         </div>
       </section>
 
-      <section class="oa-viewer__block">
+      <section class="oa-spine-viewer__block">
         <rizui_cfgrow label="缩放" hint="滚轮缩放 · 拖动画布平移" stack>
           <rizui_slider
             v-model="zoomPercent"
@@ -177,7 +177,7 @@ watch(
           <rizui_switch v-model="debugRendering" />
         </rizui_cfgrow>
 
-        <div class="oa-viewer__tools">
+        <div class="oa-spine-viewer__tools">
           <rizui_button
             text="重置视角"
             l-icon="fa-solid fa-arrows-to-dot"
@@ -186,12 +186,12 @@ watch(
           <rizui_button
             text="更换文件"
             l-icon="fa-solid fa-arrow-right-arrow-left"
-            @click="emit('change')"
+            @click="emit('reselect')"
           />
         </div>
       </section>
 
-      <footer class="oa-viewer__foot">
+      <footer class="oa-spine-viewer__foot">
         <rizui_button
           text="返回工具"
           l-icon="fa-solid fa-arrow-left"
@@ -203,7 +203,7 @@ watch(
 </template>
 
 <style scoped>
-.oa-viewer {
+.oa-spine-viewer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(260px, 24vw, 330px);
   gap: 14px;
@@ -215,7 +215,7 @@ watch(
 
 /* ---------- 画布 ---------- */
 
-.oa-viewer__stage {
+.oa-spine-viewer__stage {
   position: relative;
   height: 100%;
   overflow: hidden;
@@ -229,7 +229,7 @@ watch(
     inset 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
-.oa-viewer__canvas {
+.oa-spine-viewer__canvas {
   display: block;
   width: 100%;
   height: 100%;
@@ -237,15 +237,15 @@ watch(
   touch-action: none;
 }
 
-.oa-viewer__canvas:active {
+.oa-spine-viewer__canvas:active {
   cursor: grabbing;
 }
 
-.oa-viewer__canvas.is-loading {
+.oa-spine-viewer__canvas.is-loading {
   opacity: 0.4;
 }
 
-.oa-viewer__tip {
+.oa-spine-viewer__tip {
   position: absolute;
   bottom: 10px;
   left: 50%;
@@ -258,7 +258,7 @@ watch(
   pointer-events: none;
 }
 
-.oa-viewer__overlay {
+.oa-spine-viewer__overlay {
   position: absolute;
   inset: 0;
   display: flex;
@@ -273,26 +273,26 @@ watch(
   text-align: center;
 }
 
-.oa-viewer__overlay-title {
+.oa-spine-viewer__overlay-title {
   font-size: 15px;
   font-weight: 700;
   color: #b4453a;
 }
 
-.oa-viewer__overlay-text {
+.oa-spine-viewer__overlay-text {
   max-width: 34em;
   font-size: 12.5px;
   line-height: 1.7;
   color: #7d6a68;
 }
 
-.oa-viewer__overlay :deep(.cpr-root) {
+.oa-spine-viewer__overlay :deep(.cpr-root) {
   width: min(220px, 60%);
 }
 
 /* ---------- 侧栏 ---------- */
 
-.oa-viewer__panel {
+.oa-spine-viewer__panel {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -307,7 +307,7 @@ watch(
     inset 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
-.oa-viewer__head {
+.oa-spine-viewer__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -316,11 +316,11 @@ watch(
   border-bottom: 1px solid rgba(0, 122, 204, 0.1);
 }
 
-.oa-viewer__names {
+.oa-spine-viewer__names {
   min-width: 0;
 }
 
-.oa-viewer__id {
+.oa-spine-viewer__id {
   overflow: hidden;
   font-size: 15px;
   font-weight: 700;
@@ -329,39 +329,39 @@ watch(
   white-space: nowrap;
 }
 
-.oa-viewer__summary {
+.oa-spine-viewer__summary {
   margin-top: 3px;
   font-size: 11.5px;
   line-height: 1.5;
   color: #7d94a9;
 }
 
-.oa-viewer__block {
+.oa-spine-viewer__block {
   display: flex;
   flex-direction: column;
   gap: 9px;
 }
 
-.oa-viewer__block-head {
+.oa-spine-viewer__block-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
 }
 
-.oa-viewer__label {
+.oa-spine-viewer__label {
   font-size: 12.5px;
   font-weight: 600;
   color: #1e4b76;
 }
 
-.oa-viewer__count {
+.oa-spine-viewer__count {
   font-size: 11.5px;
   color: #8ea6b9;
 }
 
 /* ---------- 差分 chips ---------- */
 
-.oa-viewer__chips {
+.oa-spine-viewer__chips {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
   gap: 6px;
@@ -370,7 +370,7 @@ watch(
   padding-right: 2px;
 }
 
-.oa-chip {
+.oa-spine-viewer__chip {
   padding: 6px 4px;
   border: 1px solid rgba(0, 122, 204, 0.16);
   border-radius: 8px;
@@ -387,12 +387,12 @@ watch(
     transform 0.18s ease;
 }
 
-.oa-chip:hover {
+.oa-spine-viewer__chip:hover {
   border-color: rgba(0, 144, 254, 0.55);
   color: #0f5a92;
 }
 
-.oa-chip.is-active {
+.oa-spine-viewer__chip.is-active {
   border-color: transparent;
   background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
   color: #ffffff;
@@ -402,20 +402,20 @@ watch(
 /* ---------- 行控件 ---------- */
 
 /* 动作是一行小胶囊，和差分 chips 同一套视觉 */
-.oa-viewer__chips--actions {
+.oa-spine-viewer__chips--actions {
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   max-height: none;
   overflow: visible;
 }
 
-.oa-viewer__tools {
+.oa-spine-viewer__tools {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 2px;
 }
 
-.oa-viewer__foot {
+.oa-spine-viewer__foot {
   display: flex;
   margin-top: auto;
   padding-top: 10px;
@@ -423,16 +423,16 @@ watch(
 }
 
 @media (max-width: 980px) {
-  .oa-viewer {
+  .oa-spine-viewer {
     grid-template-columns: 1fr;
     height: auto;
   }
 
-  .oa-viewer__stage {
+  .oa-spine-viewer__stage {
     height: 54vh;
   }
 
-  .oa-viewer__panel {
+  .oa-spine-viewer__panel {
     overflow-y: visible;
   }
 }

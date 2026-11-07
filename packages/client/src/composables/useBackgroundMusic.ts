@@ -1,5 +1,6 @@
 import { ref, watch } from 'vue';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
+import { readonlyRef } from '@/utils/reactivity';
 
 /** preload 清单中的主界面背景音乐 id */
 const MAIN_BGM_SRC = '/api/preload/asset/main_bgm';
@@ -272,9 +273,20 @@ watch(
 /**
  * 主界面背景音乐（preload id: main_bgm）。
  *
- * 音频元素与播放状态都保存在模块作用域，属于全应用单例：
+ * **单例**：音频元素与播放状态都保存在模块作用域，
  * splash 淡入播放后切换到主界面不会中断，路由卸载也不会销毁音频。
  */
 export function useBackgroundMusic() {
-  return { isPlaying, volume, preload, play, ensurePlaying, fadeIn, stop, setVolume, suspend, resume };
+  return {
+    isPlaying: readonlyRef(isPlaying),
+    volume: readonlyRef(volume),
+    preload,
+    play,
+    ensurePlaying,
+    fadeIn,
+    stop,
+    setVolume,
+    suspend,
+    resume,
+  };
 }

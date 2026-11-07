@@ -1,46 +1,16 @@
 import { ref } from 'vue';
+import { fetchResourcePackages } from '@/api/packages';
+import { apiErrorMessage } from '@/api/request';
+import { readonlyRef } from '@/utils/reactivity';
+import type { ResourcePackage } from '@our-archive/shared';
 
-export interface PackageContent {
-  /** package.yml 里的键，如 Skeletons */
-  key: string;
-  /** 展示名，如 骨骼 */
-  label: string;
-  /** 作者是否声明包含该类资源 */
-  supported: boolean;
-  /** 相对资源包根目录的路径 */
-  path: string;
-  /** 索引文件名（hasCharacter 用） */
-  index: string;
-  /** 图片子目录（hasCharacter 用） */
-  avatar: string;
-  /** 声明为包含且目录存在 */
-  exists: boolean;
-  /** 条目数（角色为角色条数，骨骼为立绘目录数） */
-  count: number;
-}
-
-export interface ResourcePackage {
-  id: string;
-  name: string;
-  description: string;
-  version: string;
-  author: string;
-  updatedAt: string;
-  valid: boolean;
-  error?: string;
-  contents: PackageContent[];
-}
-
-interface PackagesResponse {
-  success: boolean;
-  resourcesDir?: string;
-  total?: number;
-  packages?: ResourcePackage[];
-  error?: string;
-}
+/** 跨端 DTO 由 `@our-archive/shared` 提供，这里重新导出给视图使用 */
+export type { PackageContent, ResourcePackage } from '@our-archive/shared';
 
 /**
  * 资源包索引（后端扫描 `<root>/res` 下带 package.yml 的目录）。
+ *
+ * 状态只读暴露：视图通过 `refresh()` 触发重扫，不直接改写。
  */
 export function useResourcePackages() {
   const packages = ref<ResourcePackage[]>([]);
@@ -53,22 +23,22 @@ export function useResourcePackages() {
     error.value = '';
 
     try {
-      const res = await fetch('/api/packages');
-      const data = (await res.json().catch(() => null)) as PackagesResponse | null;
-
-      if (!res.ok || !data || !data.success) {
-        throw new Error(data?.error ?? `HTTP ${res.status}`);
-      }
-
-      resourcesDir.value = String(data.resourcesDir ?? '');
-      packages.value = Array.isArray(data.packages) ? data.packages : [];
+      const data = await fetchResourcePackages();
+      resourcesDir.value = data.resourcesDir;
+      packages.value = data.packages;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err);
+      error.value = apiErrorMessage(err, '请求失败');
       packages.value = [];
     } finally {
       loading.value = false;
     }
   }
 
-  return { packages, resourcesDir, loading, error, refresh };
+  return {
+    packages: readonlyRef(packages),
+    resourcesDir: readonlyRef(resourcesDir),
+    loading: readonlyRef(loading),
+    error: readonlyRef(error),
+    refresh,
+  };
 }

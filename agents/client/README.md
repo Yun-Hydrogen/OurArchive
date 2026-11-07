@@ -12,6 +12,7 @@
 | [package.md](./package.md) | `views/PackageView.vue`、`views/PackageCharacterView.vue`、`composables/usePackageContent.ts` | 资源包大卡片（左侧分类栏 + 角色列表）、角色详情、骨骼预览的按需加载 |
 | [skeleton-preview.md](./skeleton-preview.md) | `views/SkeletonPreviewView.vue`、`components/tools/OASpine*.vue`、`composables/useSpinePackage.ts`、`composables/useSpineStage.ts`、`composables/spine/` | 立绘骨骼预览：立绘包识别、WebGL / Canvas 2D 双渲染后端与 `spine_renderer` 模式、预乘 alpha、差分与动作、按需重绘、面板控件 |
 | [mouse-spark.md](./mouse-spark.md) | `components/common/OAMouseSpark.vue`、`composables/useMouseSpark.ts` | 全局鼠标交互与点击粒子动效 |
+| [WARN.md](./WARN.md) | 全部客户端模块 | **踩坑总集**：46 条按「位置 / 表现 / 解决方案 / 原理 / 效果 / 备注」记录，改代码前先扫对应分组 |
 
 ## 目录
 
@@ -30,8 +31,11 @@ packages/client/src/
 │   ├── transition.ts      # SHELL_TIMING（banner 停靠 / 卡片入场与离场）
 │   ├── tools.ts           # TOOL_ENTRIES
 │   └── home.ts            # HOME_MENU
-├── composables/           # useAppShell、useBannerSequence、useSplashAudio、useBackgroundMusic、useMouseSpark、useGlobalConfig、useSpinePackage、useSpineStage、useResourcePackages、usePackageContent
-│   └── spine/             # 立绘渲染后端：backend（工厂 + 契约）、webglBackend、canvasBackend、mode
+├── api/                   # request.ts（封装）、packages.ts / config.ts（接口）
+├── utils/                 # format.ts、reactivity.ts（readonlyRef）
+├── spinePackage.ts        # 立绘包识别与装配（非 composable）
+├── spine/                 # 渲染适配：backend、mode、webglBackend、canvasBackend
+├── composables/           # useAppShell、useBannerSequence、useSplashAudio、useBackgroundMusic、useMouseSpark、useGlobalConfig、useSpineStage、useResourcePackages、usePackageContent
 ├── components/
 │   ├── common/            # OAMouseSpark.vue、OABubbles.vue、OABannerDock.vue、OASettingsButton.vue、OASettingsModal.vue
 │   ├── home/              # OACardArt.vue（卡片插画，内联 SVG）
@@ -49,8 +53,4 @@ packages/client/src/
 
 ## 约定
 
-- 页面放 `views/`，可复用 UI 放 `components/<feature>/`，状态与时序放 `composables/`，常量放 `config/`。
-- **不要为一个页面拆碎组件**：只在组件被多处复用、或体积过大（如 34KB 的 SVG）时才独立成文件。
-- 别名：源码用 `@`，仓库资源用 `@resources`，不写 `../` 穿越。
-- 字体只用 `var(--oa-font)`；不加载任何外部资源（字体、CDN、统计脚本）。
 - 新增页面后同步更新本索引与 [app-shell.md](./app-shell.md) 的路由表。

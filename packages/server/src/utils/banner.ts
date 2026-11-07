@@ -13,7 +13,7 @@ export interface StartupInfo {
   storage: StoragePaths;
   firstRun: boolean;
   /** 已加载的全局配置项数量 */
-  settingsCount: number;
+  configCount: number;
   /** 可用的前端构建产物目录，未构建时为 null */
   clientDistPath: string | null;
   /** 预加载资源检查结果 */
@@ -21,7 +21,7 @@ export interface StartupInfo {
 }
 
 export function printStartupInfo(info: StartupInfo) {
-  const { port, publicUrl, networkUrl, storage, firstRun, settingsCount, clientDistPath, preload } =
+  const { port, publicUrl, networkUrl, storage, firstRun, configCount, clientDistPath, preload } =
     info;
   const line = pc.cyan('═'.repeat(58));
 
@@ -34,7 +34,7 @@ export function printStartupInfo(info: StartupInfo) {
   console.log(pc.bold(pc.cyan(' | | | | | | | \'__/ /_\\ \\ \'__|/ __| \'_ \\| \\ \\ / / _ \\')));
   console.log(pc.bold(pc.cyan(' | |_| | |_| | |  |  _  | |  | (__| | | | |\\ V /  __/')));
   console.log(pc.bold(pc.cyan('  \\___/ \\__,_|_|  |_| |_|_|   \\___|_| |_|_| \\_/ \\___|')));
-  console.log(pc.dim('        -- Blue Archive Visual Novel Simulator --'));
+  console.log(pc.dim('             -- Visual Novel Simulator --'));
   console.log(line);
   console.log();
   console.log(`  ${pc.green('➜')}  ${pc.bold('Local:')}      ${pc.cyan(publicUrl)}`);
@@ -52,7 +52,7 @@ export function printStartupInfo(info: StartupInfo) {
   );
   console.log(
     `  ${pc.green('➜')}  ${pc.bold('Config:')}     ${pc.dim(
-      `${rel(storage.settingsFile)}  (${settingsCount} 项)`
+      `${rel(storage.configFile)}  (${configCount} 项)`
     )}`
   );
 

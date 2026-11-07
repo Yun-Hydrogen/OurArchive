@@ -1,97 +1,29 @@
 import { ref } from 'vue';
-import type { ResourcePackage } from '@/composables/useResourcePackages';
+import {
+  fetchPackageCharacters,
+  fetchPackageMusic,
+  fetchPackageSkeletons,
+  fetchResourcePackage,
+} from '@/api/packages';
+import { apiErrorMessage } from '@/api/request';
+import { readonlyRef } from '@/utils/reactivity';
+import type {
+  PackageCharacter,
+  PackageMusic,
+  PackageSkeleton,
+  ResourcePackage,
+} from '@our-archive/shared';
 
-/** 角色条目：后端在 characters.json 之上补了资源 URL 与骨骼存在性 */
-export interface PackageCharacter {
-  name_id: string;
-  name: string;
-  school: string;
-  club: string;
-  /** 头像文件名；缺头像时为空串 */
-  avatar: string;
-  /** 头像可访问 URL */
-  avatarUrl: string;
-  /** 绑定的立绘 id（与 characters.json 一致） */
-  spine: string[];
-  /** 每条立绘在 skeletons/ 下是否存在 */
-  spines: Array<{ id: string; exists: boolean }>;
-  /** 是否至少有一条立绘可用 */
-  hasSkeleton: boolean;
-}
+/** 跨端 DTO 由 `@our-archive/shared` 提供，这里重新导出给视图使用 */
+export type {
+  PackageCharacter,
+  PackageMusic,
+  PackageSkeleton,
+  PackageSkeletonItem,
+} from '@our-archive/shared';
 
-/** 立绘目录里的单个文件 */
-export interface PackageSkeletonFile {
-  name: string;
-  /** 小写扩展名，含点 */
-  ext: string;
-  size: number;
-  url: string;
-}
-
-/** 一个立绘目录（`skeletons/<id>/`） */
-export interface PackageSkeleton {
-  id: string;
-  files: PackageSkeletonFile[];
-  totalSize: number;
-  /** 骨骼 + 图集 + 贴图齐全，可直接预览 */
-  complete: boolean;
-}
-
-/** 一首背景音乐 */
-export interface PackageMusic {
-  name_id: string;
-  filename: string;
-  title: string;
-  artist: string;
-  /** 完整描述：卡片折叠两行，详情弹窗显示全文 */
-  description: string;
-  /** 音频 URL；文件缺失时为空串 */
-  url: string;
-  exists: boolean;
-}
-
-interface PackageResponse {
-  success: boolean;
-  package?: ResourcePackage;
-  error?: string;
-}
-
-interface CharactersResponse {
-  success: boolean;
-  total?: number;
-  characters?: PackageCharacter[];
-  error?: string;
-}
-
-interface SkeletonsResponse {
-  success: boolean;
-  total?: number;
-  skeletons?: PackageSkeleton[];
-  error?: string;
-}
-
-interface MusicResponse {
-  success: boolean;
-  total?: number;
-  music?: PackageMusic[];
-  error?: string;
-}
-
-interface SkeletonFilesResponse {
-  success: boolean;
-  id?: string;
-  files?: PackageSkeletonFile[];
-  error?: string;
-}
-
-async function getJson<T extends { success: boolean; error?: string }>(url: string): Promise<T> {
-  const res = await fetch(url);
-  const data = (await res.json().catch(() => null)) as T | null;
-
-  if (!res.ok || !data || !data.success) {
-    throw new Error(data?.error ?? `HTTP ${res.status}`);
-  }
-  return data;
+function errorText(err: unknown): string {
+  return apiErrorMessage(err, '请求失败');
 }
 
 /**
@@ -99,6 +31,7 @@ async function getJson<T extends { success: boolean; error?: string }>(url: stri
  *
  * 详情与角色进页面就拉；立绘目录有 600+ 项、体积也大，
  * 等用户真正切到「骨骼」分类时再按需加载。
+ * 状态只读暴露，改数据一律走 `load*()`。
  */
 export function usePackageContent(packageId: string) {
   const pkg = ref<ResourcePackage | null>(null);
@@ -123,13 +56,10 @@ export function usePackageContent(packageId: string) {
     error.value = '';
 
     try {
-      pkg.value = (await getJson<PackageResponse>(`/api/packages/${encodeURIComponent(packageId)}`)).package ?? null;
-      const chars = await getJson<CharactersResponse>(
-        `/api/packages/${encodeURIComponent(packageId)}/characters`
-      );
-      characters.value = chars.characters ?? [];
+      pkg.value = (await fetchResourcePackage(packageId)).package;
+      characters.value = (await fetchPackageCharacters(packageId)).characters;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err);
+      error.value = errorText(err);
       pkg.value = null;
       characters.value = [];
     } finally {
@@ -150,13 +80,10 @@ export function usePackageContent(packageId: string) {
     skeletonsError.value = '';
 
     try {
-      const data = await getJson<SkeletonsResponse>(
-        `/api/packages/${encodeURIComponent(packageId)}/skeletons`
-      );
-      skeletons.value = data.skeletons ?? [];
+      skeletons.value = (await fetchPackageSkeletons(packageId)).skeletons;
       skeletonsLoaded = true;
     } catch (err) {
-      skeletonsError.value = err instanceof Error ? err.message : String(err);
+      skeletonsError.value = errorText(err);
       skeletons.value = [];
     } finally {
       skeletonsLoading.value = false;
@@ -176,13 +103,10 @@ export function usePackageContent(packageId: string) {
     musicError.value = '';
 
     try {
-      const data = await getJson<MusicResponse>(
-        `/api/packages/${encodeURIComponent(packageId)}/music`
-      );
-      music.value = data.music ?? [];
+      music.value = (await fetchPackageMusic(packageId)).music;
       musicLoaded = true;
     } catch (err) {
-      musicError.value = err instanceof Error ? err.message : String(err);
+      musicError.value = errorText(err);
       music.value = [];
     } finally {
       musicLoading.value = false;
@@ -190,29 +114,18 @@ export function usePackageContent(packageId: string) {
   }
 
   return {
-    pkg,
-    characters,
-    skeletons,
-    music,
-    loading,
-    error,
-    skeletonsLoading,
-    skeletonsError,
-    musicLoading,
-    musicError,
+    pkg: readonlyRef(pkg),
+    characters: readonlyRef(characters),
+    skeletons: readonlyRef(skeletons),
+    music: readonlyRef(music),
+    loading: readonlyRef(loading),
+    error: readonlyRef(error),
+    skeletonsLoading: readonlyRef(skeletonsLoading),
+    skeletonsError: readonlyRef(skeletonsError),
+    musicLoading: readonlyRef(musicLoading),
+    musicError: readonlyRef(musicError),
     load,
     loadSkeletons,
     loadMusic,
   };
-}
-
-/** 从服务端拉取一个立绘目录下的文件 */
-export async function fetchSkeletonFiles(
-  packageId: string,
-  skeletonId: string
-): Promise<PackageSkeletonFile[]> {
-  const data = await getJson<SkeletonFilesResponse>(
-    `/api/packages/${encodeURIComponent(packageId)}/skeleton/${encodeURIComponent(skeletonId)}`
-  );
-  return data.files ?? [];
 }

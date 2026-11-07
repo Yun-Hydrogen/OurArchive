@@ -1,7 +1,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
+import type {
+  PackageCharacter,
+  PackageContent,
+  PackageMusic,
+  PackageSkeleton,
+  PackageSkeletonItem,
+  ResourcePackage,
+} from '@our-archive/shared';
 import { getStoragePaths, type StoragePaths } from './paths.js';
+
+/**
+ * 跨端 DTO 统一由 `@our-archive/shared` 提供，服务端只做读取与派生。
+ * 这里重新导出，让 `routes/` 与文档不必记住两个来源。
+ */
+export type {
+  PackageCharacter,
+  PackageContent,
+  PackageMusic,
+  PackageSkeleton,
+  PackageSkeletonItem,
+  ResourcePackage,
+} from '@our-archive/shared';
 
 /** 资源包清单文件名：`res/<包名>/package.yml` */
 export const PACKAGE_MANIFEST_FILE_NAME = 'package.yml';
@@ -33,7 +54,10 @@ export function buildAssetUrl(
 
 /**
  * package.yml 中已知的内容分类 → 中文展示名。
- * 未收录的自定义键直接回退成键名本身。
+ *
+ * 分类键是**外载格式**：骨骼 / 表情 / 音效 / 背景 / 背景音乐为 PascalCase，
+ * 角色为 camelCase `hasCharacter`。这里原样匹配、**不做大小写归一**，
+ * 新增分类先加约定再往这里加条目。
  */
 export const PACKAGE_CONTENT_LABELS: Record<string, string> = {
   Emotions: '表情',
@@ -43,46 +67,6 @@ export const PACKAGE_CONTENT_LABELS: Record<string, string> = {
   BackgroundMusic: '背景音乐',
   hasCharacter: '角色',
 };
-
-export interface PackageContent {
-  /** package.yml 里的键，如 Skeletons / hasCharacter */
-  key: string;
-  /** 展示名，如 骨骼 / 角色 */
-  label: string;
-  /** 作者是否声明包含该类资源 */
-  supported: boolean;
-  /** 相对资源包根目录的路径 */
-  path: string;
-  /** 索引文件名（仅 hasCharacter 使用，缺省 characters.json） */
-  index: string;
-  /** 图片子目录（仅 hasCharacter 使用，缺省 avatars） */
-  avatar: string;
-  /** 声明为包含且目录存在 */
-  exists: boolean;
-  /** 目录下的一级条目数（仅在 supported 时统计） */
-  count: number;
-}
-
-export interface ResourcePackage {
-  /** 资源包目录名，同时作为唯一标识 */
-  id: string;
-  /** package_info.name */
-  name: string;
-  /** package_info.description */
-  description: string;
-  /** package_info.version */
-  version: string;
-  /** package_info.author */
-  author: string;
-  /** package.yml 的最后修改时间（ISO 字符串） */
-  updatedAt: string;
-  /** package.yml 是否可解析出 package_info */
-  valid: boolean;
-  /** 解析失败时的原因 */
-  error?: string;
-  /** package_content 声明的内容分类（按清单顺序） */
-  contents: PackageContent[];
-}
 
 function asText(value: unknown): string {
   if (value === null || value === undefined) {
@@ -148,7 +132,7 @@ function countEntries(dir: string, key: string): { exists: boolean; count: numbe
 /** package_content 条目里除内容类型以外的字段 */
 const CONTENT_RESERVED_KEYS = new Set(['supported', 'path', 'index', 'avatar', 'name', 'description']);
 
-function buildContent(packageRoot: string, key: string, config: Record<string, unknown>): PackageContent {
+function buildPackageContent(packageRoot: string, key: string, config: Record<string, unknown>): PackageContent {
   const relativePath = asText(config.path).replace(/^[/\\]+/, '');
   const supported = asBool(config.supported);
 
@@ -184,7 +168,7 @@ function buildContent(packageRoot: string, key: string, config: Record<string, u
  *     path: emotions
  * ```
  */
-function parseContents(packageDir: string, raw: unknown): PackageContent[] {
+function parsePackageContents(packageDir: string, raw: unknown): PackageContent[] {
   if (!Array.isArray(raw)) {
     return [];
   }
@@ -204,7 +188,7 @@ function parseContents(packageDir: string, raw: unknown): PackageContent[] {
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
         continue;
       }
-      contents.push(buildContent(root, key, value as Record<string, unknown>));
+      contents.push(buildPackageContent(root, key, value as Record<string, unknown>));
       hasNested = true;
     }
 
@@ -220,14 +204,14 @@ function parseContents(packageDir: string, raw: unknown): PackageContent[] {
     // 形如 `- Emotions: emotions` 时把值当作路径
     const typeValue = record[typeKey];
     const config = typeof typeValue === 'string' ? { ...record, path: record.path ?? typeValue } : record;
-    contents.push(buildContent(root, typeKey, config));
+    contents.push(buildPackageContent(root, typeKey, config));
   }
 
   return contents;
 }
 
 
-function readPackage(packageDir: string, id: string): ResourcePackage | null {
+function readResourcePackage(packageDir: string, id: string): ResourcePackage | null {
   const manifest = path.join(packageDir, PACKAGE_MANIFEST_FILE_NAME);
   if (!fs.existsSync(manifest)) {
     return null;
@@ -293,7 +277,7 @@ function readPackage(packageDir: string, id: string): ResourcePackage | null {
     version: asText(info.version),
     author: asText(info.author),
     valid: true,
-    contents: parseContents(packageDir, contentRaw),
+    contents: parsePackageContents(packageDir, contentRaw),
   };
 }
 
@@ -313,7 +297,7 @@ export function scanResourcePackages(paths: StoragePaths = getStoragePaths()): R
 
   return entries
     .filter((entry) => entry.isDirectory())
-    .map((entry) => readPackage(path.join(paths.resDir, entry.name), entry.name))
+    .map((entry) => readResourcePackage(path.join(paths.resDir, entry.name), entry.name))
     .filter((pkg): pkg is ResourcePackage => pkg !== null)
     .sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -359,7 +343,13 @@ export function resolveInside(baseDir: string, relativePath: string): string | n
   return target;
 }
 
-/** 角色索引里的一条记录（characters.json 的原始字段） */
+/**
+ * 角色索引里的一条记录（`characters.json` 的原始字段）。
+ *
+ * ⚠️ 字段名是**外载格式**：`name_id` 为 snake_case，`spine` 指的是「立绘 id 列表」
+ * （目录名，如 `fuuka_spr`），与前端语义「骨骼 / skeleton」等价。
+ * 代码里一律用 `skeleton` 表述，仅此处保留外载原名。
+ */
 export interface PackageCharacterSource {
   name_id: string;
   name: string;
@@ -369,20 +359,8 @@ export interface PackageCharacterSource {
   spine: string[];
 }
 
-/** 给前端用的角色条目：补上资源 URL 与骨骼存在性 */
-export interface PackageCharacterEntry extends Omit<PackageCharacterSource, 'spine'> {
-  /** 头像可访问 URL；没有头像时为空串 */
-  avatarUrl: string;
-  /** 资源包内绑定的立绘 id 列表 */
-  spine: string[];
-  /** 每条立绘是否真的存在于 skeletons/ 下 */
-  spines: Array<{ id: string; exists: boolean }>;
-  /** 是否至少有一条立绘可用 */
-  hasSkeleton: boolean;
-}
-
 /** 从 package_content 里找某个分类的配置 */
-function contentOf(pkg: ResourcePackage, key: string): PackageContent | undefined {
+function getContent(pkg: ResourcePackage, key: string): PackageContent | undefined {
   return pkg.contents.find((item) => item.key === key);
 }
 
@@ -394,8 +372,8 @@ function contentOf(pkg: ResourcePackage, key: string): PackageContent | undefine
 export function readPackageCharacters(
   packageDir: string,
   pkg: ResourcePackage
-): PackageCharacterEntry[] {
-  const content = contentOf(pkg, 'hasCharacter');
+): PackageCharacter[] {
+  const content = getContent(pkg, 'hasCharacter');
   if (!content || !content.supported) {
     return [];
   }
@@ -425,12 +403,12 @@ export function readPackageCharacters(
 
   const avatarDirName = asText(content.avatar) || DEFAULT_AVATAR_DIR;
   const avatarDir = resolveInside(indexDir, avatarDirName);
-  const skeletonContent = contentOf(pkg, 'Skeletons');
+  const skeletonContent = getContent(pkg, 'Skeletons');
   const skeletonDir = skeletonContent?.supported
     ? resolveInside(packageDir, skeletonContent.path)
     : null;
 
-  const entries: PackageCharacterEntry[] = [];
+  const entries: PackageCharacter[] = [];
 
   for (const raw of parsed) {
     if (!raw || typeof raw !== 'object') {
@@ -470,22 +448,6 @@ export function readPackageCharacters(
   return entries.sort((a, b) => a.name_id.localeCompare(b.name_id));
 }
 
-/** 一首背景音乐（`background_music/index/music_info.json` 的一条） */
-export interface PackageMusicEntry {
-  /** 曲目 id，如 `theme_01` */
-  name_id: string;
-  /** 实际文件名，如 `Theme_01.ogg` */
-  filename: string;
-  title: string;
-  artist: string;
-  /** 完整描述（可能是多行剧情注释），卡片折叠两行、详情弹窗显示全文 */
-  description: string;
-  /** 音频可访问 URL（文件缺失时为空串） */
-  url: string;
-  /** 音频文件是否真的存在 */
-  exists: boolean;
-}
-
 const AUDIO_EXTENSIONS = new Set([
   '.ogg',
   '.mp3',
@@ -506,8 +468,8 @@ const AUDIO_EXTENSIONS = new Set([
 export function readPackageMusic(
   packageDir: string,
   pkg: ResourcePackage
-): PackageMusicEntry[] {
-  const content = contentOf(pkg, 'BackgroundMusic');
+): PackageMusic[] {
+  const content = getContent(pkg, 'BackgroundMusic');
   if (!content || !content.supported) {
     return [];
   }
@@ -565,7 +527,7 @@ export function readPackageMusic(
     return null;
   }
 
-  const entries: PackageMusicEntry[] = [];
+  const entries: PackageMusic[] = [];
 
   for (const raw of parsed) {
     if (!raw || typeof raw !== 'object') {
@@ -601,7 +563,7 @@ export function resolveMusicFile(
   pkg: ResourcePackage,
   filename: string
 ): string | null {
-  const content = contentOf(pkg, 'BackgroundMusic');
+  const content = getContent(pkg, 'BackgroundMusic');
   if (!content || !content.supported) {
     return null;
   }
@@ -621,33 +583,13 @@ export function resolveMusicFile(
   return target;
 }
 
-/** 立绘目录里的单个文件 */
-export interface PackageSkeletonFile {
-  name: string;
-  /** 小写扩展名，含点（`.skel` / `.atlas` / `.png`） */
-  ext: string;
-  /** 字节数 */
-  size: number;
-  url: string;
-}
-
-/** 一个立绘目录（`skeletons/<id>/`） */
-export interface PackageSkeletonEntry {
-  id: string;
-  files: PackageSkeletonFile[];
-  /** 全部文件体积之和 */
-  totalSize: number;
-  /** 是否同时具备骨骼 + 图集 + 贴图（可直接预览） */
-  complete: boolean;
-}
-
 /** 读取某个立绘目录下的文件；目录不存在或不是骨骼分类时返回 null */
 export function readSkeletonFiles(
   packageDir: string,
   pkg: ResourcePackage,
   skeletonId: string
-): PackageSkeletonFile[] | null {
-  const content = contentOf(pkg, 'Skeletons');
+): PackageSkeletonItem[] | null {
+  const content = getContent(pkg, 'Skeletons');
   if (!content || !content.supported) {
     return null;
   }
@@ -662,11 +604,11 @@ export function readSkeletonFiles(
     return null;
   }
 
-  return listSkeletonDir(pkg.id, skeletonId, dir);
+  return readSkeletonDir(pkg.id, skeletonId, dir);
 }
 
 /** 读一个立绘目录里的文件（含体积），失败返回 null */
-function listSkeletonDir(packageId: string, skeletonId: string, dir: string): PackageSkeletonFile[] | null {
+function readSkeletonDir(packageId: string, skeletonId: string, dir: string): PackageSkeletonItem[] | null {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -674,7 +616,7 @@ function listSkeletonDir(packageId: string, skeletonId: string, dir: string): Pa
     return null;
   }
 
-  const files: PackageSkeletonFile[] = [];
+  const files: PackageSkeletonItem[] = [];
 
   for (const entry of entries) {
     if (!entry.isFile()) {
@@ -709,8 +651,8 @@ function listSkeletonDir(packageId: string, skeletonId: string, dir: string): Pa
 export function readPackageSkeletons(
   packageDir: string,
   pkg: ResourcePackage
-): PackageSkeletonEntry[] {
-  const content = contentOf(pkg, 'Skeletons');
+): PackageSkeleton[] {
+  const content = getContent(pkg, 'Skeletons');
   if (!content || !content.supported) {
     return [];
   }
@@ -727,7 +669,7 @@ export function readPackageSkeletons(
     return [];
   }
 
-  const results: PackageSkeletonEntry[] = [];
+  const results: PackageSkeleton[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) {
@@ -735,7 +677,7 @@ export function readPackageSkeletons(
     }
 
     const dir = path.join(root, entry.name);
-    const files = listSkeletonDir(pkg.id, entry.name, dir) ?? [];
+    const files = readSkeletonDir(pkg.id, entry.name, dir) ?? [];
     const exts = new Set(files.map((file) => file.ext));
 
     results.push({

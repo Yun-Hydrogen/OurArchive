@@ -50,7 +50,7 @@ app.listen(PORT, SERVER_HOST, () => {
     networkUrl,
     storage: storage.paths,
     firstRun: storage.firstRun,
-    settingsCount: Object.keys(storage.settings).length,
+    configCount: Object.keys(storage.config).length,
     clientDistPath,
     preload,
   });

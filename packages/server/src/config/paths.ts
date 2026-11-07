@@ -16,7 +16,7 @@ export const STORAGE_DIRS = {
   config: 'config',
 } as const;
 
-export const SETTINGS_FILE_NAME = 'global_config.yml';
+export const CONFIG_FILE_NAME = 'global_config.yml';
 export const PRELOAD_ASSETS_FILE_NAME = 'preload_assets.yml';
 
 export interface StoragePaths {
@@ -26,7 +26,7 @@ export interface StoragePaths {
   resDir: string;
   preloadDir: string;
   configDir: string;
-  settingsFile: string;
+  configFile: string;
 }
 
 /**
@@ -105,7 +105,7 @@ export function getStoragePaths(): StoragePaths {
     resDir: path.join(rootDir, STORAGE_DIRS.res),
     preloadDir: path.join(rootDir, STORAGE_DIRS.preload),
     configDir: path.join(rootDir, STORAGE_DIRS.config),
-    settingsFile: path.join(rootDir, STORAGE_DIRS.config, SETTINGS_FILE_NAME),
+    configFile: path.join(rootDir, STORAGE_DIRS.config, CONFIG_FILE_NAME),
   };
 }
 

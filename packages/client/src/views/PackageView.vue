@@ -7,6 +7,7 @@ import { ROUTE_NAMES } from '@/config/routes';
 import { SHELL_TIMING } from '@/config/transition';
 import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
+import { formatBytes, formatDuration } from '@/utils/format';
 import {
   usePackageContent,
   type PackageCharacter,
@@ -153,7 +154,7 @@ function handleNavSelect(item: NavItem) {
   void nextTick(() => {
     const container = contentEl.value;
     const target = container?.querySelector<HTMLElement>(
-      `.oa-school[data-school="${CSS.escape(school)}"]`
+      `.oa-pkg__school[data-school="${CSS.escape(school)}"]`
     );
     if (!container || !target) {
       return;
@@ -370,21 +371,8 @@ function toggleSkeleton(id: string) {
 function previewSkeleton(id: string) {
   leaveTo({
     name: ROUTE_NAMES.skeletonPreview,
-    query: { package: packageId.value, skeleton: id },
+    query: { packageId: packageId.value, skeletonId: id },
   });
-}
-
-function formatSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return '0 B';
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
 /** 文件类型标签：骨骼 / 图集 / 贴图 / 其它 */
@@ -534,16 +522,6 @@ function seekMusic(value: number) {
   }
   el.currentTime = value;
   musicCurrent.value = value;
-}
-
-function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) {
-    return '0:00';
-  }
-  const total = Math.floor(seconds);
-  const mm = Math.floor(total / 60);
-  const ss = total % 60;
-  return `${mm}:${String(ss).padStart(2, '0')}`;
 }
 
 /** 切换分类 / 离开页面时停掉音乐，并恢复主界面背景音乐 */
@@ -709,7 +687,7 @@ function openCharacter(character: PackageCharacter) {
             <div
               v-for="group in schoolGroups"
               :key="group.school"
-              class="oa-school"
+              class="oa-pkg__school"
               :class="{
                 'is-open': isOpen(group.school),
                 'is-highlight': highlightedSchool === group.school,
@@ -722,33 +700,33 @@ function openCharacter(character: PackageCharacter) {
                 :desc="`${group.list.length} 个角色`"
               >
                 <!-- 内容懒挂载：首次展开才渲染，收起靠 grid 0fr→1fr 过渡 -->
-                <div class="oa-school__collapse" :class="{ 'is-open': isOpen(group.school) }">
-                  <div class="oa-school__collapse-inner">
+                <div class="oa-pkg__school__collapse" :class="{ 'is-open': isOpen(group.school) }">
+                  <div class="oa-pkg__school__collapse-inner">
                     <div v-if="isMountedContent(group.school)" class="oa-pkg__grid">
                       <button
                         v-for="character in group.list"
                         :key="character.name_id"
                         type="button"
-                        class="oa-char"
+                        class="oa-pkg__char"
                         :class="{ 'is-unbound': !character.hasSkeleton }"
                         :title="character.hasSkeleton ? '已绑定骨骼' : '未绑定骨骼'"
                         @click="openCharacter(character)"
                       >
-                        <span class="oa-char__avatar">
+                        <span class="oa-pkg__char__avatar">
                           <img
                             v-if="character.avatarUrl"
                             :src="character.avatarUrl"
                             :alt="character.name"
                             loading="lazy"
                           />
-                          <span v-else class="oa-char__avatar-fallback">
+                          <span v-else class="oa-pkg__char__avatar-fallback">
                             {{ character.name.slice(0, 1) }}
                           </span>
                         </span>
 
-                        <span class="oa-char__text">
-                          <span class="oa-char__name">{{ character.name }}</span>
-                          <span class="oa-char__club">{{ character.club || '无所属组织' }}</span>
+                        <span class="oa-pkg__char__text">
+                          <span class="oa-pkg__char__name">{{ character.name }}</span>
+                          <span class="oa-pkg__char__club">{{ character.club || '无所属组织' }}</span>
                         </span>
                       </button>
                     </div>
@@ -773,7 +751,7 @@ function openCharacter(character: PackageCharacter) {
               <template v-else>
                 <strong>{{ skeletons.length }}</strong> 个立绘
                 <span class="oa-pkg__dot" aria-hidden="true">·</span>
-                {{ formatSize(skeletonTotalSize) }}
+                {{ formatBytes(skeletonTotalSize) }}
                 <span class="oa-pkg__dot" aria-hidden="true">·</span>
                 {{ filteredSkeletons.length }} 个匹配
               </template>
@@ -791,36 +769,36 @@ function openCharacter(character: PackageCharacter) {
             :text="`读取立绘目录失败：${skeletonsError}`"
           />
 
-          <div v-else-if="filteredSkeletons.length" class="oa-skel-list">
+          <div v-else-if="filteredSkeletons.length" class="oa-pkg__skel-list">
             <div
               v-for="item in filteredSkeletons"
               :key="item.id"
-              class="oa-skel"
+              class="oa-pkg__skel"
               :class="{ 'is-open': isSkeletonOpen(item.id) }"
             >
               <div
-                class="oa-skel__head"
+                class="oa-pkg__skel__head"
                 role="button"
                 tabindex="0"
                 @click="toggleSkeleton(item.id)"
                 @keydown.enter.prevent="toggleSkeleton(item.id)"
                 @keydown.space.prevent="toggleSkeleton(item.id)"
               >
-                <span class="oa-skel__arrow" aria-hidden="true" />
+                <span class="oa-pkg__skel__arrow" aria-hidden="true" />
 
-                <span class="oa-skel__names">
-                  <span class="oa-skel__id">{{ item.id }}</span>
-                  <span class="oa-skel__meta">
-                    {{ item.files.length }} 个文件 · {{ formatSize(item.totalSize) }}
+                <span class="oa-pkg__skel__names">
+                  <span class="oa-pkg__skel__id">{{ item.id }}</span>
+                  <span class="oa-pkg__skel__meta">
+                    {{ item.files.length }} 个文件 · {{ formatBytes(item.totalSize) }}
                     <template v-if="!item.complete">
-                      · <span class="oa-skel__warn">缺少必需文件</span>
+                      · <span class="oa-pkg__skel__warn">缺少必需文件</span>
                     </template>
                   </span>
                 </span>
 
                 <button
                   type="button"
-                  class="oa-skel__preview"
+                  class="oa-pkg__skel__preview"
                   :disabled="!item.complete"
                   :title="item.complete ? '在骨骼预览里打开' : '缺少 .skel / .atlas / 贴图，无法预览'"
                   @click.stop="previewSkeleton(item.id)"
@@ -839,15 +817,15 @@ function openCharacter(character: PackageCharacter) {
                 </button>
               </div>
 
-              <div class="oa-skel__collapse" :class="{ 'is-open': isSkeletonOpen(item.id) }">
-                <div class="oa-skel__collapse-inner">
-                  <ul v-if="isSkeletonOpen(item.id)" class="oa-file-list">
-                    <li v-for="file in item.files" :key="file.name" class="oa-file">
-                      <span class="oa-file__kind">{{ fileKind(file.ext) }}</span>
-                      <span class="oa-file__name">{{ file.name }}</span>
-                      <span class="oa-file__size">{{ formatSize(file.size) }}</span>
+              <div class="oa-pkg__skel__collapse" :class="{ 'is-open': isSkeletonOpen(item.id) }">
+                <div class="oa-pkg__skel__collapse-inner">
+                  <ul v-if="isSkeletonOpen(item.id)" class="oa-pkg__file-list">
+                    <li v-for="file in item.files" :key="file.name" class="oa-pkg__file">
+                      <span class="oa-pkg__file__kind">{{ fileKind(file.ext) }}</span>
+                      <span class="oa-pkg__file__name">{{ file.name }}</span>
+                      <span class="oa-pkg__file__size">{{ formatBytes(file.size) }}</span>
                       <a
-                        class="oa-file__open"
+                        class="oa-pkg__file__open"
                         :href="file.url"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -891,16 +869,16 @@ function openCharacter(character: PackageCharacter) {
             :text="`读取背景音乐失败：${musicError}`"
           />
 
-          <div v-else-if="filteredMusic.length" class="oa-music-list">
+          <div v-else-if="filteredMusic.length" class="oa-pkg__music-list">
             <article
               v-for="item in filteredMusic"
               :key="item.name_id"
-              class="oa-music"
+              class="oa-pkg__music"
               :class="{ 'is-active': playingMusicId === item.name_id }"
             >
               <button
                 type="button"
-                class="oa-music__play"
+                class="oa-pkg__music__play"
                 :disabled="!item.exists"
                 :title="item.exists ? '播放 / 暂停' : '音频文件缺失'"
                 @click="toggleMusic(item)"
@@ -914,43 +892,43 @@ function openCharacter(character: PackageCharacter) {
                 </svg>
               </button>
 
-              <div class="oa-music__body">
-                <div class="oa-music__head">
-                  <span class="oa-music__title">{{ item.title }}</span>
-                  <span v-if="item.artist" class="oa-music__artist">{{ item.artist }}</span>
-                  <span v-if="!item.exists" class="oa-music__miss">文件缺失</span>
+              <div class="oa-pkg__music__body">
+                <div class="oa-pkg__music__head">
+                  <span class="oa-pkg__music__title">{{ item.title }}</span>
+                  <span v-if="item.artist" class="oa-pkg__music__artist">{{ item.artist }}</span>
+                  <span v-if="!item.exists" class="oa-pkg__music__miss">文件缺失</span>
                 </div>
 
                 <!-- 描述默认折叠两行，超出才给「查看详细」 -->
                 <template v-if="item.description">
-                  <p class="oa-music__desc" :class="{ 'is-folded': hasMoreDescription(item) }">
+                  <p class="oa-pkg__music__desc" :class="{ 'is-folded': hasMoreDescription(item) }">
                     {{ item.description }}
                   </p>
                   <button
                     v-if="hasMoreDescription(item)"
                     type="button"
-                    class="oa-music__more"
+                    class="oa-pkg__music__more"
                     @click.stop="openMusicDetail(item)"
                   >
                     查看详细
                   </button>
                 </template>
 
-                <div class="oa-music__meta">
-                  <code class="oa-music__id">{{ item.name_id }}</code>
-                  <span class="oa-music__file">{{ item.filename }}</span>
+                <div class="oa-pkg__music__meta">
+                  <code class="oa-pkg__music__id">{{ item.name_id }}</code>
+                  <span class="oa-pkg__music__file">{{ item.filename }}</span>
                 </div>
 
-                <div v-if="playingMusicId === item.name_id" class="oa-music__progress">
+                <div v-if="playingMusicId === item.name_id" class="oa-pkg__music__progress">
                   <rizui_timeline
-                    class="oa-music__timeline"
+                    class="oa-pkg__music__timeline"
                     :model-value="musicCurrent"
                     :min="0"
                     :max="musicDuration || 1"
                     :step="1"
                     @update:model-value="seekMusic"
                   />
-                  <span class="oa-music__time">{{ formatTime(musicDuration) }}</span>
+                  <span class="oa-pkg__music__time">{{ formatDuration(musicDuration) }}</span>
                 </div>
               </div>
             </article>
@@ -962,7 +940,7 @@ function openCharacter(character: PackageCharacter) {
 
           <audio
             ref="audioEl"
-            class="oa-music__audio"
+            class="oa-pkg__music__audio"
             preload="metadata"
             @play="isMusicPlaying = true"
             @pause="isMusicPlaying = false"
@@ -999,12 +977,12 @@ function openCharacter(character: PackageCharacter) {
       mask-close
       @close="closeMusicDetail"
     >
-      <div class="oa-music-detail">
-        <p class="oa-music-detail__meta">
+      <div class="oa-pkg__music-detail">
+        <p class="oa-pkg__music-detail__meta">
           <span v-if="descDialogItem?.artist">{{ descDialogItem.artist }}</span>
           <code>{{ descDialogItem?.name_id }}</code>
         </p>
-        <p class="oa-music-detail__text">{{ descDialogItem?.description }}</p>
+        <p class="oa-pkg__music-detail__text">{{ descDialogItem?.description }}</p>
       </div>
     </rizui_dialog>
   </main>
@@ -1255,7 +1233,7 @@ function openCharacter(character: PackageCharacter) {
  * rizui_card 自带 padding / 圆角 / 底部 margin，这里只补：
  * 表头可点、右侧折叠箭头、展开动画的收口。
  */
-.oa-school :deep(.ct-card) {
+.oa-pkg__school :deep(.ct-card) {
   padding: 11px 14px;
   border-radius: 12px;
   transition:
@@ -1263,19 +1241,19 @@ function openCharacter(character: PackageCharacter) {
     border-color 0.24s ease;
 }
 
-.oa-school.is-highlight :deep(.ct-card) {
+.oa-pkg__school.is-highlight :deep(.ct-card) {
   border-color: rgba(0, 144, 254, 0.55);
   box-shadow:
     0 0 0 3px rgba(0, 144, 254, 0.12),
     0 2px 10px rgba(36, 92, 138, 0.12);
 }
 
-.oa-school :deep(.ct-card-head) {
+.oa-pkg__school :deep(.ct-card-head) {
   cursor: pointer;
   user-select: none;
 }
 
-.oa-school :deep(.ct-card-head)::after {
+.oa-pkg__school :deep(.ct-card-head)::after {
   content: '';
   flex: 0 0 auto;
   width: 6px;
@@ -1287,21 +1265,21 @@ function openCharacter(character: PackageCharacter) {
   transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.oa-school.is-open :deep(.ct-card-head)::after {
+.oa-pkg__school.is-open :deep(.ct-card-head)::after {
   transform: rotate(-135deg) translate(1px, 1px);
 }
 
-.oa-school :deep(.ct-card-title) {
+.oa-pkg__school :deep(.ct-card-title) {
   font-size: 13.5px;
   color: #1e4b76;
 }
 
-.oa-school :deep(.ct-card-desc) {
+.oa-pkg__school :deep(.ct-card-desc) {
   font-size: 11px;
   color: #8aa3b8;
 }
 
-.oa-school :deep(.ct-card-body) {
+.oa-pkg__school :deep(.ct-card-body) {
   margin-top: 0;
 }
 
@@ -1309,7 +1287,7 @@ function openCharacter(character: PackageCharacter) {
  * 展开 / 收起动画：grid-template-rows 0fr → 1fr。
  * 内层必须 overflow: hidden + min-height: 0，否则 0fr 收不干净。
  */
-.oa-school__collapse {
+.oa-pkg__school__collapse {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
@@ -1318,17 +1296,17 @@ function openCharacter(character: PackageCharacter) {
     opacity 0.22s ease;
 }
 
-.oa-school__collapse.is-open {
+.oa-pkg__school__collapse.is-open {
   grid-template-rows: 1fr;
   opacity: 1;
 }
 
-.oa-school__collapse-inner {
+.oa-pkg__school__collapse-inner {
   min-height: 0;
   overflow: hidden;
 }
 
-.oa-school__collapse.is-open .oa-school__collapse-inner {
+.oa-pkg__school__collapse.is-open .oa-pkg__school__collapse-inner {
   padding-top: 10px;
 }
 
@@ -1396,7 +1374,7 @@ function openCharacter(character: PackageCharacter) {
   align-content: start;
 }
 
-.oa-char {
+.oa-pkg__char {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1415,17 +1393,17 @@ function openCharacter(character: PackageCharacter) {
     transform 0.2s ease;
 }
 
-.oa-char:hover {
+.oa-pkg__char:hover {
   border-color: rgba(0, 144, 254, 0.42);
   box-shadow: 0 6px 16px rgba(36, 92, 138, 0.12);
 }
 
-.oa-char:focus-visible {
+.oa-pkg__char:focus-visible {
   outline: 2px solid var(--oa-blue);
   outline-offset: 2px;
 }
 
-.oa-char__avatar {
+.oa-pkg__char__avatar {
   position: relative;
   display: flex;
   flex: 0 0 auto;
@@ -1439,7 +1417,7 @@ function openCharacter(character: PackageCharacter) {
 }
 
 /* 未绑定骨骼：头像上加一个角标，省下整列的宽度给名字 */
-.oa-char.is-unbound .oa-char__avatar::after {
+.oa-pkg__char.is-unbound .oa-pkg__char__avatar::after {
   content: '';
   position: absolute;
   right: 0;
@@ -1451,20 +1429,20 @@ function openCharacter(character: PackageCharacter) {
   background: #c2d1dc;
 }
 
-.oa-char__avatar img {
+.oa-pkg__char__avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center top;
 }
 
-.oa-char__avatar-fallback {
+.oa-pkg__char__avatar-fallback {
   font-size: 16px;
   font-weight: 700;
   color: #7fa8c6;
 }
 
-.oa-char__text {
+.oa-pkg__char__text {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -1472,7 +1450,7 @@ function openCharacter(character: PackageCharacter) {
   min-width: 0;
 }
 
-.oa-char__name {
+.oa-pkg__char__name {
   display: -webkit-box;
   overflow: hidden;
   font-size: 13px;
@@ -1484,7 +1462,7 @@ function openCharacter(character: PackageCharacter) {
   -webkit-line-clamp: 2;
 }
 
-.oa-char__club {
+.oa-pkg__char__club {
   overflow: hidden;
   font-size: 11px;
   line-height: 1.3;
@@ -1495,14 +1473,14 @@ function openCharacter(character: PackageCharacter) {
 
 /* ---------- 骨骼列表 ---------- */
 
-.oa-skel-list {
+.oa-pkg__skel-list {
   display: flex;
   flex-direction: column;
   gap: 5px;
   padding-bottom: 4px;
 }
 
-.oa-skel {
+.oa-pkg__skel {
   border: 1px solid rgba(190, 214, 231, 0.55);
   border-radius: 10px;
   background: #ffffff;
@@ -1511,12 +1489,12 @@ function openCharacter(character: PackageCharacter) {
     box-shadow 0.2s ease;
 }
 
-.oa-skel.is-open {
+.oa-pkg__skel.is-open {
   border-color: rgba(0, 144, 254, 0.32);
   box-shadow: 0 4px 14px rgba(36, 92, 138, 0.08);
 }
 
-.oa-skel__head {
+.oa-pkg__skel__head {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1525,13 +1503,13 @@ function openCharacter(character: PackageCharacter) {
   -webkit-tap-highlight-color: transparent;
 }
 
-.oa-skel__head:focus-visible {
+.oa-pkg__skel__head:focus-visible {
   outline: 2px solid var(--oa-blue);
   outline-offset: 2px;
   border-radius: 10px;
 }
 
-.oa-skel__arrow {
+.oa-pkg__skel__arrow {
   flex: 0 0 auto;
   width: 6px;
   height: 6px;
@@ -1541,11 +1519,11 @@ function openCharacter(character: PackageCharacter) {
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.oa-skel.is-open .oa-skel__arrow {
+.oa-pkg__skel.is-open .oa-pkg__skel__arrow {
   transform: rotate(45deg);
 }
 
-.oa-skel__names {
+.oa-pkg__skel__names {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -1553,7 +1531,7 @@ function openCharacter(character: PackageCharacter) {
   min-width: 0;
 }
 
-.oa-skel__id {
+.oa-pkg__skel__id {
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
@@ -1563,16 +1541,16 @@ function openCharacter(character: PackageCharacter) {
   white-space: nowrap;
 }
 
-.oa-skel__meta {
+.oa-pkg__skel__meta {
   font-size: 11px;
   color: #8aa3b8;
 }
 
-.oa-skel__warn {
+.oa-pkg__skel__warn {
   color: #c07a00;
 }
 
-.oa-skel__preview {
+.oa-pkg__skel__preview {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1590,17 +1568,17 @@ function openCharacter(character: PackageCharacter) {
     background 0.2s ease;
 }
 
-.oa-skel__preview svg {
+.oa-pkg__skel__preview svg {
   width: 13px;
   height: 13px;
 }
 
-.oa-skel__preview:hover:not(:disabled) {
+.oa-pkg__skel__preview:hover:not(:disabled) {
   border-color: rgba(0, 144, 254, 0.55);
   background: rgba(0, 144, 254, 0.14);
 }
 
-.oa-skel__preview:disabled {
+.oa-pkg__skel__preview:disabled {
   border-color: rgba(154, 176, 194, 0.4);
   background: rgba(154, 176, 194, 0.12);
   color: #a3b6c4;
@@ -1608,7 +1586,7 @@ function openCharacter(character: PackageCharacter) {
 }
 
 /* 与学院分组同一套 grid 0fr→1fr 展开动画 */
-.oa-skel__collapse {
+.oa-pkg__skel__collapse {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
@@ -1617,17 +1595,17 @@ function openCharacter(character: PackageCharacter) {
     opacity 0.2s ease;
 }
 
-.oa-skel__collapse.is-open {
+.oa-pkg__skel__collapse.is-open {
   grid-template-rows: 1fr;
   opacity: 1;
 }
 
-.oa-skel__collapse-inner {
+.oa-pkg__skel__collapse-inner {
   min-height: 0;
   overflow: hidden;
 }
 
-.oa-file-list {
+.oa-pkg__file-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1637,7 +1615,7 @@ function openCharacter(character: PackageCharacter) {
   list-style: none;
 }
 
-.oa-file {
+.oa-pkg__file {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1645,7 +1623,7 @@ function openCharacter(character: PackageCharacter) {
   font-size: 11.5px;
 }
 
-.oa-file__kind {
+.oa-pkg__file__kind {
   flex: 0 0 auto;
   padding: 0 6px;
   border-radius: 999px;
@@ -1655,7 +1633,7 @@ function openCharacter(character: PackageCharacter) {
   color: #1769a8;
 }
 
-.oa-file__name {
+.oa-pkg__file__name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1666,7 +1644,7 @@ function openCharacter(character: PackageCharacter) {
   white-space: nowrap;
 }
 
-.oa-file__size {
+.oa-pkg__file__size {
   flex: 0 0 auto;
   min-width: 62px;
   text-align: right;
@@ -1674,7 +1652,7 @@ function openCharacter(character: PackageCharacter) {
   color: #a3b6c4;
 }
 
-.oa-file__open {
+.oa-pkg__file__open {
   flex: 0 0 auto;
   padding: 1px 8px;
   border-radius: 999px;
@@ -1684,7 +1662,7 @@ function openCharacter(character: PackageCharacter) {
   transition: background 0.2s ease;
 }
 
-.oa-file__open:hover {
+.oa-pkg__file__open:hover {
   background: rgba(0, 144, 254, 0.1);
 }
 
@@ -1695,14 +1673,14 @@ function openCharacter(character: PackageCharacter) {
 
 /* ---------- 背景音乐 ---------- */
 
-.oa-music-list {
+.oa-pkg__music-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding-bottom: 4px;
 }
 
-.oa-music {
+.oa-pkg__music {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -1715,12 +1693,12 @@ function openCharacter(character: PackageCharacter) {
     box-shadow 0.2s ease;
 }
 
-.oa-music.is-active {
+.oa-pkg__music.is-active {
   border-color: rgba(0, 144, 254, 0.42);
   box-shadow: 0 4px 14px rgba(36, 92, 138, 0.1);
 }
 
-.oa-music__play {
+.oa-pkg__music__play {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1738,24 +1716,24 @@ function openCharacter(character: PackageCharacter) {
     border-color 0.2s ease;
 }
 
-.oa-music__play svg {
+.oa-pkg__music__play svg {
   width: 13px;
   height: 13px;
 }
 
-.oa-music__play:hover:not(:disabled) {
+.oa-pkg__music__play:hover:not(:disabled) {
   border-color: rgba(0, 144, 254, 0.55);
   background: rgba(0, 144, 254, 0.16);
 }
 
-.oa-music__play:disabled {
+.oa-pkg__music__play:disabled {
   border-color: rgba(154, 176, 194, 0.4);
   background: rgba(154, 176, 194, 0.12);
   color: #a3b6c4;
   cursor: not-allowed;
 }
 
-.oa-music__body {
+.oa-pkg__music__body {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -1763,14 +1741,14 @@ function openCharacter(character: PackageCharacter) {
   min-width: 0;
 }
 
-.oa-music__head {
+.oa-pkg__music__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 7px;
 }
 
-.oa-music__title {
+.oa-pkg__music__title {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
@@ -1779,7 +1757,7 @@ function openCharacter(character: PackageCharacter) {
 }
 
 /* 描述：默认只露两行，余下靠「查看详细」弹窗 */
-.oa-music__desc {
+.oa-pkg__music__desc {
   font-size: 11.5px;
   line-height: 1.6;
   color: #6f8ba4;
@@ -1787,14 +1765,14 @@ function openCharacter(character: PackageCharacter) {
   overflow-wrap: anywhere;
 }
 
-.oa-music__desc.is-folded {
+.oa-pkg__music__desc.is-folded {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.oa-music__more {
+.oa-pkg__music__more {
   align-self: flex-start;
   padding: 0;
   border: 0;
@@ -1806,18 +1784,18 @@ function openCharacter(character: PackageCharacter) {
   transition: color 0.18s ease;
 }
 
-.oa-music__more:hover {
+.oa-pkg__music__more:hover {
   color: var(--oa-blue);
   text-decoration: underline;
 }
 
-.oa-music-detail {
+.oa-pkg__music-detail {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.oa-music-detail__meta {
+.oa-pkg__music-detail__meta {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -1825,7 +1803,7 @@ function openCharacter(character: PackageCharacter) {
   color: #7c99b0;
 }
 
-.oa-music-detail__meta code {
+.oa-pkg__music-detail__meta code {
   padding: 1px 6px;
   border-radius: 5px;
   background: rgba(0, 144, 254, 0.08);
@@ -1833,7 +1811,7 @@ function openCharacter(character: PackageCharacter) {
   color: #1769a8;
 }
 
-.oa-music-detail__text {
+.oa-pkg__music-detail__text {
   max-height: min(52vh, 420px);
   overflow-y: auto;
   font-size: 12.5px;
@@ -1843,12 +1821,12 @@ function openCharacter(character: PackageCharacter) {
   overflow-wrap: anywhere;
 }
 
-.oa-music__artist {
+.oa-pkg__music__artist {
   font-size: 11.5px;
   color: #7c99b0;
 }
 
-.oa-music__miss {
+.oa-pkg__music__miss {
   padding: 0 6px;
   border-radius: 999px;
   background: rgba(192, 122, 0, 0.14);
@@ -1857,7 +1835,7 @@ function openCharacter(character: PackageCharacter) {
   color: #a47500;
 }
 
-.oa-music__meta {
+.oa-pkg__music__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1866,7 +1844,7 @@ function openCharacter(character: PackageCharacter) {
   color: #a3b6c4;
 }
 
-.oa-music__id {
+.oa-pkg__music__id {
   padding: 0 6px;
   border-radius: 5px;
   background: rgba(0, 144, 254, 0.08);
@@ -1874,12 +1852,12 @@ function openCharacter(character: PackageCharacter) {
   color: #1769a8;
 }
 
-.oa-music__file {
+.oa-pkg__music__file {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: #8aa3b8;
 }
 
-.oa-music__progress {
+.oa-pkg__music__progress {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1887,23 +1865,23 @@ function openCharacter(character: PackageCharacter) {
   padding-right: 4px;
 }
 
-.oa-music__timeline {
+.oa-pkg__music__timeline {
   flex: 1;
   min-width: 0;
 }
 
-.oa-music__time {
+.oa-pkg__music__time {
   flex: 0 0 auto;
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   color: #8aa3b8;
 }
 
-.oa-music__audio {
+.oa-pkg__music__audio {
   display: none;
 }
 
-.oa-music__audio {
+.oa-pkg__music__audio {
   display: none;
 }
 

@@ -1,14 +1,9 @@
 # Our Archive — 项目说明
 
-> Blue Archive 视觉小说模拟器（Visual Novel Simulator）
->
-> 独立的《蔚蓝档案》(Blue Archive) 同人视觉小说模拟器，与任何其他同类项目**毫无关联**：不基于、不复刻任何第三方同类项目的代码或设计。
+Our Archive 是一个独立的同人视觉小说模拟器，主要服务于《蔚蓝档案》风格的视觉小说，但也可用于其他视觉小说风格。
 
-## 定位
+Our Archive 旨在为玩家提供一个创作和体验视觉小说风格剧情的工具。通过该项目，用户可以编写、编辑和模拟视觉小说剧情，管理角色与对话，并以视觉小说形式进行演出。
 
-用于编写、编辑与模拟《蔚蓝档案》风格视觉小说剧情的工具：创建剧本、管理角色与对话，并以视觉小说形式演出。
-
-## 技术栈
 
 | 层 | 技术 |
 | --- | --- |
@@ -57,15 +52,6 @@ OurArchive/
 固定三个子目录：`res/`（素材）、`preload/`（预加载）、`config/`（配置，当前包含 `global_config.yml`）。
 后端启动时由 `initializeStorage()` 创建并加载配置，并对照根目录 `preload_assets.yml` 校验用户 `preload/` 完整度；失败则告知用户不完整；可用 `OUR_ARCHIVE_DATA_DIR` 覆盖根目录。细节见 [server/storage.md](./server/storage.md)。
 
-## 当前状态
-
-- **后端**：Express 服务 —— 初始化资源目录、校验预加载资源、索引 `res/` 下的资源包、托管前端产物、提供预加载 / 配置 / 资源包 API。启动完成后在控制台输出 Local 与 Network（局域网）访问地址。
-- **前端**：只能从入口 `/` 进入（直接访问 `/home`、`/tools`、`/resources` 等深层地址会被路由守卫 `replace` 回 `/`）。外壳（App.vue）常驻气泡背景、OurArchive banner 与右上角设置按钮；splash 只负责白屏引导、banner 动画触发、TOUCH TO START 与版权声明，点 TOUCH TO START 后 banner 收缩停靠到左下角、版权文字下坠、底色转浅蓝，随后 `/home` 的卡片错峰飞入——全程不重建背景。`/home` 有编辑模式 / 阅读模式叠卡、3D场景、资源管理、更多功能五个入口，`main_bgm` 从 splash 延续；「更多功能」→ `/tools`、「资源管理」→ `/resources` 已接页面，其余仍是占位。
-- **工具**：`/tools` 列出工具卡（配置在 `config/tools.ts`），目前只有「BA 立绘骨骼预览」→ `/tools/skeleton`：拖入角色文件夹或手动选文件（`.skel` / `.atlas` / 贴图），用 Spine 4.2 运行时渲染，并按纯数字动画的 `AttachmentTimeline` 提供**立绘差分**选择，可选 `Idle_01` 等动作。渲染有 WebGL（默认，合批）与 Canvas 2D（兜底）两条后端，由设置项 `spine_renderer` 选择。工具页不改外壳 `stage`，banner 停靠与底色全部延续。
-- **资源管理**：`/resources` 四个标签（资源包 / 工程 / 存档 / 插件），后三个标「未完成」。资源包标签由后端 `GET /api/packages` 扫描 `<root>/res` 下每个带 `package.yml` 的目录，展示名称、描述、版本、作者与已声明的内容分类（骨骼数 / 角色数）。
-- **资源包详情**：点开资源包进入 `/resources/:packageId` 大卡片——左侧 RizUI 侧边栏列出 `package_content` 里声明可用的分类，右侧「角色」条目展示全部角色（头像 + 名字 + 所属组织 + 是否已绑定骨骼，带搜索）；点角色进 `/resources/:packageId/character/:nameId` 看学院 / 所属组织 / 头像 / 绑定骨骼，点骨骼直接跳到 `/tools/skeleton?package=…&skeleton=…&character=…` 由后端下发文件并在预览页直接渲染。
-- **未实现**：编辑模式 / 阅读模式 / 3D场景、资源包内的其它分类内容（表情 / 音效 / 背景 / 音乐）、工程 / 存档 / 插件分类、剧本编辑器、对话演出。
-
 ## 命令
 
 ```bash
@@ -103,4 +89,6 @@ npm start            # 生产启动：后端监听 5173 并托管前端
 - **完全离线**：不请求任何外部资源。
 - **许可证**：代码 AGPL-3.0-only；`resources/` 资产为 CC BY-NC-ND 4.0，与 BA 官方无关联，不附带 BA 版权资源。第三方组件（Spine Runtimes 等）许可见 [docs/third-party-notices.md](../docs/third-party-notices.md)。
 
-模块文档：[client/](./client/README.md)、[server/](./server/README.md)。
+## Agent可持续维护文档
+
+- 详见 agents/.

@@ -32,11 +32,11 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.webm': 'audio/webm',
 };
 
-function notFound(res: Response, message: string) {
+function failNotFound(res: Response, message: string) {
   res.status(404).json({ success: false, error: message });
 }
 
-function fail(res: Response, error: unknown) {
+function failInternal(res: Response, error: unknown) {
   res.status(500).json({
     success: false,
     error: error instanceof Error ? error.message : String(error),
@@ -45,13 +45,13 @@ function fail(res: Response, error: unknown) {
 
 function sendFile(res: Response, target: string | null) {
   if (!target || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
-    notFound(res, '文件不存在');
+    failNotFound(res, '文件不存在');
     return;
   }
 
   const mime = MIME_BY_EXTENSION[path.extname(target).toLowerCase()];
   if (!mime) {
-    notFound(res, '不支持的文件类型');
+    failNotFound(res, '不支持的文件类型');
     return;
   }
 
@@ -88,7 +88,7 @@ export function createPackagesRouter(): Router {
         packages,
       });
     } catch (error) {
-      fail(res, error);
+      failInternal(res, error);
     }
   });
 
@@ -97,7 +97,7 @@ export function createPackagesRouter(): Router {
     const pkg = scanResourcePackages().find((item) => item.id === id);
 
     if (!pkg) {
-      notFound(res, `资源包不存在：${id}`);
+      failNotFound(res, `资源包不存在：${id}`);
       return;
     }
 
@@ -110,7 +110,7 @@ export function createPackagesRouter(): Router {
     const pkg = scanResourcePackages().find((item) => item.id === id);
 
     if (!packageDir || !pkg) {
-      notFound(res, `资源包不存在：${id}`);
+      failNotFound(res, `资源包不存在：${id}`);
       return;
     }
 
@@ -118,7 +118,7 @@ export function createPackagesRouter(): Router {
       const characters = readPackageCharacters(packageDir, pkg);
       res.json({ success: true, total: characters.length, characters });
     } catch (error) {
-      fail(res, error);
+      failInternal(res, error);
     }
   });
 
@@ -129,7 +129,7 @@ export function createPackagesRouter(): Router {
     const pkg = scanResourcePackages().find((item) => item.id === id);
 
     if (!packageDir || !pkg) {
-      notFound(res, `资源包不存在：${id}`);
+      failNotFound(res, `资源包不存在：${id}`);
       return;
     }
 
@@ -137,7 +137,7 @@ export function createPackagesRouter(): Router {
       const music = readPackageMusic(packageDir, pkg);
       res.json({ success: true, total: music.length, music });
     } catch (error) {
-      fail(res, error);
+      failInternal(res, error);
     }
   });
 
@@ -148,7 +148,7 @@ export function createPackagesRouter(): Router {
     const pkg = scanResourcePackages().find((item) => item.id === id);
 
     if (!packageDir || !pkg) {
-      notFound(res, `资源包不存在：${id}`);
+      failNotFound(res, `资源包不存在：${id}`);
       return;
     }
 
@@ -161,7 +161,7 @@ export function createPackagesRouter(): Router {
     const pkg = scanResourcePackages().find((item) => item.id === id);
 
     if (!packageDir || !pkg) {
-      notFound(res, `资源包不存在：${id}`);
+      failNotFound(res, `资源包不存在：${id}`);
       return;
     }
 
@@ -169,7 +169,7 @@ export function createPackagesRouter(): Router {
       const skeletons = readPackageSkeletons(packageDir, pkg);
       res.json({ success: true, total: skeletons.length, skeletons });
     } catch (error) {
-      fail(res, error);
+      failInternal(res, error);
     }
   });
 
@@ -180,13 +180,13 @@ export function createPackagesRouter(): Router {
     const pkg = scanResourcePackages().find((item) => item.id === id);
 
     if (!packageDir || !pkg) {
-      notFound(res, `资源包不存在：${id}`);
+      failNotFound(res, `资源包不存在：${id}`);
       return;
     }
 
     const files = readSkeletonFiles(packageDir, pkg, skeletonId);
     if (!files) {
-      notFound(res, `立绘不存在：${skeletonId}`);
+      failNotFound(res, `立绘不存在：${skeletonId}`);
       return;
     }
 
@@ -201,7 +201,7 @@ export function createPackagesRouter(): Router {
     const content = pkg?.contents.find((item) => item.key === 'hasCharacter');
 
     if (!packageDir || !pkg || !content?.supported) {
-      notFound(res, `资源包不存在或未声明角色资源：${id}`);
+      failNotFound(res, `资源包不存在或未声明角色资源：${id}`);
       return;
     }
 
@@ -220,7 +220,7 @@ export function createPackagesRouter(): Router {
     const content = pkg?.contents.find((item) => item.key === 'Skeletons');
 
     if (!packageDir || !pkg || !content?.supported) {
-      notFound(res, `资源包不存在或未声明骨骼资源：${id}`);
+      failNotFound(res, `资源包不存在或未声明骨骼资源：${id}`);
       return;
     }
 

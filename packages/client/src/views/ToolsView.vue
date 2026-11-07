@@ -196,11 +196,6 @@ function backHome() {
 
 /* ---------- 卡槽：入场 / 离场都落在这一层 ---------- */
 
-.oa-slot {
-  display: flex;
-  min-width: 0;
-}
-
 .oa-slot > .oa-tool-card {
   flex: 1;
 }

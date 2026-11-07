@@ -71,42 +71,42 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="splash-screen" :class="{ 'is-leaving': isLeaving }">
+  <main class="oa-splash" :class="{ 'is-leaving': isLeaving }">
     <!-- 初始白屏引导：点击任意位置开始 -->
-    <Transition name="gate-fade">
+    <Transition name="oa-gate-fade">
       <div
         v-if="isIdle"
-        class="splash-gate"
+        class="oa-splash__gate"
         role="button"
         tabindex="0"
         aria-label="点击任意位置开始"
         @click="handleStart"
         @keydown="handleGateKeydown"
       >
-        <div class="splash-gate__content">
-          <span class="splash-gate__text">点击任意位置开始</span>
-          <span class="splash-gate__subtext">CLICK ANYWHERE TO START</span>
+        <div class="oa-splash__gate__content">
+          <span class="oa-splash__gate__text">点击任意位置开始</span>
+          <span class="oa-splash__gate__subtext">CLICK ANYWHERE TO START</span>
         </div>
       </div>
     </Transition>
 
     <!-- 悬浮 TOUCH TO START：全宽 flex 容器居中，不受子级 transform 干扰 -->
-    <div v-show="isReady" class="splash-screen__prompt-dock">
+    <div v-show="isReady" class="oa-splash__prompt-dock">
       <button
         type="button"
-        class="splash-prompt"
+        class="oa-splash__prompt"
         :style="{ '--fade-in': `${SPLASH_TIMING.promptFadeIn}ms` }"
         @click="handleActivate"
       >
-        <span class="splash-prompt__label">TOUCH TO START</span>
+        <span class="oa-splash__prompt__label">TOUCH TO START</span>
       </button>
     </div>
 
     <!-- 底部版权与开源声明：离场时向下飞出 -->
-    <footer v-show="gatePassed" class="splash-legal">
+    <footer v-show="gatePassed" class="oa-splash__legal">
       <p>本程序为非官方同人衍生的开源视觉小说制作和播放工具，与 NEXON Games、Yostar 等《蔚蓝档案》(Blue Archive) 官方版权方及运营方毫无关联，亦未获得任何官方授权或赞助。</p>
       <p>程序代码依据 GNU AGPLv3 协议开源，仅供学习、技术交流与个人非商业同人创作体验。本项目源码及发行版本中不附带任何《蔚蓝档案》受版权保护的游戏专有资源（包括但不限于立绘、CG、音效与音乐等），相关游戏资产须由使用者合法自行处理与获取。</p>
-      <p class="splash-legal-strict">本程序官方发行版本使用了含有非商业授权的美术资源，严禁将本程序官方发行版本及包含非商业美术资源的源代码用于任何形式的直接或间接商业盈利活动（包括但不限于付费销售、捆绑收费、付费会员、打赏解锁与商业展示等）。所有相关知识产权均归原权利方所有。</p>
+      <p class="oa-splash__legal-strict">本程序官方发行版本使用了含有非商业授权的美术资源，严禁将本程序官方发行版本及包含非商业美术资源的源代码用于任何形式的直接或间接商业盈利活动（包括但不限于付费销售、捆绑收费、付费会员、打赏解锁与商业展示等）。所有相关知识产权均归原权利方所有。</p>
     </footer>
   </main>
 </template>
@@ -116,7 +116,7 @@ onMounted(() => {
  * 页面本身透明、也不持有 banner 与设置：
  * 底色、气泡、banner、设置都由 App 外壳常驻，跳转到主界面时它们不会重建。
  */
-.splash-screen {
+.oa-splash {
   position: relative;
   z-index: 1;
   display: flex;
@@ -128,7 +128,7 @@ onMounted(() => {
 
 /* ---------- 白屏引导 ---------- */
 
-.splash-gate {
+.oa-splash__gate {
   position: absolute;
   inset: 0;
   z-index: 10;
@@ -142,7 +142,7 @@ onMounted(() => {
   outline: none;
 }
 
-.splash-gate__content {
+.oa-splash__gate__content {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -150,7 +150,7 @@ onMounted(() => {
   animation: gate-pulse 2.4s ease-in-out infinite;
 }
 
-.splash-gate__text {
+.oa-splash__gate__text {
   font-family: var(--oa-font);
   font-size: clamp(16px, 1.8vw, 20px);
   font-weight: 500;
@@ -159,7 +159,7 @@ onMounted(() => {
   color: #13181f;
 }
 
-.splash-gate__subtext {
+.oa-splash__gate__subtext {
   font-family: var(--oa-font);
   font-size: clamp(10px, 1vw, 12px);
   font-weight: 400;
@@ -173,17 +173,17 @@ onMounted(() => {
   50% { opacity: 0.95; transform: scale(1); }
 }
 
-.gate-fade-leave-active {
+.oa-gate-fade-leave-active {
   transition: opacity 0.6s ease;
 }
 
-.gate-fade-leave-to {
+.oa-gate-fade-leave-to {
   opacity: 0;
 }
 
 /* ---------- TOUCH TO START ---------- */
 
-.splash-screen__prompt-dock {
+.oa-splash__prompt-dock {
   position: absolute;
   right: 0;
   bottom: clamp(106px, 19vh, 170px);
@@ -198,11 +198,11 @@ onMounted(() => {
     transform 300ms ease;
 }
 
-.splash-screen__prompt-dock > * {
+.oa-splash__prompt-dock > * {
   pointer-events: auto;
 }
 
-.splash-prompt {
+.oa-splash__prompt {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -214,19 +214,19 @@ onMounted(() => {
   color: #13181f;
   cursor: pointer;
   white-space: nowrap;
-  animation: splash-prompt-in var(--fade-in, 700ms) ease both;
+  animation: oa-splash__prompt-in var(--fade-in, 700ms) ease both;
   transition: background-color 200ms ease, color 200ms ease;
   -webkit-tap-highlight-color: transparent;
 }
 
-.splash-prompt:hover,
-.splash-prompt:focus-visible {
+.oa-splash__prompt:hover,
+.oa-splash__prompt:focus-visible {
   background: #13181f;
   color: #ffffff;
   outline: none;
 }
 
-.splash-prompt__label {
+.oa-splash__prompt__label {
   pointer-events: none;
   font-family: var(--oa-font);
   font-size: clamp(12px, 1.2vw, 15px);
@@ -238,14 +238,14 @@ onMounted(() => {
   text-align: center;
 }
 
-@keyframes splash-prompt-in {
+@keyframes oa-splash__prompt-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 /* ---------- 版权声明 ---------- */
 
-.splash-legal {
+.oa-splash__legal {
   position: absolute;
   right: 0;
   bottom: clamp(12px, 2.2vh, 24px);
@@ -266,7 +266,7 @@ onMounted(() => {
     opacity 380ms ease;
 }
 
-.splash-legal p {
+.oa-splash__legal p {
   font-family: var(--oa-font);
   font-size: clamp(9px, 0.72vw, 10px);
   line-height: 1.5;
@@ -274,8 +274,8 @@ onMounted(() => {
   color: #94a3b8;
 }
 
-/* 权重需高于 `.splash-legal p`，否则该行颜色会被覆盖 */
-.splash-legal .splash-legal-strict {
+/* 权重需高于 `.oa-splash__legal p`，否则该行颜色会被覆盖 */
+.oa-splash__legal .oa-splash__legal-strict {
   color: #ffa070;
   font-weight: 500;
 }
@@ -292,12 +292,12 @@ onMounted(() => {
  * both 会把 `legal-fade-in` 的末帧（transform / opacity）永久锁在元素上，
  * CSS 动画优先级高于 transition，下面这条离场 transition 就永远不会生效。
  */
-.splash-screen.is-leaving .splash-legal {
+.oa-splash.is-leaving .oa-splash__legal {
   opacity: 0;
   transform: translateY(96px);
 }
 
-.splash-screen.is-leaving .splash-screen__prompt-dock {
+.oa-splash.is-leaving .oa-splash__prompt-dock {
   opacity: 0;
   transform: translateY(18px);
   pointer-events: none;
@@ -306,14 +306,14 @@ onMounted(() => {
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 640px) {
-  .splash-screen__prompt-dock {
+  .oa-splash__prompt-dock {
     bottom: clamp(96px, 17vh, 150px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-gate__content,
-  .splash-prompt {
+  .oa-splash__gate__content,
+  .oa-splash__prompt {
     animation: none;
   }
 }

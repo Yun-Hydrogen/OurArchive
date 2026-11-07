@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { isSpineRendererMode, loadSettings, saveSettings } from '../config/storage.js';
+import { isSpineRendererMode, loadGlobalConfig, saveGlobalConfig } from '../config/storage.js';
 
 export function createConfigRouter(): Router {
   const router = Router();
@@ -8,7 +8,7 @@ export function createConfigRouter(): Router {
   router.get('/', (_req: Request, res: Response) => {
     res.json({
       success: true,
-      config: loadSettings(),
+      config: loadGlobalConfig(),
     });
   });
 
@@ -41,7 +41,7 @@ export function createConfigRouter(): Router {
       patch.spine_renderer = body.spine_renderer;
     }
 
-    const updated = saveSettings(patch);
+    const updated = saveGlobalConfig(patch);
     res.json({
       success: true,
       config: updated,

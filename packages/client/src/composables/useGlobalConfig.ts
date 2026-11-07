@@ -1,8 +1,12 @@
 import { ref } from 'vue';
+import { fetchGlobalConfig, saveGlobalConfig } from '@/api/config';
 import {
   normalizeSpineRendererMode,
   type SpineRendererMode,
-} from '@/composables/spine/mode';
+} from '@/spine/mode';
+import { readonlyRef } from '@/utils/reactivity';
+
+export type ConfigKey = 'main_bgm_volume' | 'preview_volume' | 'spine_renderer';
 
 export interface GlobalConfig {
   /** 主界面背景音乐音量，0-100 */
@@ -18,11 +22,13 @@ export interface GlobalConfig {
   spine_renderer: SpineRendererMode;
 }
 
-const config = ref<GlobalConfig>({
+export const CONFIG_DEFAULTS: GlobalConfig = {
   main_bgm_volume: 50,
   preview_volume: 60,
   spine_renderer: 'stable',
-});
+};
+
+const config = ref<GlobalConfig>({ ...CONFIG_DEFAULTS });
 
 const isLoaded = ref(false);
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -37,23 +43,21 @@ function clampVolume(value: unknown, fallback: number): number {
 }
 
 /**
- * 全局配置项（与后端 /api/config 同步并持久化至 global_config.yml）
+ * 全局配置（与后端 /api/config 同步并持久化至 global_config.yml）。
+ *
+ * **单例**：状态在模块作用域，多个调用方共享同一份 `config`，因此组件里
+ * 通过 `useGlobalConfig()` 拿到的都是同一引用。`config` 只读暴露，改动一律走 setter。
  */
 export function useGlobalConfig() {
   async function fetchConfig(): Promise<GlobalConfig> {
     try {
-      const res = await fetch('/api/config');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.config) {
-          config.value = {
-            main_bgm_volume: clampVolume(data.config.main_bgm_volume, 50),
-            preview_volume: clampVolume(data.config.preview_volume, 60),
-            spine_renderer: normalizeSpineRendererMode(data.config.spine_renderer),
-          };
-          isLoaded.value = true;
-        }
-      }
+      const data = await fetchGlobalConfig();
+      config.value = {
+        main_bgm_volume: clampVolume(data.config.main_bgm_volume, CONFIG_DEFAULTS.main_bgm_volume),
+        preview_volume: clampVolume(data.config.preview_volume, CONFIG_DEFAULTS.preview_volume),
+        spine_renderer: normalizeSpineRendererMode(data.config.spine_renderer),
+      };
+      isLoaded.value = true;
     } catch (error) {
       console.warn('[Our Archive] 获取全局配置失败，使用默认配置', error);
     }
@@ -69,28 +73,19 @@ export function useGlobalConfig() {
     saveTimer = setTimeout(async () => {
       saveTimer = null;
       try {
-        await fetch('/api/config', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            main_bgm_volume: config.value.main_bgm_volume,
-            preview_volume: config.value.preview_volume,
-            spine_renderer: config.value.spine_renderer,
-          }),
-        });
+        await saveGlobalConfig({ ...config.value });
       } catch (error) {
         console.warn('[Our Archive] 保存配置失败', error);
-      }
-    }, 300);
+      }    }, 300);
   }
 
   function setMainBgmVolume(volume: number) {
-    config.value.main_bgm_volume = clampVolume(volume, 50);
+    config.value.main_bgm_volume = clampVolume(volume, CONFIG_DEFAULTS.main_bgm_volume);
     persist();
   }
 
   function setPreviewVolume(volume: number) {
-    config.value.preview_volume = clampVolume(volume, 60);
+    config.value.preview_volume = clampVolume(volume, CONFIG_DEFAULTS.preview_volume);
     persist();
   }
 
@@ -100,8 +95,8 @@ export function useGlobalConfig() {
   }
 
   return {
-    config,
-    isLoaded,
+    config: readonlyRef(config),
+    isLoaded: readonlyRef(isLoaded),
     fetchConfig,
     setMainBgmVolume,
     setPreviewVolume,

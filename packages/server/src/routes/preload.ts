@@ -38,7 +38,7 @@ export function createPreloadRouter(): Router {
     if (!item) {
       res.status(404).json({
         success: false,
-        error: `Preload asset not found in manifest: ${assetId}`,
+        error: `预加载资源不在清单中：${assetId}`,
       });
       return;
     }
@@ -46,7 +46,7 @@ export function createPreloadRouter(): Router {
     if (!fs.existsSync(item.resolvedPath)) {
       res.status(404).json({
         success: false,
-        error: `Preload asset file missing on disk: ${item.file}`,
+        error: `预加载资源文件不存在：${item.file}`,
       });
       return;
     }

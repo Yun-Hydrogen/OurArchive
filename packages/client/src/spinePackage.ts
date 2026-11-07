@@ -11,14 +11,14 @@
  */
 
 /** 带相对路径的本地文件 */
-export interface OASpineFile {
+export interface SpineFile {
   file: File;
   /** 相对路径（含文件名），无路径信息时就是文件名 */
   path: string;
 }
 
 /** 识别出的一个立绘包 */
-export interface OASpineCharacter {
+export interface SpineCharacter {
   /** 目录名，也就是角色 id（如 `shiroko_spr`） */
   id: string;
   skeleton: File;
@@ -47,7 +47,7 @@ function dirName(path: string): string {
 }
 
 /** 读取 `<input type="file">` 的结果，补上相对路径 */
-export function toSpineFiles(files: FileList | File[]): OASpineFile[] {
+export function toSpineFiles(files: FileList | File[]): SpineFile[] {
   return Array.from(files).map((file) => ({
     file,
     path: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name,
@@ -55,8 +55,8 @@ export function toSpineFiles(files: FileList | File[]): OASpineFile[] {
 }
 
 /** 把平铺的文件列表按目录拆成候选立绘包（顺序稳定，便于列表展示） */
-export function toSpineCharacters(entries: OASpineFile[]): OASpineCharacter[] {
-  const groups = new Map<string, OASpineFile[]>();
+export function toSpineCharacters(entries: SpineFile[]): SpineCharacter[] {
+  const groups = new Map<string, SpineFile[]>();
   for (const entry of entries) {
     const dir = dirName(entry.path);
     const bucket = groups.get(dir);
@@ -67,7 +67,7 @@ export function toSpineCharacters(entries: OASpineFile[]): OASpineCharacter[] {
     }
   }
 
-  const characters: OASpineCharacter[] = [];
+  const characters: SpineCharacter[] = [];
   for (const [dir, files] of groups) {
     const atlasFiles = files.filter((item) => extensionOf(item.path) === ATLAS_EXTENSION);
     const skeletonFiles = files.filter((item) =>
@@ -126,7 +126,7 @@ interface FSNode extends FileSystemEntry {
   createReader?: () => FSDirectoryReader;
 }
 
-function readEntry(entry: FSNode, prefix: string): Promise<OASpineFile[]> {
+function readEntry(entry: FSNode, prefix: string): Promise<SpineFile[]> {
   const path = prefix ? `${prefix}/${entry.name}` : entry.name;
   if (entry.isFile && entry.file) {
     return new Promise((resolve) => {
@@ -144,7 +144,7 @@ function readEntry(entry: FSNode, prefix: string): Promise<OASpineFile[]> {
     new Promise((resolve) => reader.readEntries(resolve, () => resolve([])));
 
   return (async () => {
-    const collected: OASpineFile[] = [];
+    const collected: SpineFile[] = [];
     // readEntries 一次最多返回 100 条，必须读到空数组为止
     for (;;) {
       const batch = await readBatch();
@@ -160,7 +160,7 @@ function readEntry(entry: FSNode, prefix: string): Promise<OASpineFile[]> {
 }
 
 /** 从拖放事件里递归取文件（支持整个文件夹） */
-export async function toSpineFilesFromDrop(transfer: DataTransfer): Promise<OASpineFile[]> {
+export async function toSpineFilesFromDrop(transfer: DataTransfer): Promise<SpineFile[]> {
   const items = Array.from(transfer.items ?? []);
   const entries = items
     .map((item) => (item.kind === 'file' ? ((item.webkitGetAsEntry() as FSNode | null) ?? null) : null))
@@ -171,7 +171,7 @@ export async function toSpineFilesFromDrop(transfer: DataTransfer): Promise<OASp
     return toSpineFiles(transfer.files);
   }
 
-  const collected: OASpineFile[] = [];
+  const collected: SpineFile[] = [];
   for (const entry of entries) {
     collected.push(...(await readEntry(entry, '')));
   }
@@ -189,16 +189,16 @@ export async function toSpineFilesFromDrop(transfer: DataTransfer): Promise<OASp
 export async function loadSpineCharacterFromPackage(
   packageId: string,
   skeletonId: string
-): Promise<OASpineCharacter> {
-  // 动态引入，避免 useSpinePackage 被纯本地场景也拖上网络依赖
-  const { fetchSkeletonFiles } = await import('@/composables/usePackageContent');
+): Promise<SpineCharacter> {
+  // 动态引入，避免 spinePackage 被纯本地场景也拖上网络依赖
+  const { fetchSkeletonFiles } = await import('@/api/packages');
   const files = await fetchSkeletonFiles(packageId, skeletonId);
 
   if (!files.length) {
     throw new Error(`立绘目录为空或不存在：${skeletonId}`);
   }
 
-  const entries: OASpineFile[] = [];
+  const entries: SpineFile[] = [];
   await Promise.all(
     files.map(async (item) => {
       const res = await fetch(item.url);

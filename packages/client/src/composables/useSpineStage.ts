@@ -34,21 +34,22 @@ import {
   type SpineBackend,
   type SpineBackendKind,
   type SpineRendererMode,
-} from '@/composables/spine/backend';
-import { matchTexture, type OASpineCharacter } from '@/composables/useSpinePackage';
+} from '@/spine/backend';
+import { matchTexture, type SpineCharacter } from '@/spinePackage';
+import { readonlyRef } from '@/utils/reactivity';
 
 /** 一条差分 = 若干个 slot 的 attachment 覆盖 */
-interface OASpineLayer {
+interface SpineLayer {
   slotIndex: number;
   attachmentName: string | null;
 }
 
-export interface OASpineVariant {
+export interface SpineVariant {
   /** 动画名，也就是差分编号（如 `03`） */
   name: string;
   /** 展示用文案（如 `03 · 微笑`） */
   label: string;
-  layers: OASpineLayer[];
+  layers: SpineLayer[];
 }
 
 const EXPRESSION_LABELS: Record<string, string> = {
@@ -94,7 +95,7 @@ function isAttachmentTimeline(timeline: Timeline): timeline is AttachmentTimelin
 }
 
 /** 抽出全部差分；同一组图层只保留最先出现的一条，避免 `99` 这类重复项刷屏 */
-export function extractVariants(data: SkeletonData): OASpineVariant[] {
+export function extractSpineVariants(data: SkeletonData): SpineVariant[] {
   // 角色自身名字（`ako_spr` / `shiroko`）会出现在附件名里，当成标签没有信息量
   const noise = new Set<string>();
   for (const token of String(data.name ?? '').toLowerCase().split(/[^a-z0-9]+/)) {
@@ -106,13 +107,13 @@ export function extractVariants(data: SkeletonData): OASpineVariant[] {
   }
 
   const seen = new Set<string>();
-  const variants: OASpineVariant[] = [];
+  const variants: SpineVariant[] = [];
 
   for (const animation of data.animations) {
     if (!/^\d+$/.test(animation.name)) {
       continue;
     }
-    const layers: OASpineLayer[] = [];
+    const layers: SpineLayer[] = [];
     for (const timeline of animation.timelines) {
       if (!isAttachmentTimeline(timeline)) {
         continue;
@@ -150,7 +151,7 @@ export function extractVariants(data: SkeletonData): OASpineVariant[] {
 }
 
 /** 除差分外的循环 / 单次动画，作为「动作」下拉项 */
-function extractActions(data: SkeletonData): string[] {
+function extractSpineActions(data: SkeletonData): string[] {
   return data.animations
     .filter((animation) => !/^\d+$/.test(animation.name))
     .map((animation) => animation.name)
@@ -161,15 +162,15 @@ function extractActions(data: SkeletonData): string[] {
     });
 }
 
-export type OASpineStageStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type SpineStageStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export function useSpineStage(
   canvas: Ref<HTMLCanvasElement | null>,
   rendererMode: Ref<SpineRendererMode> = ref<SpineRendererMode>('stable')
 ) {
-  const status = ref<OASpineStageStatus>('idle');
+  const status = ref<SpineStageStatus>('idle');
   const error = ref('');
-  const variants = shallowRef<OASpineVariant[]>([]);
+  const variants = shallowRef<SpineVariant[]>([]);
   const activeVariant = ref('');
   const actions = shallowRef<string[]>([]);
   const activeAction = ref('');
@@ -197,13 +198,13 @@ export function useSpineStage(
   let viewWidth = 1;
   let viewHeight = 1;
   let loadToken = 0;
-  let lastCharacter: OASpineCharacter | null = null;
+  let lastCharacter: SpineCharacter | null = null;
   /** 已经因画布锁死重试过的 canvasKey，防止无限换画布 */
   let lastLockedKey = -1;
   /** 静态立绘（不播放动作）时靠它判断是否需要重画 */
   let needsRedraw = true;
 
-  const variantByName = shallowRef<Map<string, OASpineVariant>>(new Map());
+  const variantByName = shallowRef<Map<string, SpineVariant>>(new Map());
 
   function applyVariantLayers() {
     if (!skeleton) {
@@ -334,7 +335,7 @@ export function useSpineStage(
     info.value = null;
   }
 
-  async function load(character: OASpineCharacter) {
+  async function load(character: SpineCharacter) {
     const token = ++loadToken;
     status.value = 'loading';
     error.value = '';
@@ -391,12 +392,12 @@ export function useSpineStage(
       const nextState = new AnimationState(stateData);
       state = nextState;
 
-      const parsedVariants = extractVariants(skeletonData);
+      const parsedVariants = extractSpineVariants(skeletonData);
       variants.value = parsedVariants;
       variantByName.value = new Map(parsedVariants.map((item) => [item.name, item]));
       activeVariant.value = parsedVariants[0]?.name ?? '';
 
-      const parsedActions = extractActions(skeletonData);
+      const parsedActions = extractSpineActions(skeletonData);
       actions.value = parsedActions;
       const nextAction = parsedActions.find((name) => /idle/i.test(name)) ?? '';
       activeAction.value = nextAction;
@@ -557,16 +558,17 @@ export function useSpineStage(
   });
 
   return {
-    status,
-    error,
-    info,
-    variants,
-    activeVariant,
-    actions,
-    activeAction,
-    backendKind,
-    canvasKey,
-    zoom,
+    status: readonlyRef(status),
+    error: readonlyRef(error),
+    info: readonlyRef(info),
+    variants: readonlyRef(variants),
+    activeVariant: readonlyRef(activeVariant),
+    actions: readonlyRef(actions),
+    activeAction: readonlyRef(activeAction),
+    backendKind: readonlyRef(backendKind),
+    canvasKey: readonlyRef(canvasKey),
+    zoom: readonlyRef(zoom),
+    // 双向绑定：`rizui_switch` 直接 v-model，保持可写
     debugRendering,
     load,
     setVariant,

@@ -28,10 +28,6 @@ assets:
     file: preload/images/uis/button_background.png
     file_type: image
 
-  # 情绪表情贴图示例
-  - id: emoicon_action
-    file: preload/images/emotions/emoicon_action.png
-    file_type: image
 ```
 
 ### 字段说明
@@ -65,7 +61,9 @@ assets:
 将真实的多媒体文件按配置路径放置到本地运行数据目录下：
 
 * **Windows**: `C:\Users\<用户名>\Documents\OurArchive\preload\...`
+
 * **Linux**: `/home/<用户名>/OurArchive/preload/...`
+
 * **Android (Termux)**: `/sdcard/OurArchive/preload/...`
 
 > **注意（大小写敏感）**：Linux 与 Android 文件系统严格区分大小写，请确保物理文件名及文件夹名称与 YAML 中的 `file` 路径大小写完全一致。
@@ -81,65 +79,15 @@ npm run dev:server
 后端在启动时会自动解析 `preload_assets.yml` 并核对物理文件是否存在：
 - 若所有配置的文件均存在，控制台输出 `➜ Preload: X/X 项就绪` 并展示绿色提示；
 - 若存在缺失或路径不匹配，控制台将输出黄色警告：
-  ```text
-  !  警告：preload不完整，可能影响体验，请从第三方分发处获得preload资源。
-     缺失文件: preload/sounds/se/next.wav 等
-  ```
-
-### 第四步：在前端中调用与消费
-
-后端内置了预加载静态服务与数据接口，开发者可直接通过以下方式调用：
-
-#### 1. 播放音频资源
-直接通过 `/api/preload/asset/:id` 接口播放，例如配合 `useSplashAudio`：
-
-```ts
-import { useSplashAudio } from '@/composables/useSplashAudio';
-
-// 循环播放主界面 BGM
-const { play, fadeIn, setVolume } = useSplashAudio('/api/preload/asset/main_bgm', {
-  loop: true,
-  volume: 0.5,
-});
-```
-
-#### 2. 展示图片/表情资源
-在 Vue 模板中直接绑定 URL：
-
-```html
-<img :src="'/api/preload/asset/' + emotionId" alt="表情贴图" />
-```
-
-#### 3. 获取全量预加载清单元数据
-前端可请求 `GET /api/preload/assets` 获取所有已配置的资源列表、就绪状态及对应资源访问链接：
-
-```ts
-const res = await fetch('/api/preload/assets');
-const data = await res.json();
-console.log(data.assets);
-// 返回: [{ id: "main_bgm", file: "preload/sounds/main_bgm.mp3", exists: true, url: "/api/preload/asset/main_bgm" }, ...]
-```
-
----
-
-## 4. 推荐的文件分类组织结构
-
-为了保持资源整洁，建议按照以下层级规范放置素材：
 
 ```text
-<资源根目录>/preload/
-├── sounds/                   # 音频素材
-│   ├── main_bgm.mp3          # 主界面背景音乐
-│   ├── bgm/                  # 剧情场景 BGM
-│   └── se/                   # 系统与交互音效 (click, confirm 等)
-└── images/                   # 图片素材
-    ├── uis/                  # 界面素材 (button_background.png 等)
-    ├── emotions/             # 角色对话表情贴图 (Emoticon_*.png)
-    └── avatars/              # 默认头像或头像框
+  !  警告：preload不完整，可能影响体验，请从第三方分发处获得preload资源。
+     缺失文件: preload/sounds/se/next.wav 等
 ```
 
----
 
-## 5. 打包分发注意事项
+## 4. 打包分发注意事项
 
 当执行平台打包命令（如 `npm run build:windows`、`npm run build:linux` 等）时，打包脚本会自动将项目根目录的 `preload_assets.yml` 复制到目标发行包根目录下，与可执行文件/启动脚本同级分发。使用者解压发行包后即可一目了然地获悉该版本所需的预加载资源结构。
+
+**但是打包不会自动包含任何实际的预加载资源文件**，使用者仍需自行从取并放置到对应的 `preload/` 目录下。

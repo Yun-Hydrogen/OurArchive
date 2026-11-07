@@ -5,6 +5,7 @@ import { rizui_button, rizui_infobox, rizui_progress } from 'riz-ui';
 import { ROUTE_NAMES } from '@/config/routes';
 import { SHELL_TIMING } from '@/config/transition';
 import { useResourcePackages, type ResourcePackage } from '@/composables/useResourcePackages';
+import { formatCount, formatDateTime } from '@/utils/format';
 
 const router = useRouter();
 const { packages, resourcesDir, loading, error, refresh } = useResourcePackages();
@@ -89,22 +90,6 @@ function openPackage(pkg: ResourcePackage) {
 function activeContents(pkg: ResourcePackage) {
   return pkg.contents.filter((item) => item.supported);
 }
-
-function formatDate(iso: string) {
-  if (!iso) {
-    return '未知';
-  }
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return '未知';
-  }
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function formatCount(count: number) {
-  return count > 0 ? String(count) : '';
-}
 </script>
 
 <template>
@@ -141,19 +126,19 @@ function formatCount(count: number) {
           :key="tab.id"
           type="button"
           role="tab"
-          class="oa-tab"
+          class="oa-res__tab"
           :class="{ 'is-active': tab.id === activeTab }"
           :aria-selected="tab.id === activeTab"
           @click="activeTab = tab.id"
         >
-          <span class="oa-tab__label">{{ tab.label }}</span>
-          <span v-if="!tab.ready" class="oa-tab__badge">未完成</span>
+          <span class="oa-res__tab__label">{{ tab.label }}</span>
+          <span v-if="!tab.ready" class="oa-res__tab__badge">未完成</span>
         </button>
       </nav>
     </div>
 
     <section class="oa-res__body">
-      <Transition name="oa-tab-fade" mode="out-in">
+      <Transition name="oa-res-tab-fade" mode="out-in">
         <div :key="activeTab" class="oa-res__panel">
           <template v-if="activeTab === 'packages'">
             <div class="oa-res__toolbar">
@@ -189,7 +174,7 @@ function formatCount(count: number) {
                 :style="{ '--enter-delay': cardDelay(index) }"
               >
                 <div
-                  class="oa-pack"
+                  class="oa-pkg-card"
                   role="button"
                   tabindex="0"
                   :aria-label="`打开资源包 ${pkg.name}`"
@@ -197,46 +182,46 @@ function formatCount(count: number) {
                   @keydown.enter.prevent="openPackage(pkg)"
                   @keydown.space.prevent="openPackage(pkg)"
                 >
-                  <header class="oa-pack__head">
-                    <div class="oa-pack__names">
-                      <h2 class="oa-pack__name">{{ pkg.name }}</h2>
-                      <p class="oa-pack__id">{{ pkg.id }}</p>
+                  <header class="oa-pkg-card__head">
+                    <div class="oa-pkg-card__names">
+                      <h2 class="oa-pkg-card__name">{{ pkg.name }}</h2>
+                      <p class="oa-pkg-card__id">{{ pkg.id }}</p>
                     </div>
-                    <span v-if="pkg.version" class="oa-pack__version">{{ pkg.version }}</span>
+                    <span v-if="pkg.version" class="oa-pkg-card__version">{{ pkg.version }}</span>
                   </header>
 
-                  <p class="oa-pack__desc">
+                  <p class="oa-pkg-card__desc">
                     {{ pkg.description || '这个资源包还没有填写描述。' }}
                   </p>
 
-                  <dl class="oa-pack__meta">
-                    <div class="oa-pack__meta-item">
+                  <dl class="oa-pkg-card__meta">
+                    <div class="oa-pkg-card__meta-item">
                       <dt>作者</dt>
                       <dd>{{ pkg.author || '未署名' }}</dd>
                     </div>
-                    <div class="oa-pack__meta-item">
+                    <div class="oa-pkg-card__meta-item">
                       <dt>更新</dt>
-                      <dd>{{ formatDate(pkg.updatedAt) }}</dd>
+                      <dd>{{ formatDateTime(pkg.updatedAt) }}</dd>
                     </div>
                   </dl>
 
-                  <ul v-if="activeContents(pkg).length" class="oa-pack__chips">
+                  <ul v-if="activeContents(pkg).length" class="oa-pkg-card__chips">
                     <li
                       v-for="item in activeContents(pkg)"
                       :key="item.key"
-                      class="oa-chip"
+                      class="oa-pkg-card__chip"
                       :class="{ 'is-missing': !item.exists }"
                       :title="`${item.path || item.key}${item.exists ? '' : '（目录不存在）'}`"
                     >
-                      <span class="oa-chip__dot" aria-hidden="true" />
+                      <span class="oa-pkg-card__chip__dot" aria-hidden="true" />
                       {{ item.label }}
-                      <span v-if="formatCount(item.count)" class="oa-chip__count">
+                      <span v-if="formatCount(item.count)" class="oa-pkg-card__chip__count">
                         {{ item.count }}
                       </span>
-                      <span v-if="!item.exists" class="oa-chip__miss">缺失</span>
+                      <span v-if="!item.exists" class="oa-pkg-card__chip__miss">缺失</span>
                     </li>
                   </ul>
-                  <p v-else class="oa-pack__empty">未声明可用资源</p>
+                  <p v-else class="oa-pkg-card__empty">未声明可用资源</p>
 
                   <rizui_infobox
                     v-if="!pkg.valid"
@@ -354,7 +339,7 @@ function formatCount(count: number) {
   align-self: flex-start;
 }
 
-.oa-tab {
+.oa-res__tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -372,11 +357,11 @@ function formatCount(count: number) {
     box-shadow 0.2s ease;
 }
 
-.oa-tab:hover {
+.oa-res__tab:hover {
   color: #1e4b76;
 }
 
-.oa-tab.is-active {
+.oa-res__tab.is-active {
   background: linear-gradient(180deg, #ffffff 0%, #eaf6ff 100%);
   color: #123a5c;
   box-shadow:
@@ -384,11 +369,11 @@ function formatCount(count: number) {
     inset 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
-.oa-tab__label {
+.oa-res__tab__label {
   font-weight: 600;
 }
 
-.oa-tab__badge {
+.oa-res__tab__badge {
   padding: 1px 6px;
   border-radius: 999px;
   background: rgba(248, 190, 0, 0.18);
@@ -415,19 +400,19 @@ function formatCount(count: number) {
 }
 
 /* 切换分类时做个短促的交叉淡入，避免内容硬切 */
-.oa-tab-fade-enter-active,
-.oa-tab-fade-leave-active {
+.oa-res-tab-fade-enter-active,
+.oa-res-tab-fade-leave-active {
   transition:
     opacity 180ms ease,
     transform 180ms ease;
 }
 
-.oa-tab-fade-enter-from {
+.oa-res-tab-fade-enter-from {
   opacity: 0;
   transform: translateY(8px);
 }
 
-.oa-tab-fade-leave-to {
+.oa-res-tab-fade-leave-to {
   opacity: 0;
   transform: translateY(-4px);
 }
@@ -484,12 +469,7 @@ function formatCount(count: number) {
 
 /* ---------- 卡槽：入场 / 离场 ---------- */
 
-.oa-slot {
-  display: flex;
-  min-width: 0;
-}
-
-.oa-slot > .oa-pack {
+.oa-slot > .oa-pkg-card {
   flex: 1;
 }
 
@@ -525,7 +505,7 @@ function formatCount(count: number) {
 
 /* ---------- 资源包卡片 ---------- */
 
-.oa-pack {
+.oa-pkg-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -547,33 +527,33 @@ function formatCount(count: number) {
     transform 0.2s ease;
 }
 
-.oa-pack:hover {
+.oa-pkg-card:hover {
   box-shadow:
     0 16px 32px rgba(36, 92, 138, 0.2),
     0 2px 5px rgba(36, 92, 138, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
-.oa-pack:focus-visible {
+.oa-pkg-card:focus-visible {
   outline: 2px solid var(--oa-blue);
   outline-offset: 3px;
 }
 
-.oa-pack__head {
+.oa-pkg-card__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.oa-pack__names {
+.oa-pkg-card__names {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.oa-pack__name {
+.oa-pkg-card__name {
   font-size: clamp(15px, 1.25vw, 18px);
   font-weight: 700;
   line-height: 1.3;
@@ -581,13 +561,13 @@ function formatCount(count: number) {
   overflow-wrap: anywhere;
 }
 
-.oa-pack__id {
+.oa-pkg-card__id {
   font-size: 11.5px;
   letter-spacing: 0.02em;
   color: #8aa3b8;
 }
 
-.oa-pack__version {
+.oa-pkg-card__version {
   flex: 0 0 auto;
   padding: 2px 9px;
   border-radius: 999px;
@@ -597,7 +577,7 @@ function formatCount(count: number) {
   font-weight: 600;
 }
 
-.oa-pack__desc {
+.oa-pkg-card__desc {
   display: -webkit-box;
   overflow: hidden;
   font-size: 12.5px;
@@ -607,28 +587,28 @@ function formatCount(count: number) {
   -webkit-line-clamp: 3;
 }
 
-.oa-pack__meta {
+.oa-pkg-card__meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 18px;
 }
 
-.oa-pack__meta-item {
+.oa-pkg-card__meta-item {
   display: flex;
   align-items: baseline;
   gap: 6px;
   font-size: 11.5px;
 }
 
-.oa-pack__meta-item dt {
+.oa-pkg-card__meta-item dt {
   color: #9ab0c2;
 }
 
-.oa-pack__meta-item dd {
+.oa-pkg-card__meta-item dd {
   color: #4d7799;
 }
 
-.oa-pack__chips {
+.oa-pkg-card__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -637,7 +617,7 @@ function formatCount(count: number) {
   list-style: none;
 }
 
-.oa-chip {
+.oa-pkg-card__chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -650,29 +630,29 @@ function formatCount(count: number) {
   line-height: 1.5;
 }
 
-.oa-chip__dot {
+.oa-pkg-card__chip__dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: currentColor;
 }
 
-.oa-chip__count {
+.oa-pkg-card__chip__count {
   color: #6f8ba4;
   font-size: 10.5px;
 }
 
-.oa-chip.is-missing {
+.oa-pkg-card__chip.is-missing {
   border-color: rgba(209, 138, 0, 0.24);
   background: rgba(248, 190, 0, 0.12);
   color: #a47500;
 }
 
-.oa-chip__miss {
+.oa-pkg-card__chip__miss {
   font-size: 10.5px;
 }
 
-.oa-pack__empty {
+.oa-pkg-card__empty {
   padding-top: 4px;
   font-size: 11.5px;
   color: #9ab0c2;

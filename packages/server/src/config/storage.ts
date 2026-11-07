@@ -1,15 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
-import { getStoragePaths, SETTINGS_FILE_NAME, type StoragePaths } from './paths.js';
+import { getStoragePaths, CONFIG_FILE_NAME, type StoragePaths } from './paths.js';
 
-export type GlobalSettings = Record<string, unknown>;
+export type GlobalConfig = Record<string, unknown>;
 
 export interface StorageInitResult {
   paths: StoragePaths;
   /** 本次启动是否为首次创建资源根目录 */
   firstRun: boolean;
-  settings: GlobalSettings;
+  config: GlobalConfig;
 }
 
 const DEFAULT_CONFIG_CONTENT =
@@ -34,9 +34,9 @@ function migrateLegacyConfigDir(paths: StoragePaths) {
   const legacyDir = path.join(paths.rootDir, 'configs');
   if (fs.existsSync(legacyDir)) {
     const legacyFile = path.join(legacyDir, 'global_settings.yml');
-    if (!fs.existsSync(paths.settingsFile) && fs.existsSync(legacyFile)) {
+    if (!fs.existsSync(paths.configFile) && fs.existsSync(legacyFile)) {
       try {
-        fs.copyFileSync(legacyFile, paths.settingsFile);
+        fs.copyFileSync(legacyFile, paths.configFile);
       } catch (error) {
         console.warn(
           `[Our Archive] 旧配置迁移失败: ${legacyFile}`,
@@ -53,9 +53,9 @@ function migrateLegacyConfigDir(paths: StoragePaths) {
 
   // 迁移 config/global_settings.yml -> config/global_config.yml
   const legacySettingsFile = path.join(paths.configDir, 'global_settings.yml');
-  if (!fs.existsSync(paths.settingsFile) && fs.existsSync(legacySettingsFile)) {
+  if (!fs.existsSync(paths.configFile) && fs.existsSync(legacySettingsFile)) {
     try {
-      fs.copyFileSync(legacySettingsFile, paths.settingsFile);
+      fs.copyFileSync(legacySettingsFile, paths.configFile);
     } catch (error) {
       console.warn(
         `[Our Archive] 旧配置文件迁移失败: ${legacySettingsFile}`,
@@ -90,37 +90,37 @@ export function initializeStorage(): StorageInitResult {
 
   migrateLegacyConfigDir(paths);
 
-  if (!fs.existsSync(paths.settingsFile)) {
-    fs.writeFileSync(paths.settingsFile, DEFAULT_CONFIG_CONTENT, 'utf-8');
+  if (!fs.existsSync(paths.configFile)) {
+    fs.writeFileSync(paths.configFile, DEFAULT_CONFIG_CONTENT, 'utf-8');
   }
 
   return {
     paths,
     firstRun,
-    settings: loadSettings(paths),
+    config: loadGlobalConfig(paths),
   };
 }
 
 /**
  * 读取全局配置。文件缺失或解析失败时返回默认配置。
  */
-export function loadSettings(paths: StoragePaths = getStoragePaths()): GlobalSettings {
-  const defaults: GlobalSettings = {
+export function loadGlobalConfig(paths: StoragePaths = getStoragePaths()): GlobalConfig {
+  const defaults: GlobalConfig = {
     main_bgm_volume: 50,
     preview_volume: 60,
     spine_renderer: DEFAULT_SPINE_RENDERER,
   };
 
-  if (!fs.existsSync(paths.settingsFile)) {
+  if (!fs.existsSync(paths.configFile)) {
     return defaults;
   }
 
   try {
-    const parsed = parseYaml(fs.readFileSync(paths.settingsFile, 'utf-8'));
+    const parsed = parseYaml(fs.readFileSync(paths.configFile, 'utf-8'));
     if (parsed && typeof parsed === 'object') {
-      const merged: GlobalSettings = {
+      const merged: GlobalConfig = {
         ...defaults,
-        ...(parsed as GlobalSettings),
+        ...(parsed as GlobalConfig),
       };
       // 音量项统一收敛到 0-100 的整数
       for (const key of ['main_bgm_volume', 'preview_volume'] as const) {
@@ -138,7 +138,7 @@ export function loadSettings(paths: StoragePaths = getStoragePaths()): GlobalSet
     }
   } catch (error) {
     console.warn(
-      `[Our Archive] 配置文件解析失败，将使用默认配置: ${paths.settingsFile}`,
+      `[Our Archive] 配置文件解析失败，将使用默认配置: ${paths.configFile}`,
       error instanceof Error ? error.message : error
     );
   }
@@ -149,15 +149,15 @@ export function loadSettings(paths: StoragePaths = getStoragePaths()): GlobalSet
 /**
  * 合并写入全局配置。
  */
-export function saveSettings(
-  settings: GlobalSettings,
+export function saveGlobalConfig(
+  config: GlobalConfig,
   paths: StoragePaths = getStoragePaths()
-): GlobalSettings {
-  const merged = { ...loadSettings(paths), ...settings };
+): GlobalConfig {
+  const merged = { ...loadGlobalConfig(paths), ...config };
 
   fs.mkdirSync(paths.configDir, { recursive: true });
   fs.writeFileSync(
-    paths.settingsFile,
+    paths.configFile,
     stringifyYaml(merged, { indent: 2, lineWidth: -1, noRefs: true }),
     'utf-8'
   );

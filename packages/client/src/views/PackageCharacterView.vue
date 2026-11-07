@@ -61,7 +61,7 @@ function backToPackage() {
 function openSkeleton(skeletonId: string) {
   leaveTo({
     name: ROUTE_NAMES.skeletonPreview,
-    query: { package: packageId.value, skeleton: skeletonId, character: nameId.value },
+    query: { packageId: packageId.value, skeletonId, nameId: nameId.value },
   });
 }
 </script>
@@ -159,14 +159,14 @@ function openSkeleton(skeletonId: string) {
               v-for="spine in character.spines"
               :key="spine.id"
               type="button"
-              class="oa-bone"
+              class="oa-charview__bone"
               :class="{ 'is-missing': !spine.exists }"
               :disabled="!spine.exists"
               :title="spine.exists ? '打开骨骼预览' : '资源包里缺少这个立绘目录'"
               @click="openSkeleton(spine.id)"
             >
-              <span class="oa-bone__id">{{ spine.id }}</span>
-              <span class="oa-bone__tag">{{ spine.exists ? '预览' : '缺失' }}</span>
+              <span class="oa-charview__bone__id">{{ spine.id }}</span>
+              <span class="oa-charview__bone__tag">{{ spine.exists ? '预览' : '缺失' }}</span>
             </button>
           </div>
 
@@ -450,7 +450,7 @@ function openSkeleton(skeletonId: string) {
   gap: 7px;
 }
 
-.oa-bone {
+.oa-charview__bone {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -467,23 +467,23 @@ function openSkeleton(skeletonId: string) {
     transform 0.2s ease;
 }
 
-.oa-bone:hover:not(:disabled) {
+.oa-charview__bone:hover:not(:disabled) {
   border-color: rgba(0, 144, 254, 0.55);
   background: rgba(0, 144, 254, 0.12);
   transform: translateY(-1px);
 }
 
-.oa-bone:focus-visible {
+.oa-charview__bone:focus-visible {
   outline: 2px solid var(--oa-blue);
   outline-offset: 2px;
 }
 
-.oa-bone__id {
+.oa-charview__bone__id {
   font-size: 12.5px;
   letter-spacing: 0.01em;
 }
 
-.oa-bone__tag {
+.oa-charview__bone__tag {
   padding: 0 6px;
   border-radius: 999px;
   background: rgba(0, 144, 254, 0.14);
@@ -491,14 +491,14 @@ function openSkeleton(skeletonId: string) {
   line-height: 1.7;
 }
 
-.oa-bone.is-missing {
+.oa-charview__bone.is-missing {
   border-color: rgba(154, 176, 194, 0.4);
   background: rgba(154, 176, 194, 0.1);
   color: #97afc1;
   cursor: not-allowed;
 }
 
-.oa-bone.is-missing .oa-bone__tag {
+.oa-charview__bone.is-missing .oa-charview__bone__tag {
   background: rgba(154, 176, 194, 0.2);
 }
 

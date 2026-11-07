@@ -134,10 +134,10 @@ export function loadPreloadAssets(
       continue;
     }
 
-    // 兼容 file_type 与用户手误的 file_tpye
-    const fileType = String(
-      record.file_type ?? record.file_tpye ?? record.type ?? 'unknown'
-    ).trim().toLowerCase();
+    // 只认 file_type；旧版的 file_tpye 是用户手误拼写，不再兜底
+    const fileType = String(record.file_type ?? 'unknown')
+      .trim()
+      .toLowerCase();
 
     // 规范化文件路径：剥离前导斜杠，确保安全解析
     const cleanRelative = rawFile.replace(/^[/\\]+/, '');

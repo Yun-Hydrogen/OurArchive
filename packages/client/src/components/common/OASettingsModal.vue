@@ -10,7 +10,7 @@ import {
   rizui_infobox,
 } from 'riz-ui';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
-import { SPINE_RENDERER_OPTIONS, type SpineRendererMode } from '@/composables/spine/mode';
+import { SPINE_RENDERER_OPTIONS, type SpineRendererMode } from '@/spine/mode';
 
 const props = defineProps<{
   visible: boolean;
@@ -59,7 +59,7 @@ watch(
     @update:show="emit('update:visible', $event)"
     @close="handleClose"
   >
-    <div class="oa-settings-content">
+    <div class="oa-settings__content">
       <rizui_card title="背景音效" desc="调整主界面背景音乐及音效参数">
         <rizui_cfgrow label="主界面背景音乐音量" hint="范围 0 - 100">
           <rizui_slider
@@ -105,7 +105,7 @@ watch(
     </div>
 
     <template #footer>
-      <div class="oa-settings-footer">
+      <div class="oa-settings__footer">
         <rizui_button primary text="确定" @click="handleClose" />
       </div>
     </template>
@@ -113,7 +113,7 @@ watch(
 </template>
 
 <style scoped>
-.oa-settings-content {
+.oa-settings__content {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -121,7 +121,7 @@ watch(
   padding: 4px 0;
 }
 
-.oa-settings-footer {
+.oa-settings__footer {
   display: flex;
   justify-content: flex-end;
   width: 100%;

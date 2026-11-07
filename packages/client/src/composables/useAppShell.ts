@@ -1,9 +1,10 @@
-import { computed, readonly, ref } from 'vue';
+import { computed, ref } from 'vue';
+import { readonlyRef } from '@/utils/reactivity';
 
 /**
  * 应用外壳（App 层）的共享状态。
  *
- * 底色、气泡背景、banner、设置按钮都挂在 App 上，由这里驱动：
+ * **单例**：底色、气泡背景、banner、设置按钮都挂在 App 上，由这里驱动；
  * 路由切换时它们不会被销毁重建，因此从 splash 到 home 不会出现「整页重载」的观感。
  */
 const stage = ref<'splash' | 'home'>('splash');
@@ -12,12 +13,13 @@ const gatePassed = ref(false);
 /** 递增即重挂 banner SVG，让内部 CSS 动画从头播放 */
 const bannerPlayToken = ref(0);
 
+/** 状态变化 / 输入事件：模板直接绑定 */
 export function useAppShell() {
   return {
-    stage: readonly(stage),
+    stage: readonlyRef(stage),
     isHome: computed(() => stage.value === 'home'),
-    gatePassed: readonly(gatePassed),
-    bannerPlayToken: readonly(bannerPlayToken),
+    gatePassed: readonlyRef(gatePassed),
+    bannerPlayToken: readonlyRef(bannerPlayToken),
 
     /** 进入主界面阶段：banner 停靠到左上角、底色渐变点亮 */
     enterHome() {

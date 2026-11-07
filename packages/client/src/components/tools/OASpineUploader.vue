@@ -5,17 +5,17 @@ import {
   toSpineCharacters,
   toSpineFiles,
   toSpineFilesFromDrop,
-  type OASpineCharacter,
-  type OASpineFile,
-} from '@/composables/useSpinePackage';
+  type SpineCharacter,
+  type SpineFile,
+} from '@/spinePackage';
 
 const emit = defineEmits<{
-  (e: 'pick', character: OASpineCharacter): void;
+  (e: 'select', character: SpineCharacter): void;
 }>();
 
 const dirInput = ref<HTMLInputElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
-const characters = ref<OASpineCharacter[]>([]);
+const characters = ref<SpineCharacter[]>([]);
 const reading = ref(false);
 const dragging = ref(false);
 const error = ref('');
@@ -32,7 +32,7 @@ function resetInput(input: HTMLInputElement | null) {
   }
 }
 
-function applyEntries(entries: OASpineFile[]) {
+function applyEntries(entries: SpineFile[]) {
   if (!entries.length) {
     error.value = '没有读到任何文件。';
     return;
@@ -48,7 +48,8 @@ function applyEntries(entries: OASpineFile[]) {
   characters.value = found;
 }
 
-async function handlePicked(files: FileList | null, input: HTMLInputElement | null) {
+/** 选文件：`@change` 与 `@drop` 统一走这里 */
+async function handleFilesSelected(files: FileList | null, input: HTMLInputElement | null) {
   if (!files || !files.length) {
     return;
   }
@@ -77,6 +78,7 @@ async function handleDrop(event: DragEvent) {
   }
 }
 
+/** 模板上的 `@click` / `@dragover` / `@drop` */
 function handleDragOver() {
   dragging.value = true;
 }
@@ -88,10 +90,12 @@ function handleDragLeave(event: DragEvent) {
   }
 }
 
-function choose(character: OASpineCharacter) {
-  emit('pick', character);
+/** 选到角色后通知父级 */
+function choose(character: SpineCharacter) {
+  emit('select', character);
 }
 
+/** 清空识别结果 */
 function clearAll() {
   characters.value = [];
   error.value = '';
@@ -99,15 +103,15 @@ function clearAll() {
 </script>
 
 <template>
-  <div class="oa-upload">
+  <div class="oa-spine-uploader">
     <div
-      class="oa-upload__zone"
+      class="oa-spine-uploader__zone"
       :class="{ 'is-dragging': dragging, 'is-reading': reading }"
       @dragover.prevent="handleDragOver"
       @dragleave.prevent="handleDragLeave"
       @drop.prevent="handleDrop"
     >
-      <div class="oa-upload__glyph" aria-hidden="true">
+      <div class="oa-spine-uploader__glyph" aria-hidden="true">
         <svg viewBox="0 0 48 48" fill="none">
           <path
             d="M10 16.5A3.5 3.5 0 0 1 13.5 13h6.2l3 3.6h11.8A3.5 3.5 0 0 1 38 20.1v13.4A3.5 3.5 0 0 1 34.5 37h-21A3.5 3.5 0 0 1 10 33.5z"
@@ -125,14 +129,14 @@ function clearAll() {
         </svg>
       </div>
 
-      <p class="oa-upload__title">把角色文件夹拖到这里</p>
-      <p class="oa-upload__hint">
+      <p class="oa-spine-uploader__title">把角色文件夹拖到这里</p>
+      <p class="oa-spine-uploader__hint">
         一个立绘包需要同一目录下的 <code>.skel</code>（或 <code>.json</code>）、<code>.atlas</code>
         与贴图。<br />
         也可以直接拖入整个 <code>skeletons</code> 目录，会按子目录拆成多个角色。
       </p>
 
-      <div class="oa-upload__actions">
+      <div class="oa-spine-uploader__actions">
         <rizui_button
           text="选择文件夹"
           l-icon="fa-solid fa-folder-open"
@@ -146,29 +150,29 @@ function clearAll() {
         />
       </div>
 
-      <div v-if="reading" class="oa-upload__reading">
+      <div v-if="reading" class="oa-spine-uploader__reading">
         <rizui_progress :indeterminate="true" :height="5" rounded />
         <span>正在读取文件…</span>
       </div>
 
       <input
         ref="dirInput"
-        class="oa-upload__input"
+        class="oa-spine-uploader__input"
         type="file"
         multiple
         tabindex="-1"
         aria-hidden="true"
-        @change="handlePicked(($event.target as HTMLInputElement).files, dirInput)"
+        @change="handleFilesSelected(($event.target as HTMLInputElement).files, dirInput)"
       />
       <input
         ref="fileInput"
-        class="oa-upload__input"
+        class="oa-spine-uploader__input"
         type="file"
         multiple
         tabindex="-1"
         aria-hidden="true"
         accept=".skel,.json,.atlas,.png,.webp,.jpg,.jpeg"
-        @change="handlePicked(($event.target as HTMLInputElement).files, fileInput)"
+        @change="handleFilesSelected(($event.target as HTMLInputElement).files, fileInput)"
       />
     </div>
 
@@ -179,21 +183,21 @@ function clearAll() {
       icon="fa-solid fa-triangle-exclamation"
     />
 
-    <section v-if="characters.length" class="oa-upload__result">
-      <header class="oa-upload__result-head">
+    <section v-if="characters.length" class="oa-spine-uploader__result">
+      <header class="oa-spine-uploader__result-head">
         <span>识别到 {{ characters.length }} 个立绘包</span>
-        <button type="button" class="oa-upload__clear" @click="clearAll">清空</button>
+        <button type="button" class="oa-spine-uploader__clear" @click="clearAll">清空</button>
       </header>
 
-      <ul class="oa-upload__list">
+      <ul class="oa-spine-uploader__list">
         <li v-for="character in characters" :key="`${character.id}-${character.skeleton.name}`">
-          <button type="button" class="oa-upload__item" @click="choose(character)">
-            <span class="oa-upload__item-id">{{ character.id }}</span>
-            <span class="oa-upload__item-meta">
+          <button type="button" class="oa-spine-uploader__item" @click="choose(character)">
+            <span class="oa-spine-uploader__item-id">{{ character.id }}</span>
+            <span class="oa-spine-uploader__item-meta">
               {{ character.skeleton.name }} · {{ character.atlas.name }} ·
               {{ character.textures.length }} 张贴图
             </span>
-            <span class="oa-upload__item-go">预览</span>
+            <span class="oa-spine-uploader__item-go">预览</span>
           </button>
         </li>
       </ul>
@@ -202,14 +206,14 @@ function clearAll() {
 </template>
 
 <style scoped>
-.oa-upload {
+.oa-spine-uploader {
   display: flex;
   flex-direction: column;
   gap: 14px;
   width: 100%;
 }
 
-.oa-upload__zone {
+.oa-spine-uploader__zone {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -227,42 +231,42 @@ function clearAll() {
     box-shadow 0.24s ease;
 }
 
-.oa-upload__zone.is-dragging {
+.oa-spine-uploader__zone.is-dragging {
   border-color: var(--oa-blue);
   background: rgba(232, 246, 255, 0.94);
   box-shadow: 0 0 0 4px rgba(0, 144, 254, 0.12);
 }
 
-.oa-upload__zone.is-reading {
+.oa-spine-uploader__zone.is-reading {
   opacity: 0.72;
 }
 
-.oa-upload__glyph {
+.oa-spine-uploader__glyph {
   color: var(--oa-blue);
   width: 48px;
   height: 48px;
 }
 
-.oa-upload__glyph svg {
+.oa-spine-uploader__glyph svg {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.oa-upload__title {
+.oa-spine-uploader__title {
   font-size: clamp(15px, 1.2vw, 18px);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
 
-.oa-upload__hint {
+.oa-spine-uploader__hint {
   max-width: 52em;
   font-size: 12.5px;
   line-height: 1.7;
   color: #61809c;
 }
 
-.oa-upload__hint code {
+.oa-spine-uploader__hint code {
   padding: 1px 5px;
   border-radius: 4px;
   background: rgba(0, 144, 254, 0.09);
@@ -271,7 +275,7 @@ function clearAll() {
   color: #1666a8;
 }
 
-.oa-upload__actions {
+.oa-spine-uploader__actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -279,7 +283,7 @@ function clearAll() {
   margin-top: 6px;
 }
 
-.oa-upload__reading {
+.oa-spine-uploader__reading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -289,7 +293,7 @@ function clearAll() {
   color: #6f8ba4;
 }
 
-.oa-upload__input {
+.oa-spine-uploader__input {
   position: absolute;
   left: -9999px;
   width: 1px;
@@ -301,13 +305,13 @@ function clearAll() {
 
 /* ---------- 识别结果 ---------- */
 
-.oa-upload__result {
+.oa-spine-uploader__result {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.oa-upload__result-head {
+.oa-spine-uploader__result-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -316,7 +320,7 @@ function clearAll() {
   color: #1e4b76;
 }
 
-.oa-upload__clear {
+.oa-spine-uploader__clear {
   border: none;
   background: none;
   font-family: inherit;
@@ -325,11 +329,11 @@ function clearAll() {
   cursor: pointer;
 }
 
-.oa-upload__clear:hover {
+.oa-spine-uploader__clear:hover {
   color: var(--oa-blue);
 }
 
-.oa-upload__list {
+.oa-spine-uploader__list {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -339,7 +343,7 @@ function clearAll() {
   list-style: none;
 }
 
-.oa-upload__item {
+.oa-spine-uploader__item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
@@ -361,20 +365,20 @@ function clearAll() {
     transform 0.2s ease;
 }
 
-.oa-upload__item:hover {
+.oa-spine-uploader__item:hover {
   border-color: rgba(0, 144, 254, 0.5);
   box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
   transform: translateY(-1px);
 }
 
-.oa-upload__item-id {
+.oa-spine-uploader__item-id {
   grid-area: id;
   font-size: 13.5px;
   font-weight: 700;
   color: #14395b;
 }
 
-.oa-upload__item-meta {
+.oa-spine-uploader__item-meta {
   grid-area: meta;
   overflow: hidden;
   font-size: 11.5px;
@@ -383,7 +387,7 @@ function clearAll() {
   white-space: nowrap;
 }
 
-.oa-upload__item-go {
+.oa-spine-uploader__item-go {
   grid-area: go;
   font-size: 12px;
   font-weight: 600;

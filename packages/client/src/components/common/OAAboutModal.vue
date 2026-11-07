@@ -47,53 +47,53 @@ function handleClose() {
       </div>
 
       <!-- 贡献与致谢列表 -->
-      <div class="oa-contrib">
+      <div class="oa-about__contrib">
         <!-- BASpark 鼠标特效 -->
-        <div class="oa-contrib-item">
-          <div class="oa-contrib-item__top">
-            <div class="oa-contrib-item__title">
+        <div class="oa-about__contrib-item">
+          <div class="oa-about__contrib-item__top">
+            <div class="oa-about__contrib-item__title">
               <i class="fa-solid fa-wand-magic-sparkles" />
               <span>BASpark 鼠标特效</span>
             </div>
-            <span class="oa-tag oa-tag--license">MIT</span>
+            <span class="oa-about__tag oa-about__tag--license">MIT</span>
           </div>
-          <p class="oa-contrib-item__desc">
+          <p class="oa-about__contrib-item__desc">
             基于 HTML5/Canvas 深度复刻《蔚蓝档案》UI 风格动效的 Windows 鼠标特效工具。
           </p>
           <a
-            class="oa-contrib-item__link"
+            class="oa-about__contrib-item__link"
             href="https://github.com/DoomVoss/BASpark"
             target="_blank"
             rel="noopener noreferrer"
           >
             <i class="fa-brands fa-github" />
             <span>DoomVoss/BASpark</span>
-            <i class="fa-solid fa-arrow-up-right-from-square oa-link-icon" />
+            <i class="fa-solid fa-arrow-up-right-from-square oa-about__link-icon" />
           </a>
         </div>
 
         <!-- 基沃托斯古书馆 -->
-        <div class="oa-contrib-item">
-          <div class="oa-contrib-item__top">
-            <div class="oa-contrib-item__title">
+        <div class="oa-about__contrib-item">
+          <div class="oa-about__contrib-item__top">
+            <div class="oa-about__contrib-item__title">
               <i class="fa-solid fa-book-bookmark" />
               <span>基沃托斯古书馆</span>
             </div>
-            <span class="oa-tag oa-tag--wiki">Wiki</span>
+            <span class="oa-about__tag oa-about__tag--wiki">Wiki</span>
           </div>
-          <p class="oa-contrib-item__desc">
+          <p class="oa-about__contrib-item__desc">
             《蔚蓝档案》剧情、设定、音频与视觉资料索引与内容参考，Our Archive也参考了其骨骼和3d、光环的实现方式。
             在此感谢基沃托斯古书馆。
           </p>
           <a
-            class="oa-contrib-item__link"
+            class="oa-about__contrib-item__link"
             href="https://kivo.wiki"
             target="_blank"
             rel="noopener noreferrer"
           >
             <i class="fa-solid fa-globe" />
             <span>https://kivo.wiki</span>
-            <i class="fa-solid fa-arrow-up-right-from-square oa-link-icon" />
+            <i class="fa-solid fa-arrow-up-right-from-square oa-about__link-icon" />
           </a>
         </div>
 
@@ -158,13 +158,13 @@ function handleClose() {
   color: #557b9e;
 }
 
-.oa-contrib {
+.oa-about__contrib {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.oa-contrib-item {
+.oa-about__contrib-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -175,19 +175,19 @@ function handleClose() {
   box-shadow: 0 2px 6px rgba(0, 80, 160, 0.03);
 }
 
-.oa-contrib-item--subtle {
+.oa-about__contrib-item--subtle {
   background: rgba(240, 248, 255, 0.55);
   border-color: rgba(0, 144, 254, 0.1);
 }
 
-.oa-contrib-item__top {
+.oa-about__contrib-item__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.oa-contrib-item__title {
+.oa-about__contrib-item__title {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -196,19 +196,19 @@ function handleClose() {
   color: #1a4267;
 }
 
-.oa-contrib-item__title i {
+.oa-about__contrib-item__title i {
   color: #0090fe;
   font-size: 13px;
 }
 
-.oa-contrib-item__desc {
+.oa-about__contrib-item__desc {
   margin: 0;
   font-size: 12px;
   line-height: 1.55;
   color: #55728d;
 }
 
-.oa-contrib-item__link {
+.oa-about__contrib-item__link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -224,18 +224,18 @@ function handleClose() {
   transition: background-color 0.2s, color 0.2s, transform 0.2s;
 }
 
-.oa-contrib-item__link:hover {
+.oa-about__contrib-item__link:hover {
   background: #e0f2fe;
   color: #0090fe;
   transform: translateY(-1px);
 }
 
-.oa-link-icon {
+.oa-about__link-icon {
   font-size: 10px;
   opacity: 0.7;
 }
 
-.oa-tag {
+.oa-about__tag {
   display: inline-flex;
   align-items: center;
   padding: 2px 7px;
@@ -244,19 +244,19 @@ function handleClose() {
   font-weight: 600;
 }
 
-.oa-tag--license {
+.oa-about__tag--license {
   background: #e0f2fe;
   color: #0284c7;
   border: 1px solid #bae6fd;
 }
 
-.oa-tag--wiki {
+.oa-about__tag--wiki {
   background: #fef3c7;
   color: #b45309;
   border: 1px solid #fde68a;
 }
 
-.oa-tag--author {
+.oa-about__tag--author {
   background: #dcfce7;
   color: #15803d;
   border: 1px solid #bbf7d0;

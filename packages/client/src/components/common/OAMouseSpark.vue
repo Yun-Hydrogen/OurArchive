@@ -17,11 +17,11 @@ useMouseSpark(canvasRef, props);
 </script>
 
 <template>
-  <canvas ref="canvasRef" class="oa-mouse-spark-canvas" aria-hidden="true" />
+  <canvas ref="canvasRef" class="oa-mouse-spark" aria-hidden="true" />
 </template>
 
 <style scoped>
-.oa-mouse-spark-canvas {
+.oa-mouse-spark {
   position: fixed;
   inset: 0;
   width: 100%;
