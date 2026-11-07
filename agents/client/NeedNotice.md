@@ -20,6 +20,8 @@
 | 五、立绘骨骼预览（Spine） | 33 – 44 |
 | 六、构建 / 资源 / 数据 | 45 – 46 |
 
+服务端踩坑见 [agents/server/NeedNotice.md](../server/NeedNotice.md)。
+
 ---
 
 # 一、启动 / 外壳 / 路由
