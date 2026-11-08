@@ -3,6 +3,7 @@ import {
   fetchPackageCharacters,
   fetchPackageMusic,
   fetchPackageSkeletons,
+  fetchPackageSounds,
   fetchResourcePackage,
 } from '@/api/packages';
 import { apiErrorMessage } from '@/api/request';
@@ -11,6 +12,8 @@ import type {
   PackageCharacter,
   PackageMusic,
   PackageSkeleton,
+  PackageSound,
+  PackageSoundCategory,
   ResourcePackage,
 } from '@our-archive/shared';
 
@@ -20,6 +23,8 @@ export type {
   PackageMusic,
   PackageSkeleton,
   PackageSkeletonItem,
+  PackageSound,
+  PackageSoundCategory,
 } from '@our-archive/shared';
 
 function errorText(err: unknown): string {
@@ -38,6 +43,8 @@ export function usePackageContent(packageId: string) {
   const characters = ref<PackageCharacter[]>([]);
   const skeletons = ref<PackageSkeleton[]>([]);
   const music = ref<PackageMusic[]>([]);
+  const sounds = ref<PackageSound[]>([]);
+  const soundCategories = ref<PackageSoundCategory[]>([]);
   const loading = ref(false);
   const error = ref('');
 
@@ -50,6 +57,11 @@ export function usePackageContent(packageId: string) {
   const musicLoading = ref(false);
   const musicError = ref('');
   let musicLoaded = false;
+
+  /** 音效清单与类别映射同理（3000+ 条，按需且只拉一次） */
+  const soundsLoading = ref(false);
+  const soundsError = ref('');
+  let soundsLoaded = false;
 
   async function load() {
     loading.value = true;
@@ -113,19 +125,50 @@ export function usePackageContent(packageId: string) {
     }
   }
 
+  /** 拉取音效列表与类别映射（读 index/sound_info.json + categories.json），同样按需且只拉一次 */
+  async function loadSounds(force = false) {
+    if (soundsLoading.value) {
+      return;
+    }
+    if (soundsLoaded && !force) {
+      return;
+    }
+
+    soundsLoading.value = true;
+    soundsError.value = '';
+
+    try {
+      const data = await fetchPackageSounds(packageId);
+      sounds.value = data.sounds;
+      soundCategories.value = data.categories;
+      soundsLoaded = true;
+    } catch (err) {
+      soundsError.value = errorText(err);
+      sounds.value = [];
+      soundCategories.value = [];
+    } finally {
+      soundsLoading.value = false;
+    }
+  }
+
   return {
     pkg: readonlyRef(pkg),
     characters: readonlyRef(characters),
     skeletons: readonlyRef(skeletons),
     music: readonlyRef(music),
+    sounds: readonlyRef(sounds),
+    soundCategories: readonlyRef(soundCategories),
     loading: readonlyRef(loading),
     error: readonlyRef(error),
     skeletonsLoading: readonlyRef(skeletonsLoading),
     skeletonsError: readonlyRef(skeletonsError),
     musicLoading: readonlyRef(musicLoading),
     musicError: readonlyRef(musicError),
+    soundsLoading: readonlyRef(soundsLoading),
+    soundsError: readonlyRef(soundsError),
     load,
     loadSkeletons,
     loadMusic,
+    loadSounds,
   };
 }

@@ -10,6 +10,8 @@ import type {
   PackageMusic,
   PackageSkeleton,
   PackageSkeletonItem,
+  PackageSound,
+  PackageSoundCategory,
   ResourcePackage,
 } from '@our-archive/shared';
 
@@ -42,6 +44,13 @@ interface MusicResponse {
   success: boolean;
   total: number;
   music: PackageMusic[];
+}
+
+interface SoundsResponse {
+  success: boolean;
+  total: number;
+  sounds: PackageSound[];
+  categories: PackageSoundCategory[];
 }
 
 interface SkeletonFilesResponse {
@@ -77,6 +86,11 @@ export function fetchPackageSkeletons(packageId: string): Promise<SkeletonsRespo
 /** 背景音乐曲目（读 `index/music_info.json`） */
 export function fetchPackageMusic(packageId: string): Promise<MusicResponse> {
   return apiGet<MusicResponse>(`/api/packages/${encodeURIComponent(packageId)}/music`);
+}
+
+/** 音效列表与类别映射（读 `index/sound_info.json` + `categories.json`） */
+export function fetchPackageSounds(packageId: string): Promise<SoundsResponse> {
+  return apiGet<SoundsResponse>(`/api/packages/${encodeURIComponent(packageId)}/sounds`);
 }
 
 /** 单个立绘目录下的文件清单 */

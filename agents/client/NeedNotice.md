@@ -1,4 +1,4 @@
-本文档记录了 前端 踩过的比较难解/复杂/难以发掘的坑，供后续开发者参考。
+﻿本文档记录了 前端 踩过的比较难解/复杂/难以发掘的坑，供后续开发者参考。
 请按照 
 1. 问题出现的模块位置
 2. 未解决前的表现
@@ -18,9 +18,9 @@
 | 一、启动 / 外壳 / 路由 | 01 – 06 |
 | 二、主界面卡片动画 | 07 – 12 |
 | 三、RizUI 集成 | 13 – 19 |
-| 四、资源管理 / 资源包 | 20 – 22 |
-| 五、立绘骨骼预览（Spine） | 23 – 31 |
-| 六、构建 / 资源 / 数据 | 32 – 33 |
+| 四、资源管理 / 资源包 | 20 – 23 |
+| 五、立绘骨骼预览（Spine） | 24 – 32 |
+| 六、构建 / 资源 / 数据 | 33 – 34 |
 
 服务端踩坑见 [agents/server/NeedNotice.md](../server/NeedNotice.md)。
 
@@ -245,11 +245,23 @@
 - **效果**：切歌全程静默，`main_bgm` 保持淡出状态。
 - **备注**：`suspend()` / `resume()` 内部有模块级 `suspended` 标记，幂等。
 
+## 23 · 试听用的 `<audio>` 必须常驻挂载，且播放态只能有一个来源
+
+- **位置**：`views/PackageView.vue`
+- **表现**：音效区点播放键毫无反应（音乐区正常）；或者音乐 / 音效两行同时显示「正在播放」，进度条与高亮互相打架；或者播完一次后再点不响。
+- **解决方案**：
+  1. `<audio ref="audioEl">` 放到页面根部（`<main>` 内、分类模板之外），任何分类切换都不会卸载它；
+  2. 只保留一个 `playingItem: { kind: 'music' | 'sound'; id } | null`，用 `isPlayingItem(kind, id)` 判断高亮、图标、进度条——**不要**为音乐和音效各留一个 `playingXxxId`；
+  3. `@ended` 里必须 `playingItem = null` 且 `currentTime = 0`。
+- **原理**：`ref` 只在节点挂载期间有值。音频元素写在「背景音乐」分支里时，切到「音效」分支它就随 `v-if` 卸载，`audioEl.value === null`，`toggleSound()` 直接 `return`（看起来就是按钮失灵）；而两个独立 id 又会互相不清理，导致同一时刻两行都认为自己正在播。播完不清状态时 `paused === true` 但 `currentTime` 停在末尾，再 `play()` 立刻又结束，听感同样是「没反应」。
+- **效果**：两个分类共用同一个实例，切分类时先 `stopMusic()` 再播另一边，同一时刻只会有一条高亮。
+- **备注**：`stopMusic()` 里 `removeAttribute('src')` 是必要的；只 `pause()` 的话换 `src` 前的旧缓冲会残留。
+
 ---
 
 # 五、立绘骨骼预览（Spine）
 
-## 23 · canvas 渲染成本 = 三角形数（这是最核心的一条）
+## 24 · canvas 渲染成本 = 三角形数（这是最核心的一条）
 
 - **位置**：`spine/canvasBackend.ts`、`spine/webglBackend.ts`
 - **表现**：阿罗娜、普拉娜的立绘明显的掉帧（个位数 fps），其他角色正常。
@@ -258,7 +270,7 @@
 - **效果**：5863 次 draw call 合成 1~2 次，满帧；Spine 运行时只进入异步路由 chunk，且现在从本地插件目录动态加载。
 - **备注**：模式由设置项 `spine_renderer` 控制（`aggressive` 仅 WebGL / `stable` 优先 WebGL / `conservative` 仅 canvas 2d）。
 
-## 24 · 直通 alpha 图集 + mipmap = 细线变粗发黑
+## 25 · 直通 alpha 图集 + mipmap = 细线变粗发黑
 
 - **位置**：`spine/webglBackend.ts`
 - **表现**：阿罗娜脸上的腮红线条明显变粗、发黑；发丝边缘出现暗边。整张图的其他颜色却是对的。
@@ -267,7 +279,7 @@
 - **效果**：细线恢复正常粗细与颜色，缩小采样也平滑（不再为了躲色边而关掉 mipmap）。
 - **备注**：只改其中一个开关的表现分别是「整体偏暗」「边缘发黑」「细节变粗」——排错时先确认这三处是否一致。
 
-## 25 · WebGL 能力要先用一次性 canvas 探测
+## 26 · WebGL 能力要先用一次性 canvas 探测
 
 - **位置**：`spine/backend.ts`（`canUseWebGL()`）
 - **表现**：「稳定」模式下本该回退 canvas 2d，结果两个后端都起不来。
@@ -276,7 +288,7 @@
 - **效果**：不支持 WebGL 的环境能干净地落到 canvas 2d。
 - **备注**：探测产生的上下文记得主动丢弃，避免占满浏览器的上下文配额。
 
-## 26 · Spine 运行时不进依赖，WebGL / Canvas 包不能混用
+## 27 · Spine 运行时不进依赖，WebGL / Canvas 包不能混用
 
 - **位置**：`spine/runtime.ts`、`spine/backend.ts`、`packages/client/package.json`
 - **表现**：把 `@esotericsoftware/*` 加回依赖会再次触发许可冲突；用 WebGL 包解析骨骼、却用 Canvas 包渲染时，内部 `instanceof` 判定全为 `false`，画面空白但不报错。
@@ -285,7 +297,7 @@
 - **效果**：前端依赖里没有 Spine 包，两条渲染路径都正常。
 - **备注**：运行时版本由后端 `config/spine.ts` 固定；升级时改版本号并对照 `spine/types.ts` 的最小接口。
 
-## 27 · `TextureAtlas` 在 4.2 只接受文本，贴图要自己 `setTexture()`
+## 28 · `TextureAtlas` 在 4.2 只接受文本，贴图要自己 `setTexture()`
 
 - **位置**：`composables/useSpineStage.ts`、两个 backend 的 `bindTextures`
 - **表现**：载入时报「无法读取 undefined 的 getImage」或在 `region.texture` 处崩溃。
@@ -294,7 +306,7 @@
 - **效果**：两条渲染路径都能正常贴图。
 - **备注**：`page.setTexture()` 会把贴图回填到该页的所有 region，所以顺序必须在 `AtlasAttachmentLoader` 之前。
 
-## 28 · 不要再额外翻一次 Y
+## 29 · 不要再额外翻一次 Y
 
 - **位置**：`composables/useSpineStage.ts`
 - **表现**：立绘上下颠倒，或者整体镜像。
@@ -303,7 +315,7 @@
 - **效果**：立绘方向正确。
 - **备注**：WebGL 侧投影用 `Matrix4.ortho(0, w, h, 0, 1, -1)`（y 轴向下），与 canvas 2d 语义一致，不要再引入额外的翻转。
 
-## 29 · `readEntries` 一次最多返回 100 条
+## 30 · `readEntries` 一次最多返回 100 条
 
 - **位置**：`spinePackage.ts`
 - **表现**：拖入整个 `skeletons/` 根目录时静默丢文件，识别出的角色少了一大半，还不报错。
@@ -312,7 +324,7 @@
 - **效果**：大目录能完整展开（整个 `skeletons/` 600+ 个目录可直接拖入）。
 - **备注**：`toSpineFilesFromDrop()` 里递归展开时同样要处理。
 
-## 30 · 快速换角色要用 `loadToken` 丢弃过期载入
+## 31 · 快速换角色要用 `loadToken` 丢弃过期载入
 
 - **位置**：`composables/useSpineStage.ts`
 - **表现**：连续点几个角色后，画面显示的骨骼和面板显示的 id 对不上。
@@ -321,7 +333,7 @@
 - **效果**：永远只显示最后一次选择的角色。
 - **备注**：`disposeStage()` 同时负责停 `requestAnimationFrame`、断开 `ResizeObserver`、释放 GL 贴图与着色器。
 
-## 31 · 「静态」模式要按需重绘
+## 32 · 「静态」模式要按需重绘
 
 - **位置**：`composables/useSpineStage.ts`
 - **表现**：选「静态（不播放动作）」时 GPU / CPU 仍然满载，笔记本风扇狂转。
@@ -334,7 +346,7 @@
 
 # 六、构建 / 资源 / 数据
 
-## 32 · 手写 JSON / YAML 带 BOM 会让解析失败
+## 33 · 手写 JSON / YAML 带 BOM 会让解析失败
 
 - **位置**：`res/*/characters/characters.json`、`res/*/index/music_info.json`、`package.yml`（由服务端读取，但由前端资源包作者手写）
 - **表现**：资源包在列表里显示 `valid: false`，或者角色 / 音乐数量为 0，但文件肉眼看着完全正常。
@@ -343,7 +355,7 @@
 - **效果**：清单能正常解析，计数正确。
 - **备注**：写这类文件优先用编辑器或带 `utf-8` 显式编码的脚本；服务端已经对 `package.yml` / `characters.json` / `music_info.json` 都做了 BOM 剥离。
 
-## 33 · 进度条消失后内容不能硬切
+## 34 · 进度条消失后内容不能硬切
 
 - **位置**：`composables/useEnterAnimation.ts`、`style.css` 的 `oa-swap` / `oa-fade`，以及资源管理、资源包、角色详情、立绘预览等页
 - **表现**：本地接口很快，进度条一闪而过；或者请求稍慢时，进度条走到头、卡片直接出现，没有飞入动画。返回上一页时也有页面整页硬切。

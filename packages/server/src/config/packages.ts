@@ -7,6 +7,8 @@ import type {
   PackageMusic,
   PackageSkeleton,
   PackageSkeletonItem,
+  PackageSound,
+  PackageSoundCategory,
   ResourcePackage,
 } from '@our-archive/shared';
 import { getStoragePaths, type StoragePaths } from './paths.js';
@@ -21,6 +23,8 @@ export type {
   PackageMusic,
   PackageSkeleton,
   PackageSkeletonItem,
+  PackageSound,
+  PackageSoundCategory,
   ResourcePackage,
 } from '@our-archive/shared';
 
@@ -35,13 +39,18 @@ export const DEFAULT_AVATAR_DIR = 'avatars';
 export const MUSIC_INDEX_DIR = 'index';
 export const MUSIC_INDEX_FILE = 'music_info.json';
 
+/** Sounds 分类的音效索引与类别映射：`<path>/index/sound_info.json` / `categories.json` */
+export const SOUND_INDEX_DIR = 'index';
+export const SOUND_INFO_FILE = 'sound_info.json';
+export const SOUND_CATEGORIES_FILE = 'categories.json';
+
 /**
  * 资源包内静态资源的访问前缀。
  * 与 `routes/packages.ts` 里挂载的路由保持一致。
  */
 export function buildAssetUrl(
   packageId: string,
-  kind: 'avatar' | 'skeleton' | 'music',
+  kind: 'avatar' | 'skeleton' | 'music' | 'sounds',
   relative: string
 ): string {
   const encoded = relative
@@ -118,6 +127,19 @@ function countEntries(dir: string, key: string): { exists: boolean; count: numbe
     const musicIndex = path.join(dir, MUSIC_INDEX_DIR, MUSIC_INDEX_FILE);
     try {
       const parsed = JSON.parse(fs.readFileSync(musicIndex, 'utf-8').replace(/^\uFEFF/, ''));
+      if (Array.isArray(parsed)) {
+        return { exists: true, count: parsed.length };
+      }
+    } catch {
+      // 没有索引文件就退回目录条目数
+    }
+  }
+
+  // 音效按音效索引计条目数，不把 index/ 与音频文件混起来数
+  if (key === 'Sounds') {
+    const soundIndex = path.join(dir, SOUND_INDEX_DIR, SOUND_INFO_FILE);
+    try {
+      const parsed = JSON.parse(fs.readFileSync(soundIndex, 'utf-8').replace(/^\uFEFF/, ''));
       if (Array.isArray(parsed)) {
         return { exists: true, count: parsed.length };
       }
@@ -459,6 +481,131 @@ const AUDIO_EXTENSIONS = new Set([
   '.webm',
 ]);
 
+/** 音频时长的轻量解析结果（秒，整数）；解析失败为 -1 */
+const UNKNOWN_DURATION = -1;
+
+/**
+ * 从文件内容算音频时长（秒，保留整数）。
+ *
+ * 只覆盖 `packages.ts` 里 `AUDIO_EXTENSIONS` 常见的几种：
+ * - WAV（PCM / WAVE_FORMAT_EXTENSIBLE）：解析 RIFF 的 `fmt ` 块拿采样率 / 位深 / 通道数，
+ *   `data` 块给出字节数，时长 = 字节数 / (采样率 × 通道数 × 位深/8)。
+ * - Ogg / Opus：按 Ogg 容器 + OpusHead（本包实际的格式）解析；非 Opus 直接回 -1，
+ *   这里是「前端能显示时长」，不是要完整解码。
+ *
+ * 返回 -1 表示「现在算不出」，前端只会显示「时长未知」，不影响播放。
+ */
+function parseAudioDuration(filePath: string): number {
+  let buffer: Buffer;
+  try {
+    buffer = fs.readFileSync(filePath);
+  } catch {
+    return UNKNOWN_DURATION;
+  }
+
+  // WAV
+  if (buffer.length > 44 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WAVE') {
+    return parseWavDuration(buffer);
+  }
+
+  // Ogg / Opus
+  if (buffer.length > 4 && buffer.toString('ascii', 0, 4) === 'OggS') {
+    return parseOggDuration(buffer);
+  }
+
+  // 其余格式回「未知」，前端不显示而不是 0
+  return UNKNOWN_DURATION;
+}
+
+/**
+ * 扫描 WAV 的 RIFF 块，算时长（秒，整数）。
+ * fmt 块在前、data 块在后（有些文件还带 fact 块，这里按 8 字节头逐块走）。
+ */
+function parseWavDuration(buffer: Buffer): number {
+  let offset = 12;
+  let fmt: Buffer | null = null;
+  let dataBytes = 0;
+
+  while (offset + 8 <= buffer.length) {
+    const chunkId = buffer.toString('ascii', offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    const chunkDataStart = offset + 8;
+
+    if (chunkId === 'fmt ') {
+      fmt = buffer.subarray(chunkDataStart, chunkDataStart + Math.min(chunkSize, 64));
+    } else if (chunkId === 'data') {
+      dataBytes = chunkSize;
+      break;
+    }
+
+    offset = chunkDataStart + chunkSize + (chunkSize % 2);
+  }
+
+  if (!fmt || fmt.length < 16 || dataBytes <= 0) {
+    return UNKNOWN_DURATION;
+  }
+
+  const channels = fmt.readUInt16LE(2);
+  const sampleRate = fmt.readUInt32LE(4);
+  const byteRate = fmt.readUInt32LE(8);
+  const blockAlign = fmt.readUInt16LE(12);
+  const bitsPerSample = fmt.readUInt16LE(14) || 16;
+
+  // 有些 mono WAV 把通道数写成了 0，按单通道兜底，不让时长误判回 -1。
+  const safeChannels = channels > 0 && channels <= 64 ? channels : 1;
+  const safeBits = bitsPerSample > 0 && bitsPerSample <= 64 ? bitsPerSample : 16;
+
+  if (sampleRate <= 0) {
+    return UNKNOWN_DURATION;
+  }
+
+  // 优先用 ByteRate（fmt 块写死的每秒字节数，最准）；没有时用
+  // SampleRate * BlockAlign，BlockAlign = Channels * bitsPerSample / 8
+  const bytesPerSecond =
+    byteRate > 0
+      ? byteRate
+      : blockAlign > 0
+        ? sampleRate * blockAlign
+        : sampleRate * safeChannels * (safeBits / 8);
+
+  if (bytesPerSecond <= 0) {
+    return UNKNOWN_DURATION;
+  }
+
+  const seconds = dataBytes / bytesPerSecond;
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return UNKNOWN_DURATION;
+  }
+
+  // 小数秒要保留一位小数的前端展示（0.6s 这种别塌成 0）
+  return Math.max(0, Math.floor(seconds * 10) / 10);
+}
+
+/** OpusHead 路径：按 Ogg 容器 + OpusHead 解析时长（只覆盖 Opus，非 Opus 回 -1） */
+function parseOggDuration(buffer: Buffer): number {
+  // OpusHead 前 5 字节: "OpusHe" (0xOpusHead)
+  const opusHeadIdx = buffer.indexOf(Buffer.from('OpusHead'));
+  if (opusHeadIdx === -1) {
+    return UNKNOWN_DURATION;
+  }
+
+  // 找 GranulePosition 在页面头
+  const granuleOffset = opusHeadIdx > 22 ? 22 : 0;
+  const granule = buffer.readBigUInt64LE(granuleOffset);
+  const sampleRate = buffer.readUInt32LE(opusHeadIdx + 8);
+  if (sampleRate <= 0) {
+    return UNKNOWN_DURATION;
+  }
+
+  // 一页 granule 单位采样数，换算秒时会向上取补齐
+  const seconds = Number(granule) / sampleRate;
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return UNKNOWN_DURATION;
+  }
+
+  return Math.max(0, Math.floor(seconds));
+}
+
 /**
  * 读取 BackgroundMusic 分类的曲目列表。
  *
@@ -551,6 +698,7 @@ export function readPackageMusic(
       description: asText(record.description),
       url: resolved ? buildAssetUrl(pkg.id, 'music', resolved) : '',
       exists: Boolean(resolved),
+      duration: resolved ? parseAudioDuration(path.join(audioDir, resolved)) : UNKNOWN_DURATION,
     });
   }
 
@@ -564,6 +712,175 @@ export function resolveMusicFile(
   filename: string
 ): string | null {
   const content = getContent(pkg, 'BackgroundMusic');
+  if (!content || !content.supported) {
+    return null;
+  }
+
+  const audioDir = resolveInside(packageDir, content.path);
+  if (!audioDir) {
+    return null;
+  }
+
+  const target = resolveInside(audioDir, filename);
+  if (!target || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
+    return null;
+  }
+  if (!AUDIO_EXTENSIONS.has(path.extname(target).toLowerCase())) {
+    return null;
+  }
+  return target;
+}
+
+/**
+ * 读取 Sounds 分类的音效列表与类别映射。
+ *
+ * 约定：`<path>/index/sound_info.json` 是音效索引，`<path>/index/categories.json`
+ * 是类别键 → 中文名映射；音频文件直接放在 `<path>/` 下。
+ * 索引里的 `original_filename` 决定播放哪个文件；缺失时退回「同名 + 任意音频后缀」。
+ * 类别在索引里不存在时，`categoryLabel` 回退为类别键本身（前端只分类不丢条目）。
+ */
+export function readPackageSounds(
+  packageDir: string,
+  pkg: ResourcePackage
+): { sounds: PackageSound[]; categories: PackageSoundCategory[] } {
+  const content = getContent(pkg, 'Sounds');
+  if (!content || !content.supported) {
+    return { sounds: [], categories: [] };
+  }
+
+  const audioDir = resolveInside(packageDir, content.path);
+  if (!audioDir) {
+    return { sounds: [], categories: [] };
+  }
+
+  const indexFile = resolveInside(audioDir, `${SOUND_INDEX_DIR}/${SOUND_INFO_FILE}`);
+  if (!indexFile || !fs.existsSync(indexFile)) {
+    return { sounds: [], categories: [] };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(indexFile, 'utf-8').replace(/^\uFEFF/, ''));
+  } catch {
+    return { sounds: [], categories: [] };
+  }
+  if (!Array.isArray(parsed)) {
+    return { sounds: [], categories: [] };
+  }
+
+  // 类别映射：key 是索引里的 category，value 是展示名
+  const categoryLabels = new Map<string, string>();
+  const categoriesFile = resolveInside(audioDir, `${SOUND_INDEX_DIR}/${SOUND_CATEGORIES_FILE}`);
+  if (categoriesFile && fs.existsSync(categoriesFile)) {
+    try {
+      const rawCategories = JSON.parse(
+        fs.readFileSync(categoriesFile, 'utf-8').replace(/^\uFEFF/, '')
+      );
+      if (rawCategories && typeof rawCategories === 'object' && !Array.isArray(rawCategories)) {
+        for (const [key, value] of Object.entries(rawCategories)) {
+          const label = asText(value);
+          if (key && label) {
+            categoryLabels.set(key, label);
+          }
+        }
+      }
+    } catch {
+      // 映射坏了就只回退类别键本身，不阻断列表
+    }
+  }
+
+  // 目录里的音频文件清单，用于「只给了 id_name」时兜底匹配
+  let audioFiles: string[] = [];
+  try {
+    audioFiles = fs
+      .readdirSync(audioDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && AUDIO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
+      .map((entry) => entry.name);
+  } catch {
+    audioFiles = [];
+  }
+
+  /** 在磁盘上找实际音频：优先 original_filename，否则按 id_name 模糊匹配 */
+  function resolveAudio(idName: string, filename: string): string | null {
+    const candidates = [
+      filename,
+      `${idName}${path.extname(filename) || '.ogg'}`,
+      ...audioFiles.filter(
+        (name) => name.toLowerCase() === `${idName}${path.extname(name)}`.toLowerCase()
+      ),
+      ...audioFiles.filter(
+        (name) => name.toLowerCase().startsWith(`${idName.toLowerCase()}.`)
+      ),
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      const full = resolveInside(audioDir, candidate);
+      if (full && fs.existsSync(full)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  const sounds: PackageSound[] = [];
+  const categoryCounts = new Map<string, number>();
+  const categoryDurations = new Map<string, number>();
+
+  for (const raw of parsed) {
+    if (!raw || typeof raw !== 'object') {
+      continue;
+    }
+    const record = raw as Record<string, unknown>;
+    const idName = asText(record.id_name);
+    if (!idName) {
+      continue;
+    }
+
+    const category = asText(record.category);
+    if (category) {
+      categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+    }
+
+    const declared = asText(record.original_filename);
+    const resolved = resolveAudio(idName, declared);
+    const duration = resolved ? parseAudioDuration(path.join(audioDir, resolved)) : UNKNOWN_DURATION;
+    if (duration !== UNKNOWN_DURATION) {
+      const key = category || 'Other';
+      categoryDurations.set(key, (categoryDurations.get(key) ?? 0) + duration);
+    }
+
+    sounds.push({
+      id_name: idName,
+      original_filename: resolved ?? declared,
+      description: asText(record.description),
+      category: category || 'Other',
+      categoryLabel: categoryLabels.get(category) ?? (category || 'Other'),
+      url: resolved ? buildAssetUrl(pkg.id, 'sounds', resolved) : '',
+      exists: Boolean(resolved),
+      duration,
+    });
+  }
+
+  // 只有被引用的类别才下发；排序与前端分类标签一致（按 label 排，键作平局）
+  const categories: PackageSoundCategory[] = [...categoryCounts.entries()]
+    .map(([id, count]) => ({
+      id,
+      label: categoryLabels.get(id) ?? id,
+      count,
+      duration: categoryDurations.get(id) ?? 0,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN') || a.id.localeCompare(b.id));
+
+  return { sounds, categories };
+}
+
+/** 在 Sounds 目录里定位一个音频文件，越界或不存在返回 null */
+export function resolveSoundFile(
+  packageDir: string,
+  pkg: ResourcePackage,
+  filename: string
+): string | null {
+  const content = getContent(pkg, 'Sounds');
   if (!content || !content.supported) {
     return null;
   }

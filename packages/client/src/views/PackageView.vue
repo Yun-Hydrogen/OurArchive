@@ -8,11 +8,12 @@ import { SHELL_TIMING } from '@/config/transition';
 import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
 import { useEnterAnimation } from '@/composables/useEnterAnimation';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
-import { formatBytes, formatDuration } from '@/utils/format';
+import { formatBytes, formatDuration, formatDurationDecimal, formatDurationLong } from '@/utils/format';
 import {
   usePackageContent,
   type PackageCharacter,
   type PackageMusic,
+  type PackageSound,
 } from '@/composables/usePackageContent';
 
 /** 学院为空时的兜底分组名 */
@@ -23,8 +24,12 @@ const SECTION_CHARACTERS = 'characters';
 const SECTION_SKELETONS = 'Skeletons';
 /** 侧边栏里「背景音乐」分类的 id */
 const SECTION_MUSIC = 'BackgroundMusic';
+/** 侧边栏里「音效」分类的 id */
+const SECTION_SOUNDS = 'Sounds';
 /** 侧边栏学院子条目的 id 前缀（只做定位，不切换分类） */
 const SCHOOL_PREFIX = 'school:';
+/** 侧边栏音效类别子条目的 id 前缀；`sound:` 本身表示「全部」 */
+const SOUND_CATEGORY_PREFIX = 'sound:';
 
 /** package.yml 的键 → 侧边栏 id（只有 hasCharacter 需要归一） */
 function navIdOf(key: string): string {
@@ -40,15 +45,20 @@ const {
   characters,
   skeletons,
   music,
+  sounds,
+  soundCategories,
   loading,
   error,
   skeletonsLoading,
   skeletonsError,
   musicLoading,
   musicError,
+  soundsLoading,
+  soundsError,
   load,
   loadSkeletons,
   loadMusic,
+  loadSounds,
 } = usePackageContent(packageId.value);
 
 /** 侧边栏当前条目（永远停在分类上，学院子条目只做定位） */
@@ -116,6 +126,27 @@ const navItems = computed<NavItem[]>(() => {
       };
     }
 
+    // 音效类别（categories.json 的映射）做成侧边栏子条目，和角色学院同一套交互
+    if (content.key === SECTION_SOUNDS && content.supported && soundCategoryGroups.value.length) {
+      return {
+        id: SECTION_SOUNDS,
+        label: content.label,
+        badge: content.count > 0 ? content.count : undefined,
+        children: [
+          {
+            id: SOUND_CATEGORY_PREFIX,
+            label: '全部',
+            badge: sounds.value.length,
+          },
+          ...soundCategoryGroups.value.map((group) => ({
+            id: `${SOUND_CATEGORY_PREFIX}${group.label}`,
+            label: group.label,
+            badge: group.count,
+          })),
+        ],
+      };
+    }
+
     return {
       id: navIdOf(content.key),
       label: content.label,
@@ -128,34 +159,40 @@ const navItems = computed<NavItem[]>(() => {
 
 /**
  * rizui_nav 选中子条目时会把 modelValue 改成子条目 id，
- * 这里拦住学院子条目，保证分类始终有效。
+ * 这里拦住学院 / 音效类别子条目，保证分类始终有效。
  */
 const navModel = computed<string>({
   get: () => activeSection.value,
   set: (value) => {
     const next = String(value ?? '');
-    if (!next || next.startsWith(SCHOOL_PREFIX)) {
+    if (!next || next.startsWith(SCHOOL_PREFIX) || next.startsWith(SOUND_CATEGORY_PREFIX)) {
       return;
     }
     activeSection.value = next;
   },
 });
 
-/** 点侧边栏学院子条目：现在才展开并滚动到对应分组 */
-function handleNavSelect(item: NavItem) {
-  const id = String(item?.id ?? '');
-  if (!id.startsWith(SCHOOL_PREFIX)) {
+/**
+ * 带子条目的分类点父条目只会「展开 / 收起」，不会切换右侧内容。
+ * 展开时顺带把分类切过去，避免「展开音效却还停在角色」。
+ */
+function handleNavToggle(payload: { item: NavItem; expanded: boolean }) {
+  if (!payload?.expanded) {
     return;
   }
-  const school = id.slice(SCHOOL_PREFIX.length);
-  activeSection.value = SECTION_CHARACTERS;
-  openSchool(school);
+  const id = String(payload.item?.id ?? '');
+  if (id === SECTION_SOUNDS || id === SECTION_CHARACTERS) {
+    if (activeSection.value !== id) {
+      activeSection.value = id;
+    }
+  }
+}
 
+/** 把内容区滚到某个子条目的位置并短暂高亮 */
+function scrollToBlock(selector: string, highlight: () => void) {
   void nextTick(() => {
     const container = contentEl.value;
-    const target = container?.querySelector<HTMLElement>(
-      `.oa-pkg__school[data-school="${CSS.escape(school)}"]`
-    );
+    const target = container?.querySelector<HTMLElement>(selector);
     if (!container || !target) {
       return;
     }
@@ -164,8 +201,40 @@ function handleNavSelect(item: NavItem) {
     const delta = target.getBoundingClientRect().top - container.getBoundingClientRect().top;
     container.scrollTo({ top: container.scrollTop + delta - 6, behavior: 'smooth' });
 
-    highlightSchool(school);
+    highlight();
   });
+}
+
+/** 点侧边栏学院 / 音效类别子条目：切分类、必要时补数据，再定位内容区 */
+async function handleNavSelect(item: NavItem) {
+  const id = String(item?.id ?? '');
+
+  if (id.startsWith(SOUND_CATEGORY_PREFIX)) {
+    const category = id.slice(SOUND_CATEGORY_PREFIX.length);
+    activeSection.value = SECTION_SOUNDS;
+    activeSoundCategory.value = category;
+
+    // 首次进入音效分类时数据还没到，先拉完再滚动，否则列表还是空的
+    if (!sounds.value.length) {
+      await loadSounds();
+    }
+
+    void nextTick(() => {
+      contentEl.value?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    return;
+  }
+
+  if (!id.startsWith(SCHOOL_PREFIX)) {
+    return;
+  }
+  const school = id.slice(SCHOOL_PREFIX.length);
+  activeSection.value = SECTION_CHARACTERS;
+  openSchool(school);
+
+  scrollToBlock(`.oa-pkg__school[data-school="${CSS.escape(school)}"]`, () =>
+    highlightSchool(school)
+  );
 }
 
 /** 定位后短暂高亮一下，方便一眼看到落在哪里 */
@@ -175,6 +244,7 @@ let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 function highlightSchool(school: string) {
   if (highlightTimer) {
     clearTimeout(highlightTimer);
+    highlightTimer = null;
   }
   highlightedSchool.value = school;
   highlightTimer = setTimeout(() => {
@@ -212,6 +282,9 @@ const activeKeyword = computed({
     if (activeSection.value === SECTION_MUSIC) {
       return musicKeyword.value;
     }
+    if (activeSection.value === SECTION_SOUNDS) {
+      return soundKeyword.value;
+    }
     return keyword.value;
   },
   set: (value: string) => {
@@ -219,6 +292,8 @@ const activeKeyword = computed({
       skeletonKeyword.value = value;
     } else if (activeSection.value === SECTION_MUSIC) {
       musicKeyword.value = value;
+    } else if (activeSection.value === SECTION_SOUNDS) {
+      soundKeyword.value = value;
     } else {
       keyword.value = value;
     }
@@ -238,6 +313,9 @@ const searchPlaceholder = computed(() => {
   }
   if (activeSection.value === SECTION_MUSIC) {
     return '搜索曲名 / 作曲 / id';
+  }
+  if (activeSection.value === SECTION_SOUNDS) {
+    return '搜索 id / 描述 / 文件名';
   }
   return '';
 });
@@ -400,6 +478,8 @@ watch(
       void loadSkeletons();
     } else if (section === SECTION_MUSIC) {
       void loadMusic();
+    } else if (section === SECTION_SOUNDS) {
+      void loadSounds();
     }
   },
   { immediate: true }
@@ -418,10 +498,27 @@ const { config: globalConfig } = useGlobalConfig();
 
 /** 只有一个 Audio 实例：换曲就改 src，避免多路同时出声 */
 const audioEl = ref<HTMLAudioElement | null>(null);
-const playingMusicId = ref('');
+
+/**
+ * 当前正在播的试听是谁（互斥状态）。
+ * 用单个 ref 驱动两套列表的高亮/进度，避免一曲一音效同时打架：
+ * 要么是 music:<name_id>，要么是 sound:<id_name>。
+ */
+const playingItem = ref<{ kind: 'music' | 'sound'; id: string } | null>(null);
+
+/** 同一条是否正在播（高亮、进度条都在这里判断） */
+function isPlayingItem(kind: 'music' | 'sound', id: string): boolean {
+  const current = playingItem.value;
+  return current?.kind === kind && current.id === id;
+}
+
+/** 当前播放状态（由 audio 元素的 play / pause 事件驱动） */
 const isMusicPlaying = ref(false);
 const musicCurrent = ref(0);
 const musicDuration = ref(0);
+
+/** 当前条目的服务端时长（秒），驱动进度轴的 max；未知时为 0 */
+const currentServerDuration = ref(0);
 
 /** 元素挂载和设置改动都同步一次音量 */
 watch(
@@ -479,8 +576,8 @@ function toggleMusic(item: PackageMusic) {
     return;
   }
 
-  // 同一首：只在播放 / 暂停之间切换
-  if (playingMusicId.value === item.name_id) {
+  // 同一条：只在播放 / 暂停之间切换
+  if (isPlayingItem('music', item.name_id)) {
     if (el.paused) {
       // 继续试听 → 再次压住主界面背景音乐
       suspendMainBgm();
@@ -498,20 +595,32 @@ function toggleMusic(item: PackageMusic) {
 
   // 换曲：先压住主界面背景音乐，再切 src
   suspendMainBgm();
-  playingMusicId.value = item.name_id;
+  playingItem.value = { kind: 'music', id: item.name_id };
+  currentServerDuration.value = item.duration > 0 ? item.duration : 0;
   musicCurrent.value = 0;
   musicDuration.value = 0;
   el.src = item.url;
   void el.play().catch(() => {
-    playingMusicId.value = '';
+    playingItem.value = null;
     isMusicPlaying.value = false;
     void resumeMainBgm();
   });
 }
 
-/** 试听自然播完：恢复主界面背景音乐 */
-function handleMusicEnded() {
+/**
+ * 试听自然播完：清掉「当前试听」并回到开头。
+ * 不清状态的话，播放键会停在「已暂停 + 进度在末尾」，
+ * 再点只会从末尾 `play()`，听感就是「点了没反应」。
+ */
+function handlePreviewEnded() {
   isMusicPlaying.value = false;
+  playingItem.value = null;
+  currentServerDuration.value = 0;
+  musicCurrent.value = 0;
+  const el = audioEl.value;
+  if (el) {
+    el.currentTime = 0;
+  }
   void resumeMainBgm();
 }
 
@@ -532,17 +641,166 @@ function stopMusic() {
   }
   el.pause();
   el.removeAttribute('src');
-  playingMusicId.value = '';
+  if (playingItem.value?.kind === 'music') {
+    playingItem.value = null;
+  }
+  currentServerDuration.value = 0;
   isMusicPlaying.value = false;
   musicCurrent.value = 0;
   musicDuration.value = 0;
   void resumeMainBgm();
 }
 
+/* ------------------------------ 音效 ------------------------------ */
+
+/** 音效搜索词 */
+const soundKeyword = ref('');
+
+/**
+ * 当前选中的音效类别，值是 `categories.json` 映射后的**中文标签**；`''` 表示全部。
+ * 用标签而不是原始键：`FX` 与 `Other` 都映射成「其他」，按标签合并成同一个侧边栏条目。
+ */
+const activeSoundCategory = ref('');
+
+/**
+ * 展示用类别分组：把映射到同一个中文名的原始类别键合并。
+ * 例：`categories.json` 里 `FX` / `Other` 都是「其他」→ 侧边栏只有一个「其他」。
+ */
+const soundCategoryGroups = computed(() => {
+  const map = new Map<string, { label: string; keys: string[]; count: number; duration: number }>();
+
+  for (const category of soundCategories.value) {
+    if (category.count <= 0) {
+      continue;
+    }
+    const bucket = map.get(category.label);
+    if (bucket) {
+      bucket.keys.push(category.id);
+      bucket.count += category.count;
+      bucket.duration += category.duration;
+    } else {
+      map.set(category.label, {
+        label: category.label,
+        keys: [category.id],
+        count: category.count,
+        duration: category.duration,
+      });
+    }
+  }
+
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'));
+});
+
+/** 当前选中标签对应的原始类别键集合；`null` 表示不按类别过滤 */
+const activeSoundKeys = computed(() => {
+  if (!activeSoundCategory.value) {
+    return null;
+  }
+  const keys = soundCategories.value
+    .filter((category) => category.label === activeSoundCategory.value)
+    .map((category) => category.id);
+  return keys.length ? new Set(keys) : null;
+});
+
+const filteredSounds = computed(() => {
+  const word = soundKeyword.value.trim().toLowerCase();
+  const keys = activeSoundKeys.value;
+
+  return sounds.value.filter((item) => {
+    if (keys && !keys.has(item.category)) {
+      return false;
+    }
+    if (!word) {
+      return true;
+    }
+    return [item.id_name, item.description, item.original_filename].some((field) =>
+      field.toLowerCase().includes(word)
+    );
+  });
+});
+
+/** 按类别分组，组内保持索引顺序，组间按类别映射的 label 排序（与后端 categories 一致） */
+const soundGroups = computed(() => {
+  const order = new Map(soundCategories.value.map((item) => [item.id, item.label]));
+  const map = new Map<string, PackageSound[]>();
+
+  for (const item of filteredSounds.value) {
+    const key = item.category || 'Other';
+    const bucket = map.get(key);
+    if (bucket) {
+      bucket.push(item);
+    } else {
+      map.set(key, [item]);
+    }
+  }
+
+  return [...map.entries()]
+    .map(([category, list]) => ({
+      category,
+      label: order.get(category) ?? category,
+      list,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN') || a.category.localeCompare(b.category));
+});
+
+/** 当前类别的展示名（`''` 即「全部」） */
+const activeSoundCategoryLabel = computed(() => activeSoundCategory.value || '全部类别');
+
+/** 当前筛选结果的合计时长（秒），用于摘要行；只累加可读时长的条目 */
+const filteredSoundDuration = computed(() =>
+  filteredSounds.value.reduce((sum, item) => sum + (item.duration > 0 ? item.duration : 0), 0)
+);
+
+function toggleSound(item: PackageSound) {
+  const el = audioEl.value;
+  if (!el || !item.url) {
+    return;
+  }
+
+  // 同一条：只在播放 / 暂停之间切换
+  if (isPlayingItem('sound', item.id_name)) {
+    if (el.paused) {
+      suspendMainBgm();
+      void el.play().catch(() => {
+        isMusicPlaying.value = false;
+        void resumeMainBgm();
+      });
+    } else {
+      el.pause();
+      void resumeMainBgm();
+    }
+    return;
+  }
+
+  // 换条：先压住主界面背景音乐，再切 src
+  suspendMainBgm();
+  playingItem.value = { kind: 'sound', id: item.id_name };
+  currentServerDuration.value = item.duration > 0 ? item.duration : 0;
+  musicCurrent.value = 0;
+  musicDuration.value = 0;
+  el.src = item.url;
+  void el.play().catch(() => {
+    playingItem.value = null;
+    isMusicPlaying.value = false;
+    void resumeMainBgm();
+  });
+}
+
+/** 切换到音效分类 / 离开页面时停掉试听 */
+function stopSound() {
+  if (playingItem.value?.kind !== 'sound') {
+    return;
+  }
+  stopMusic();
+}
+
 watch(activeSection, (section) => {
   if (section !== SECTION_MUSIC) {
     stopMusic();
     closeMusicDetail();
+  }
+  if (section !== SECTION_SOUNDS) {
+    stopSound();
   }
 });
 
@@ -656,8 +914,9 @@ function openCharacter(character: PackageCharacter) {
         :inset="0"
         height="100%"
         :collapsible="false"
-        :default-expanded-keys="[SECTION_CHARACTERS]"
+        :default-expanded-keys="[SECTION_CHARACTERS, SECTION_SOUNDS]"
         @select="handleNavSelect"
+        @toggle="handleNavToggle"
       />
 
       <div ref="contentEl" class="oa-pkg__content">
@@ -873,7 +1132,7 @@ function openCharacter(character: PackageCharacter) {
               v-for="item in filteredMusic"
               :key="item.name_id"
               class="oa-pkg__music"
-              :class="{ 'is-active': playingMusicId === item.name_id }"
+              :class="{ 'is-active': isPlayingItem('music', item.name_id) }"
             >
               <button
                 type="button"
@@ -882,7 +1141,7 @@ function openCharacter(character: PackageCharacter) {
                 :title="item.exists ? '播放 / 暂停' : '音频文件缺失'"
                 @click="toggleMusic(item)"
               >
-                <svg v-if="playingMusicId === item.name_id && isMusicPlaying" viewBox="0 0 16 16" aria-hidden="true">
+                <svg v-if="isPlayingItem('music', item.name_id) && isMusicPlaying" viewBox="0 0 16 16" aria-hidden="true">
                   <rect x="4.4" y="3.2" width="2.6" height="9.6" rx="1" fill="currentColor" />
                   <rect x="9" y="3.2" width="2.6" height="9.6" rx="1" fill="currentColor" />
                 </svg>
@@ -916,18 +1175,26 @@ function openCharacter(character: PackageCharacter) {
                 <div class="oa-pkg__music__meta">
                   <code class="oa-pkg__music__id">{{ item.name_id }}</code>
                   <span class="oa-pkg__music__file">{{ item.filename }}</span>
+                  <span
+                    v-if="item.duration > 0"
+                    class="oa-pkg__music__time"
+                    :title="`音频时长 ${formatDurationDecimal(item.duration)}`"
+                  >
+                    {{ formatDurationDecimal(item.duration) }}
+                  </span>
+                  <span v-else class="oa-pkg__music__unknown">时长未知</span>
                 </div>
 
-                <div v-if="playingMusicId === item.name_id" class="oa-pkg__music__progress">
+                <div v-if="isPlayingItem('music', item.name_id)" class="oa-pkg__music__progress">
                   <rizui_timeline
                     class="oa-pkg__music__timeline"
                     :model-value="musicCurrent"
                     :min="0"
-                    :max="musicDuration || 1"
-                    :step="1"
+                    :max="musicDuration || currentServerDuration || (item.duration > 0 ? item.duration : 1)"
+                    :step="0.1"
                     @update:model-value="seekMusic"
                   />
-                  <span class="oa-pkg__music__time">{{ formatDuration(musicDuration) }}</span>
+                  <span class="oa-pkg__music__time">{{ formatDurationDecimal(musicDuration || currentServerDuration || (item.duration > 0 ? item.duration : 0)) }}</span>
                 </div>
               </div>
             </article>
@@ -937,17 +1204,107 @@ function openCharacter(character: PackageCharacter) {
             <p>{{ musicKeyword ? '没有匹配的曲目。' : '索引里没有曲目。' }}</p>
           </div>
           </Transition>
+        </template>
 
-          <audio
-            ref="audioEl"
-            class="oa-pkg__music__audio"
-            preload="metadata"
-            @play="isMusicPlaying = true"
-            @pause="isMusicPlaying = false"
-            @ended="handleMusicEnded"
-            @timeupdate="musicCurrent = audioEl?.currentTime ?? 0"
-            @loadedmetadata="musicDuration = audioEl?.duration ?? 0"
-          />
+        <!-- 音效：类别走左侧子条目，右侧只列当前类别 -->
+        <template v-else-if="activeSection === SECTION_SOUNDS && activeContent?.supported">
+          <div class="oa-pkg__toolbar">
+            <p class="oa-pkg__summary">
+              <template v-if="soundsLoading && !sounds.length">正在读取音效索引…</template>
+              <template v-else>
+                <strong>{{ filteredSounds.length }}</strong> 个音效
+                <span class="oa-pkg__dot" aria-hidden="true">·</span>
+                {{ activeSoundCategoryLabel }}
+                <span class="oa-pkg__dot" aria-hidden="true">·</span>
+                总时长 {{ formatDurationLong(filteredSoundDuration) }}
+              </template>
+            </p>
+          </div>
+
+          <Transition name="oa-swap" mode="out-in">
+            <div v-if="soundsLoading && !sounds.length" key="loading" class="oa-pkg__state oa-pkg__state--inline">
+              <p class="oa-pkg__state-text">正在读取音效索引…</p>
+              <rizui_progress :indeterminate="true" :height="6" rounded />
+            </div>
+
+            <div v-else-if="soundsError" key="error" class="oa-pkg__notice">
+              <rizui_infobox
+                type="error"
+                :text="`读取音效失败：${soundsError}`"
+              />
+            </div>
+
+            <div v-else-if="filteredSounds.length" key="list" class="oa-pkg__music-list">
+              <div v-for="group in soundGroups" :key="group.category" class="oa-pkg__sound-group">
+                <p
+                  v-if="!activeSoundCategory || soundGroups.length > 1"
+                  class="oa-pkg__sound-group__title"
+                >
+                  {{ group.label }}
+                  <span class="oa-pkg__sound-group__count">{{ group.list.length }}</span>
+                </p>
+                <article
+                  v-for="item in group.list"
+                  :key="item.id_name"
+                  class="oa-pkg__music"
+                  :class="{ 'is-active': isPlayingItem('sound', item.id_name) }"
+                >
+                  <button
+                    type="button"
+                    class="oa-pkg__music__play"
+                    :disabled="!item.exists"
+                    :title="item.exists ? '播放 / 暂停' : '音频文件缺失'"
+                    @click="toggleSound(item)"
+                  >
+                    <svg v-if="isPlayingItem('sound', item.id_name) && isMusicPlaying" viewBox="0 0 16 16" aria-hidden="true">
+                      <rect x="4.4" y="3.2" width="2.6" height="9.6" rx="1" fill="currentColor" />
+                      <rect x="9" y="3.2" width="2.6" height="9.6" rx="1" fill="currentColor" />
+                    </svg>
+                    <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M5.2 3.4 12.4 8l-7.2 4.6Z" fill="currentColor" />
+                    </svg>
+                  </button>
+
+                  <div class="oa-pkg__music__body">
+                    <div class="oa-pkg__music__head">
+                      <span class="oa-pkg__music__title">{{ item.id_name }}</span>
+                      <span v-if="!item.exists" class="oa-pkg__music__miss">文件缺失</span>
+                      <span v-if="item.description" class="oa-pkg__music__artist">{{ item.description }}</span>
+                    </div>
+
+                    <div class="oa-pkg__music__meta">
+                      <code class="oa-pkg__music__id">{{ item.id_name }}</code>
+                      <span class="oa-pkg__music__file">{{ item.original_filename }}</span>
+                      <span
+                        v-if="item.duration > 0"
+                        class="oa-pkg__music__time"
+                        :title="`音频时长 ${formatDurationDecimal(item.duration)}`"
+                      >
+                        {{ formatDurationDecimal(item.duration) }}
+                      </span>
+                      <span v-else class="oa-pkg__music__unknown">时长未知</span>
+                    </div>
+
+                    <div v-if="isPlayingItem('sound', item.id_name)" class="oa-pkg__music__progress">
+                      <rizui_timeline
+                        class="oa-pkg__music__timeline"
+                        :model-value="musicCurrent"
+                        :min="0"
+                        :max="musicDuration || currentServerDuration || (item.duration > 0 ? item.duration : 1)"
+                        :step="0.1"
+                        @update:model-value="seekMusic"
+                      />
+                      <span class="oa-pkg__music__time">{{ formatDurationDecimal(musicDuration || currentServerDuration || (item.duration > 0 ? item.duration : 0)) }}</span>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div v-else class="oa-pkg__empty">
+              <p>{{ soundKeyword ? '没有匹配的音效。' : '索引里没有音效。' }}</p>
+            </div>
+          </Transition>
         </template>
 
         <!-- 未声明该分类：统一提示 -->
@@ -969,6 +1326,21 @@ function openCharacter(character: PackageCharacter) {
       </div>
     </section>
     </Transition>
+
+    <!--
+      试听音频元素必须常驻：音乐 / 音效共用同一个实例，
+      放在任一分类模板里都会在切分类时被卸载，ref 变成 null → 点了没声。
+    -->
+    <audio
+      ref="audioEl"
+      class="oa-pkg__music__audio"
+      preload="metadata"
+      @play="isMusicPlaying = true"
+      @pause="isMusicPlaying = false"
+      @ended="handlePreviewEnded"
+      @timeupdate="musicCurrent = audioEl?.currentTime ?? 0"
+      @loadedmetadata="musicDuration = audioEl?.duration ?? 0"
+    />
 
     <!-- 曲目完整描述：rizui_dialog 自带 Teleport，放页面根部避免随分类卸载 -->
     <rizui_dialog
@@ -1888,8 +2260,40 @@ function openCharacter(character: PackageCharacter) {
   display: none;
 }
 
-.oa-pkg__music__audio {
-  display: none;
+/* ---------- 音效 ---------- */
+
+.oa-pkg__sound-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.oa-pkg__music__unknown {
+  font-size: 10.5px;
+  color: #a3b6c4;
+}
+
+.oa-pkg__sound-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.oa-pkg__sound-group__title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 2px 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e4b76;
+}
+
+.oa-pkg__sound-group__count {
+  font-size: 10.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: #a3b6c4;
 }
 
 .oa-pkg__placeholder-badge--off {

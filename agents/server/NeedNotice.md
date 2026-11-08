@@ -65,7 +65,7 @@
 - **解决方案**：保存为 **UTF-8 无 BOM**；服务端读取时统一 `.replace(/^\uFEFF/, '')` 兜底（`packages.ts` 里三处：`package.yml`、`characters.json`、`music_info.json`）。
 - **原理**：`JSON.parse` 遇到 BOM（`EF BB BF`）直接抛 `Unexpected token`；Windows 上 PowerShell 5.1 的 `Set-Content -Encoding utf8` 默认写 BOM。
 - **效果**：清单能正常解析，计数正确。
-- **备注**：此条是跨端问题，前端侧见 [client/NeedNotice.md](../client/NeedNotice.md) 条目 32。
+- **备注**：此条是跨端问题，前端侧见 [client/NeedNotice.md](../client/NeedNotice.md) 条目 33。
 
 ## 05 · 预加载清单只认 `file_type`，不要兜底拼错的键
 

@@ -5,10 +5,12 @@ import {
   readPackageCharacters,
   readPackageMusic,
   readPackageSkeletons,
+  readPackageSounds,
   readSkeletonFiles,
   resolveInside,
   resolveMusicFile,
   resolvePackageDir,
+  resolveSoundFile,
   scanResourcePackages,
 } from '../config/packages.js';
 import { getStoragePaths } from '../config/paths.js';
@@ -70,6 +72,8 @@ function sendFile(res: Response, target: string | null) {
  * - `GET /api/packages/:id/skeleton/:skeletonId` 立绘目录内的文件清单
  * - `GET /api/packages/:id/music`               背景音乐曲目（读 index/music_info.json，含 description）
  * - `GET /api/packages/:id/music/*`             背景音乐音频本体
+ * - `GET /api/packages/:id/sounds`              音效列表与类别映射（读 index/sound_info.json + categories.json）
+ * - `GET /api/packages/:id/sounds/*`            音效音频本体
  * - `GET /api/packages/:id/avatar/*`            头像图片
  * - `GET /api/packages/:id/skeleton/:id/*`      立绘文件（.skel / .atlas / .png）
  */
@@ -153,6 +157,39 @@ export function createPackagesRouter(): Router {
     }
 
     sendFile(res, resolveMusicFile(packageDir, pkg, String(req.params.file ?? '')));
+  });
+
+  // 音效列表与类别映射（读 <path>/index/sound_info.json + categories.json）
+  router.get('/:id/sounds', (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      failNotFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    try {
+      const { sounds, categories } = readPackageSounds(packageDir, pkg);
+      res.json({ success: true, total: sounds.length, sounds, categories });
+    } catch (error) {
+      failInternal(res, error);
+    }
+  });
+
+  // 音效音频本体
+  router.get('/:id/sounds/:file(*)', (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      failNotFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    sendFile(res, resolveSoundFile(packageDir, pkg, String(req.params.file ?? '')));
   });
 
   // 全部立绘目录（含文件清单与体积）

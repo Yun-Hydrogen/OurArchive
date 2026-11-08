@@ -1,21 +1,27 @@
 关联前端文件：
 `packages/client/src/views/PackageView.vue` — 资源包大卡片（左侧分类栏 + 右侧内容区）
 `packages/client/src/views/PackageCharacterView.vue` — 角色详情
-`packages/client/src/composables/usePackageContent.ts` — 单个资源包的内容（详情 + 角色 + 立绘 + 音乐）
+`packages/client/src/composables/usePackageContent.ts` — 单个资源包的内容（详情 + 角色 + 立绘 + 音乐 + 音效）
 `packages/client/src/api/packages.ts` — 资源包相关 HTTP 请求
 
 用法：
 
 ### `navModel`（带写入闸门的可写 computed）
 
-1. 作用：把 `v-model` 接到 `rizui_sidebar`；2. `rizui_nav` 选中子条目时会把 `modelValue` 改成子条目 id，这里拦住 `school:` 前缀的值，保证 `activeSection` 永远停在分类上；3. 学院子条目的定位走 `@select` 里的 `handleNavSelect`。
-2. 输入输出：`get` 返回 `activeSection`；`set` 丢弃空值与 `school:` 前缀。
-3. 注意事项：**不要**把 `v-model` 直接绑 `activeSection`（会被污染成 `school:…`，右侧 `v-if` 立刻失效）。
+1. 作用：把 `v-model` 接到 `rizui_sidebar`；2. `rizui_nav` 选中子条目时会把 `modelValue` 改成子条目 id，这里拦住 `school:` / `sound:` 前缀的值，保证 `activeSection` 永远停在分类上；3. 子条目的定位走 `@select` 里的 `handleNavSelect`，展开走 `@toggle` 里的 `handleNavToggle`。
+2. 输入输出：`get` 返回 `activeSection`；`set` 丢弃空值与子条目前缀。
+3. 注意事项：**不要**把 `v-model` 直接绑 `activeSection`（会被污染成 `school:…` / `sound:…`，右侧 `v-if` 立刻失效）。
 
-### `handleNavSelect(item)`（学院子条目定位）
+### `handleNavToggle(payload)`（父条目展开即切换分类）
 
-1. 作用：点侧边栏的学院子条目时把 `activeSection` 拉回角色分类；2. 学院分组由 `schoolGroups` 按名字排序（组内保持 `name_id` 顺序）；3. 展开走 `toggleSchool(school)`，折叠动画用 `grid-template-rows: 0fr → 1fr` + `opacity` 过渡，内层必须 `min-height: 0; overflow: hidden` 才能收干净。
-2. 输入：`NavItem`（`@select` 抛出的条目，`id` 形如 `school:<academy>`）；输出：无。
+1. 作用：`rizui_nav` 里带 `children` 的条目点击只「展开 / 收起」，不会触发 `select`。展开角色 / 音效时顺带把 `activeSection` 切过去，避免「展开音效却还停在角色」。
+2. 输入：`{ item: NavItem; expanded: boolean }`；输出：无。
+3. 注意事项：只在 `expanded === true` 时切换；收起不切，否则点一下父条目就把内容换掉。
+
+### `handleNavSelect(item)`（学院 / 音效类别子条目定位）
+
+1. 作用：点侧边栏子条目时把 `activeSection` 拉回对应分类，再定位内容区。学院子条目走 `openSchool(school)` + 滚动高亮；音效类别子条目写 `activeSoundCategory`（中文标签），数据没到时先 `await loadSounds()` 并把列表滚回顶部。
+2. 输入：`NavItem`（`id` 形如 `school:<学院>` / `sound:<类别标签>`；`sound:` 本身是「全部」）；输出：无。
 3. 注意事项：定位量用 `getBoundingClientRect` 差值算，不要用 `offsetParent`（换层后会偏）；`rizui_card` 的头部不是按钮，表头点击靠事件代理判定是否落在 `.ct-card-head` 上。
 
 ### `navIdOf(key)` / `activeContent`
@@ -38,16 +44,22 @@
 
 ### 骨骼清单按需加载
 
-1. 作用：骨骼清单的项数由用户资源包决定（数据量取决于外载资源，不设上限），进页面只拉详情 + 角色；切到「骨骼」分类再 `loadSkeletons()`，composable 内用 `skeletonsLoaded` 去重；首次加载时摘要行显示「正在读取立绘目录…」。
-2. 实现：`watch(activeSection)` 分支到 `loadSkeletons()` / `loadMusic()`，`immediate: true` 保证初次进入分类时触发。
-3. 注意事项：骨骼和音乐用各自独立的 `*Loading` / `*Error` / `*Loaded` 三件套，不要复用页面的 `loading`。
+1. 作用：骨骼清单的项数由用户资源包决定（数据量取决于外载资源，不设上限），进页面只拉详情 + 角色；切到「骨骼」分类再 `loadSkeletons()`，切到「背景音乐」再 `loadMusic()`，切到「音效」再 `loadSounds()`，composable 内用 `*Loaded` 去重；首次加载时摘要行显示「正在读取…」。
+2. 实现：`watch(activeSection)` 分支到 `loadSkeletons()` / `loadMusic()` / `loadSounds()`，`immediate: true` 保证初次进入分类时触发。
+3. 注意事项：骨骼、音乐、音效用各自独立的 `*Loading` / `*Error` / `*Loaded` 三件套，不要复用页面的 `loading`。音效 3000+ 条走同样的按需加载，不要进页面就拉。
 
-### `toggleMusic(item)`（试听与主界面 BGM 互斥）
+### `toggleMusic(item)` / `toggleSound(item)`（试听与主界面 BGM 互斥）
 
-1. 作用：进入资源包试听时压住 `main_bgm`；同曲只在播放 / 暂停之间切换，换曲先压住再换 `src`。
-2. 输入：`PackageMusic`；输出：无。
-3. 注意事项：**不要**用 `<audio>` 的 `@pause` 事件恢复 `main_bgm`（换曲改 `src` 也会触发 `pause`，会先恢复再压住）；恢复只走「暂停按钮 / `@ended` / `stopMusic()`」三条显式路径。
+1. 作用：进入资源包试听时压住 `main_bgm`；同条只在播放 / 暂停之间切换，换条先压住再换 `src`。音乐与音效共用同一个 `<audio ref="audioEl">`（常驻在页面根部），「当前在播谁」只有 `playingItem: { kind, id } | null` 一份状态，`isPlayingItem(kind, id)` 供两边模板判断高亮 / 图标 / 进度条。
+2. 输入：`PackageMusic` / `PackageSound`；输出：无。
+3. 注意事项：**不要**用 `<audio>` 的 `@pause` 事件恢复 `main_bgm`（换曲改 `src` 也会触发 `pause`，会先恢复再压住）；恢复只走「暂停按钮 / `@ended` / `stopMusic()`」三条显式路径。`@ended` 必须清空 `playingItem` 并把 `currentTime` 归零，否则播放键会停在末尾，再点没声音。
 4. 注意事项（试听音量）：`watch([audioEl, () => globalConfig.value.preview_volume])` 把试听音量同步到设置里的「预览音频 / 音效音量」。
+
+### 音效类别（`categories.json` 映射）
+
+1. 作用：音效类别做成**侧边栏子条目**（和角色学院同一套交互：`全部` + 各中文类别，带条数），不使用顶部分类按钮。
+2. 逻辑：`activeSoundCategory` 存的是映射后的**中文标签**，`soundCategoryGroups` 把映射到同一标签的原始键合并（例如 `FX` / `Other` 都是「其他」），`activeSoundKeys` 再反查出这些键供 `filteredSounds` 过滤；`soundGroups` 负责内容区分组，组内保持索引顺序、组间按中文 label 排序（与后端一致）。
+3. 注意事项：`soundGroups` 的组内空类别回退 `Other`，与后端的 `category || 'Other'` 对齐；不要在前端硬编码类别名，也不要按原始键直接展示（会出现两个同名「其他」）。
 
 ### `isDescDialogOpen`（可写 computed）
 

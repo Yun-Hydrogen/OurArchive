@@ -18,7 +18,7 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-/** 秒 → `m:ss` */
+/** 秒 → `m:ss`（负数 / 非数字回「0:00」） */
 export function formatDuration(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return '0:00';
@@ -27,6 +27,30 @@ export function formatDuration(seconds: number): string {
   const mm = Math.floor(total / 60);
   const ss = total % 60;
   return `${mm}:${String(ss).padStart(2, '0')}`;
+}
+
+/** 秒 → `m:ss.d`（含一位小数，音效等短音频显示用） */
+export function formatDurationDecimal(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return '0:00.0';
+  }
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const whole = Math.floor(secs);
+  const tenth = Math.floor((secs - whole) * 10);
+  return `${minutes}:${String(whole).padStart(2, '0')}.${tenth}`;
+}
+
+/** 秒 → `1:12:03`（小时为 0 时不显示小时，只有 m:ss） */
+export function formatDurationLong(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return '0:00';
+  }
+  const total = Math.floor(seconds);
+  const hh = Math.floor(total / 3600);
+  const mm = Math.floor((total % 3600) / 60);
+  const ss = total % 60;
+  return hh > 0 ? `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${mm}:${String(ss).padStart(2, '0')}`;
 }
 
 /** ISO 时间 → `YYYY-MM-DD HH:mm`（非法输入返回「未知」） */

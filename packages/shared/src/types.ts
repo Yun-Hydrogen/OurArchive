@@ -86,6 +86,37 @@ export interface PackageSkeleton {
   complete: boolean;
 }
 
+/** 一条音效（`index/sound_info.json` 的一条） */
+export interface PackageSound {
+  /** 音效 id（小写 snake_case），如 `se_49mm_01` */
+  id_name: string;
+  /** 实际文件名，如 `SE_49mm_01.wav` */
+  original_filename: string;
+  description: string;
+  /** `categories.json` 里的类别键，如 `SE` / `SFX`（无映射时即原始类别名） */
+  category: string;
+  /** 分类中文名（`categories.json` 映射）；缺映射时为类别键本身 */
+  categoryLabel: string;
+  /** 音频可访问 URL；文件缺失时为空串 */
+  url: string;
+  /** 音频文件是否真的存在 */
+  exists: boolean;
+  /** 音频时长（秒，小数保留一位）；未知时为 -1 */
+  duration: number;
+}
+
+/** 音效类别（`index/categories.json` 的一条键值对） */
+export interface PackageSoundCategory {
+  /** 类别键，如 `SE` */
+  id: string;
+  /** 展示名，如 `剧情` */
+  label: string;
+  /** 该类别下的音效数；键未被引用时不下发 */
+  count: number;
+  /** 该类别下音效时长合计（秒，保留一位小数）；只统计可读时长的条目 */
+  duration: number;
+}
+
 /** 一首背景音乐（`index/music_info.json` 的一条） */
 export interface PackageMusic {
   /** 曲目 id，如 `theme_01` */
@@ -100,4 +131,6 @@ export interface PackageMusic {
   url: string;
   /** 音频文件是否真的存在 */
   exists: boolean;
+  /** 音频时长（秒，小数保留一位）；未知时为 -1 */
+  duration: number;
 }
