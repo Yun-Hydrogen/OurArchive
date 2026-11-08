@@ -4,11 +4,13 @@ import path from 'node:path';
 import {
   readPackageBackgrounds,
   readPackageCharacters,
+  readPackageEmotions,
   readPackageMusic,
   readPackageSkeletons,
   readPackageSounds,
   readSkeletonFiles,
   resolveBackgroundFile,
+  resolveEmotionFile,
   resolveInside,
   resolveMusicFile,
   resolvePackageDir,
@@ -86,6 +88,8 @@ function sendFile(res: Response, target: string | null) {
  * - `GET /api/packages/:id/sounds/*`            音效音频本体
  * - `GET /api/packages/:id/backgrounds`         背景图与分类（读 index/category.yml，缺省只读根目录）
  * - `GET /api/packages/:id/backgrounds/*`       背景图本体
+ * - `GET /api/packages/:id/emotions`            表情清单（读 index/emotions.yml，含合成层与关键帧）
+ * - `GET /api/packages/:id/emotions/*`          表情图片 / 音效本体
  * - `GET /api/packages/:id/avatar/*`            头像图片
  * - `GET /api/packages/:id/skeleton/:id/*`      立绘文件（.skel / .atlas / .png）
  */
@@ -236,6 +240,39 @@ export function createPackagesRouter(): Router {
     }
 
     sendFile(res, resolveBackgroundFile(packageDir, pkg, String(req.params.file ?? '')));
+  });
+
+  // 表情清单（读 <path>/index/emotions.yml，含合成层与关键帧）
+  router.get('/:id/emotions', (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      failNotFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    try {
+      const emotions = readPackageEmotions(packageDir, pkg);
+      res.json({ success: true, total: emotions.length, emotions });
+    } catch (error) {
+      failInternal(res, error);
+    }
+  });
+
+  // 表情用到的图片 / 音效本体
+  router.get('/:id/emotions/:file(*)', (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      failNotFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    sendFile(res, resolveEmotionFile(packageDir, pkg, String(req.params.file ?? '')));
   });
 
   // 全部立绘目录（含文件清单与体积）

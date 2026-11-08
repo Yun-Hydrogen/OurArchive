@@ -5,9 +5,17 @@ import { rizui_card, rizui_dialog, rizui_infobox, rizui_progress, rizui_sidebar,
 import type { NavItem } from 'riz-ui';
 import { ROUTE_NAMES } from '@/config/routes';
 import { SHELL_TIMING } from '@/config/transition';
+import OACharacterPickerDialog from '@/components/common/OACharacterPickerDialog.vue';
+import OAEmotionPreview from '@/components/tools/OAEmotionPreview.vue';
 import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
+import {
+  disposeCharacterPicker,
+  openCharacterPicker,
+  type CharacterPickItem,
+} from '@/composables/useCharacterPicker';
 import { useEnterAnimation } from '@/composables/useEnterAnimation';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
+import { loadSpineCharacterFromPackage, type SpineCharacter } from '@/spinePackage';
 import { formatBytes, formatDuration, formatDurationDecimal, formatDurationLong } from '@/utils/format';
 import {
   usePackageContent,
@@ -29,6 +37,8 @@ const SECTION_MUSIC = 'BackgroundMusic';
 const SECTION_SOUNDS = 'Sounds';
 /** 侧边栏里「背景」分类的 id */
 const SECTION_BACKGROUNDS = 'Backgrounds';
+/** 侧边栏里「表情」分类的 id */
+const SECTION_EMOTIONS = 'Emotions';
 /** 侧边栏学院子条目的 id 前缀（只做定位，不切换分类） */
 const SCHOOL_PREFIX = 'school:';
 /** 侧边栏音效类别子条目的 id 前缀；`sound:` 本身表示「全部」 */
@@ -53,6 +63,7 @@ const {
   sounds,
   soundCategories,
   backgrounds,
+  emotions,
   loading,
   error,
   skeletonsLoading,
@@ -63,11 +74,14 @@ const {
   soundsError,
   backgroundsLoading,
   backgroundsError,
+  emotionsLoading,
+  emotionsError,
   load,
   loadSkeletons,
   loadMusic,
   loadSounds,
   loadBackgrounds,
+  loadEmotions,
 } = usePackageContent(packageId.value);
 
 /** 侧边栏当前条目（永远停在分类上，学院子条目只做定位） */
@@ -537,6 +551,8 @@ watch(
       void loadSounds();
     } else if (section === SECTION_BACKGROUNDS) {
       void loadBackgrounds();
+    } else if (section === SECTION_EMOTIONS) {
+      void loadEmotions();
     }
   },
   { immediate: true }
@@ -924,6 +940,106 @@ function closeBackgroundPreview() {
   previewBackground.value = null;
 }
 
+/* ------------------------------ 表情 ------------------------------ */
+
+/** 表情预览用的立绘；为空时提示先选角色 */
+const emotionCharacter = ref<SpineCharacter | null>(null);
+const emotionCharacterLabel = ref('');
+const emotionCharacterLoading = ref(false);
+const emotionCharacterError = ref('');
+const emotionPreview = ref<InstanceType<typeof OAEmotionPreview> | null>(null);
+
+/** 已被角色引用的立绘 id，用来从「独立立绘」里排除掉 */
+const boundSkeletonIds = computed(
+  () =>
+    new Set(
+      characters.value
+        .flatMap((character) => character.spines)
+        .filter((spine) => spine.exists)
+        .map((spine) => spine.id)
+    )
+);
+
+/**
+ * 候选列表 = 每个角色绑定的立绘 + 没被任何角色引用的独立立绘目录。
+ * 独立立绘需要完整三件套，否则载入必然失败。
+ */
+async function buildCharacterChoices(): Promise<CharacterPickItem[]> {
+  if (!skeletons.value.length) {
+    await loadSkeletons();
+  }
+
+  const items: CharacterPickItem[] = [];
+
+  for (const character of characters.value) {
+    for (const spine of character.spines) {
+      if (!spine.exists) {
+        continue;
+      }
+      items.push({
+        key: `character:${character.name_id}:${spine.id}`,
+        label: character.name,
+        description: [character.school, character.club].filter(Boolean).join(' · ') || '角色立绘',
+        group: '角色立绘',
+        skeletonId: spine.id,
+        avatarUrl: character.avatarUrl,
+      });
+    }
+  }
+
+  const bound = boundSkeletonIds.value;
+  for (const skeleton of skeletons.value) {
+    if (!skeleton.complete || bound.has(skeleton.id)) {
+      continue;
+    }
+    items.push({
+      key: `skeleton:${skeleton.id}`,
+      label: skeleton.id,
+      description: '未被角色引用的独立立绘目录',
+      group: '独立立绘',
+      skeletonId: skeleton.id,
+      avatarUrl: '',
+    });
+  }
+
+  return items;
+}
+
+async function loadEmotionCharacter(picked: CharacterPickItem) {
+  emotionCharacterLoading.value = true;
+  emotionCharacterError.value = '';
+
+  try {
+    emotionCharacter.value = await loadSpineCharacterFromPackage(packageId.value, picked.skeletonId);
+    emotionCharacterLabel.value =
+      picked.group === '独立立绘'
+        ? picked.skeletonId
+        : `${picked.label} · ${picked.skeletonId}`;
+  } catch (error) {
+    emotionCharacter.value = null;
+    emotionCharacterLabel.value = '';
+    emotionCharacterError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    emotionCharacterLoading.value = false;
+  }
+}
+
+/** 打开角色选择框；决定用哪条立绘作为表情预览底座 */
+async function pickEmotionCharacter() {
+  const items = await buildCharacterChoices();
+  const picked = await openCharacterPicker(items, {
+    title: '选择表情预览角色',
+    description: '从资源包里已绑定立绘的角色，或独立的立绘目录中选择一个作为表情预览的底座。',
+    emptyText: '这个资源包里没有可用的立绘（先确认「骨骼」分类里至少有一个完整目录）。',
+  });
+
+  if (!picked) {
+    return;
+  }
+
+  await loadEmotionCharacter(picked);
+}
+
 watch(activeSection, (section) => {
   if (section !== SECTION_MUSIC) {
     stopMusic();
@@ -934,6 +1050,9 @@ watch(activeSection, (section) => {
   }
   if (section !== SECTION_BACKGROUNDS) {
     closeBackgroundPreview();
+  }
+  if (section !== SECTION_EMOTIONS) {
+    emotionPreview.value?.stop();
   }
 });
 
@@ -951,6 +1070,7 @@ onBeforeUnmount(() => {
     highlightTimer = null;
   }
   stopMusic();
+  disposeCharacterPicker();
   resizeObserver?.disconnect();
   resizeObserver = null;
 });
@@ -1512,6 +1632,55 @@ function openCharacter(character: PackageCharacter) {
           </Transition>
         </template>
 
+        <!-- 表情：先选一个立绘做底座，再点右侧表情叠加播放 -->
+        <template v-else-if="activeSection === SECTION_EMOTIONS && activeContent?.supported">
+          <div class="oa-pkg__toolbar">
+            <p class="oa-pkg__summary">
+              <template v-if="emotionsLoading && !emotions.length">正在读取表情索引…</template>
+              <template v-else>
+                <strong>{{ emotions.length }}</strong> 个表情
+                <span class="oa-pkg__dot" aria-hidden="true">·</span>
+                {{ emotionCharacterLoading ? '正在载入立绘…' : emotionCharacterLabel || '未选择预览角色' }}
+              </template>
+            </p>
+
+            <div class="oa-pkg__tools">
+              <button type="button" class="oa-pkg__mini" @click="pickEmotionCharacter">
+                选择预览角色
+              </button>
+            </div>
+          </div>
+
+          <rizui_infobox
+            v-if="emotionCharacterError"
+            type="error"
+            :text="`载入预览立绘失败：${emotionCharacterError}`"
+          />
+
+          <Transition name="oa-swap" mode="out-in">
+            <div
+              v-if="emotionCharacterLoading && !emotionCharacter"
+              key="loading"
+              class="oa-pkg__state oa-pkg__state--inline"
+            >
+              <p class="oa-pkg__state-text">正在载入立绘文件…</p>
+              <rizui_progress :indeterminate="true" :height="6" rounded />
+            </div>
+
+            <div v-else key="stage" class="oa-pkg__emotion-stage">
+              <OAEmotionPreview
+                ref="emotionPreview"
+                :character="emotionCharacter"
+                :emotions="emotions"
+                :loading="emotionsLoading"
+                :error="emotionsError"
+                :character-label="emotionCharacterLabel"
+                @pick="pickEmotionCharacter"
+              />
+            </div>
+          </Transition>
+        </template>
+
         <!-- 未声明该分类：统一提示 -->
         <div v-else-if="activeContent && !activeContent.supported" class="oa-pkg__placeholder">
           <span class="oa-pkg__placeholder-badge oa-pkg__placeholder-badge--off">未包含</span>
@@ -1593,6 +1762,9 @@ function openCharacter(character: PackageCharacter) {
         <p class="oa-pkg__music-detail__text">{{ descDialogItem?.description }}</p>
       </div>
     </rizui_dialog>
+
+    <!-- 角色选择对话框：常驻挂载，由 openCharacterPicker() 唤起 -->
+    <OACharacterPickerDialog />
   </main>
 </template>
 
@@ -2528,6 +2700,14 @@ function openCharacter(character: PackageCharacter) {
 .oa-pkg__music__unknown {
   font-size: 10.5px;
   color: #a3b6c4;
+}
+
+/* ---------- 表情 ---------- */
+
+.oa-pkg__emotion-stage {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 /* ---------- 背景 ---------- */

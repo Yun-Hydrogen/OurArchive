@@ -185,6 +185,13 @@ export function useSpineStage(
   /** 换模式时需要一张全新的 <canvas>（同一张画布不能既 webgl 又 2d），交给模板做 :key */
   const canvasKey = ref(0);
 
+  /**
+   * 角色在画布上的投影信息，给「表情叠加层」定位用：
+   * - `unit`：540 设计宽度对应的屏幕像素（随角色缩放 / 缩放滑条变化）
+   * - `anchorX` / `anchorY`：头顶锚点在画布内的像素坐标
+   */
+  const metrics = ref({ unit: 0, anchorX: 0, anchorY: 0, charHeight: 0 });
+
   let runtime: SpineCoreRuntime | null = null;
   let skeleton: SpineSkeleton | null = null;
   let state: SpineAnimationState | null = null;
@@ -308,6 +315,15 @@ export function useSpineStage(
     skeleton.scaleY = -scale;
     skeleton.x = viewWidth / 2 + panX - (bounds.x + bounds.width / 2) * scale;
     skeleton.y = viewHeight / 2 + panY + (bounds.y + bounds.height / 2) * scale;
+
+    // 头顶锚点：包围盒上沿；540 设计宽度按角色高度等比换算
+    const charHeight = Math.max(bounds.height * scale, 1);
+    metrics.value = {
+      unit: charHeight / 1012,
+      anchorX: viewWidth / 2 + panX,
+      anchorY: viewHeight / 2 + panY - (bounds.height / 2) * scale,
+      charHeight,
+    };
 
     backend.render(skeleton, debugRendering.value);
   }
@@ -580,6 +596,7 @@ export function useSpineStage(
     backendKind: readonlyRef(backendKind),
     canvasKey: readonlyRef(canvasKey),
     zoom: readonlyRef(zoom),
+    metrics: readonlyRef(metrics),
     // 双向绑定：`rizui_switch` 直接 v-model，保持可写
     debugRendering,
     load,

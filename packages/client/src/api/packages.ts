@@ -8,6 +8,7 @@ import { apiGet } from './request';
 import type {
   PackageBackgroundCategory,
   PackageCharacter,
+  PackageEmotion,
   PackageMusic,
   PackageSkeleton,
   PackageSkeletonItem,
@@ -60,6 +61,12 @@ interface BackgroundsResponse {
   categories: PackageBackgroundCategory[];
 }
 
+interface EmotionsResponse {
+  success: boolean;
+  total: number;
+  emotions: PackageEmotion[];
+}
+
 interface SkeletonFilesResponse {
   success: boolean;
   id: string;
@@ -104,6 +111,13 @@ export function fetchPackageSounds(packageId: string): Promise<SoundsResponse> {
 export function fetchPackageBackgrounds(packageId: string): Promise<BackgroundsResponse> {
   return apiGet<BackgroundsResponse>(
     `/api/packages/${encodeURIComponent(packageId)}/backgrounds`
+  );
+}
+
+/** 表情清单（读 `index/emotions.yml`，含合成层与关键帧） */
+export function fetchPackageEmotions(packageId: string): Promise<EmotionsResponse> {
+  return apiGet<EmotionsResponse>(
+    `/api/packages/${encodeURIComponent(packageId)}/emotions`
   );
 }
 

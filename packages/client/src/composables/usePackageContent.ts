@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import {
   fetchPackageBackgrounds,
   fetchPackageCharacters,
+  fetchPackageEmotions,
   fetchPackageMusic,
   fetchPackageSkeletons,
   fetchPackageSounds,
@@ -12,6 +13,7 @@ import { readonlyRef } from '@/utils/reactivity';
 import type {
   PackageBackgroundCategory,
   PackageCharacter,
+  PackageEmotion,
   PackageMusic,
   PackageSkeleton,
   PackageSound,
@@ -24,6 +26,9 @@ export type {
   PackageBackground,
   PackageBackgroundCategory,
   PackageCharacter,
+  PackageEmotion,
+  PackageEmotionKeyframe,
+  PackageEmotionLayer,
   PackageMusic,
   PackageSkeleton,
   PackageSkeletonItem,
@@ -50,6 +55,7 @@ export function usePackageContent(packageId: string) {
   const sounds = ref<PackageSound[]>([]);
   const soundCategories = ref<PackageSoundCategory[]>([]);
   const backgrounds = ref<PackageBackgroundCategory[]>([]);
+  const emotions = ref<PackageEmotion[]>([]);
   const loading = ref(false);
   const error = ref('');
 
@@ -72,6 +78,11 @@ export function usePackageContent(packageId: string) {
   const backgroundsLoading = ref(false);
   const backgroundsError = ref('');
   let backgroundsLoaded = false;
+
+  /** 表情清单同理（含关键帧，体积小但仍按需拉取） */
+  const emotionsLoading = ref(false);
+  const emotionsError = ref('');
+  let emotionsLoaded = false;
 
   async function load() {
     loading.value = true;
@@ -184,6 +195,29 @@ export function usePackageContent(packageId: string) {
     }
   }
 
+  /** 拉取表情清单（读 index/emotions.yml），同样按需且只拉一次 */
+  async function loadEmotions(force = false) {
+    if (emotionsLoading.value) {
+      return;
+    }
+    if (emotionsLoaded && !force) {
+      return;
+    }
+
+    emotionsLoading.value = true;
+    emotionsError.value = '';
+
+    try {
+      emotions.value = (await fetchPackageEmotions(packageId)).emotions;
+      emotionsLoaded = true;
+    } catch (err) {
+      emotionsError.value = errorText(err);
+      emotions.value = [];
+    } finally {
+      emotionsLoading.value = false;
+    }
+  }
+
   return {
     pkg: readonlyRef(pkg),
     characters: readonlyRef(characters),
@@ -192,6 +226,7 @@ export function usePackageContent(packageId: string) {
     sounds: readonlyRef(sounds),
     soundCategories: readonlyRef(soundCategories),
     backgrounds: readonlyRef(backgrounds),
+    emotions: readonlyRef(emotions),
     loading: readonlyRef(loading),
     error: readonlyRef(error),
     skeletonsLoading: readonlyRef(skeletonsLoading),
@@ -202,10 +237,13 @@ export function usePackageContent(packageId: string) {
     soundsError: readonlyRef(soundsError),
     backgroundsLoading: readonlyRef(backgroundsLoading),
     backgroundsError: readonlyRef(backgroundsError),
+    emotionsLoading: readonlyRef(emotionsLoading),
+    emotionsError: readonlyRef(emotionsError),
     load,
     loadSkeletons,
     loadMusic,
     loadSounds,
     loadBackgrounds,
+    loadEmotions,
   };
 }

@@ -18,9 +18,9 @@
 | 一、启动 / 外壳 / 路由 | 01 – 06 |
 | 二、主界面卡片动画 | 07 – 12 |
 | 三、RizUI 集成 | 13 – 19 |
-| 四、资源管理 / 资源包 | 20 – 23 |
-| 五、立绘骨骼预览（Spine） | 24 – 32 |
-| 六、构建 / 资源 / 数据 | 33 – 34 |
+| 四、资源管理 / 资源包 | 20 – 25 |
+| 五、立绘骨骼预览（Spine） | 26 – 34 |
+| 六、构建 / 资源 / 数据 | 35 – 36 |
 
 服务端踩坑见 [agents/server/NeedNotice.md](../server/NeedNotice.md)。
 
@@ -257,11 +257,28 @@
 - **效果**：两个分类共用同一个实例，切分类时先 `stopMusic()` 再播另一边，同一时刻只会有一条高亮。
 - **备注**：`stopMusic()` 里 `removeAttribute('src')` 是必要的；只 `pause()` 的话换 `src` 前的旧缓冲会残留。
 
+## 24 · `<img>` 不能当图层容器
+
+- **位置**：`components/tools/OAEmotionPlayer.vue`
+- **表现**：表情的第二层（子层）永远不显示，`getBoundingClientRect().width === 0`，`transform` 也是 `none`。
+- **解决方案**：每层用 `div` 当容器，图片作为它的子节点（`width: 100%`），子层 append 到父层的 `div` 里。
+- **原理**：`<img>` 是替换元素（replaced element），它的子节点不参与渲染，`appendChild` 不会报错但永远是 0 尺寸。
+- **效果**：`Heart = 气球 + 爱心`、`Bulb = 气球 + 灯泡 + 光圈` 这类多层合成正常叠放。
+- **备注**：`canvas` / `video` / `iframe` 同理，都不要往里塞子节点。
+
+## 25 · canvas 的 `height: 100%` 在「靠 flex 撑开」的父级里不生效
+
+- **位置**：`components/tools/OAEmotionPreview.vue`
+- **表现**：舞台容器已经 600+ px 高，但 canvas 只有 `min-height` 那么高（280px），角色看起来被裁了一截；表情锚点也算在错误的位置。
+- **解决方案**：给 `.oa-emo__stage` 一个**确定高度**（`height: clamp(300px, 52vh, 620px)`），不靠 `flex: 1` 撑；canvas 的 `height: 100%` 才能解析出正确值。
+- **原理**：百分比高度要相对「高度可解析」的包含块计算；`flex: 1` + `flex-basis: 0` 的父级在部分布局下被当成高度不确定，canvas 退回默认 150px / 自身 `min-height`。
+- **效果**：canvas 与舞台等高，`useSpineStage` 量到的 `viewHeight` 与 DOM 一致，表情锚点正确。
+- **备注**：`ResizeObserver` 只在尺寸真的变化时才会纠正，父级高度算错时它不会「猜」出正确值。
+
 ---
 
 # 五、立绘骨骼预览（Spine）
-
-## 24 · canvas 渲染成本 = 三角形数（这是最核心的一条）
+## 26 · canvas 渲染成本 = 三角形数（这是最核心的一条）
 
 - **位置**：`spine/canvasBackend.ts`、`spine/webglBackend.ts`
 - **表现**：阿罗娜、普拉娜的立绘明显的掉帧（个位数 fps），其他角色正常。
@@ -270,7 +287,7 @@
 - **效果**：5863 次 draw call 合成 1~2 次，满帧；Spine 运行时只进入异步路由 chunk，且现在从本地插件目录动态加载。
 - **备注**：模式由设置项 `spine_renderer` 控制（`aggressive` 仅 WebGL / `stable` 优先 WebGL / `conservative` 仅 canvas 2d）。
 
-## 25 · 直通 alpha 图集 + mipmap = 细线变粗发黑
+## 27 · 直通 alpha 图集 + mipmap = 细线变粗发黑
 
 - **位置**：`spine/webglBackend.ts`
 - **表现**：阿罗娜脸上的腮红线条明显变粗、发黑；发丝边缘出现暗边。整张图的其他颜色却是对的。
@@ -279,7 +296,7 @@
 - **效果**：细线恢复正常粗细与颜色，缩小采样也平滑（不再为了躲色边而关掉 mipmap）。
 - **备注**：只改其中一个开关的表现分别是「整体偏暗」「边缘发黑」「细节变粗」——排错时先确认这三处是否一致。
 
-## 26 · WebGL 能力要先用一次性 canvas 探测
+## 28 · WebGL 能力要先用一次性 canvas 探测
 
 - **位置**：`spine/backend.ts`（`canUseWebGL()`）
 - **表现**：「稳定」模式下本该回退 canvas 2d，结果两个后端都起不来。
@@ -288,7 +305,7 @@
 - **效果**：不支持 WebGL 的环境能干净地落到 canvas 2d。
 - **备注**：探测产生的上下文记得主动丢弃，避免占满浏览器的上下文配额。
 
-## 27 · Spine 运行时不进依赖，WebGL / Canvas 包不能混用
+## 29 · Spine 运行时不进依赖，WebGL / Canvas 包不能混用
 
 - **位置**：`spine/runtime.ts`、`spine/backend.ts`、`packages/client/package.json`
 - **表现**：把 `@esotericsoftware/*` 加回依赖会再次触发许可冲突；用 WebGL 包解析骨骼、却用 Canvas 包渲染时，内部 `instanceof` 判定全为 `false`，画面空白但不报错。
@@ -297,7 +314,7 @@
 - **效果**：前端依赖里没有 Spine 包，两条渲染路径都正常。
 - **备注**：运行时版本由后端 `config/spine.ts` 固定；升级时改版本号并对照 `spine/types.ts` 的最小接口。
 
-## 28 · `TextureAtlas` 在 4.2 只接受文本，贴图要自己 `setTexture()`
+## 30 · `TextureAtlas` 在 4.2 只接受文本，贴图要自己 `setTexture()`
 
 - **位置**：`composables/useSpineStage.ts`、两个 backend 的 `bindTextures`
 - **表现**：载入时报「无法读取 undefined 的 getImage」或在 `region.texture` 处崩溃。
@@ -306,7 +323,7 @@
 - **效果**：两条渲染路径都能正常贴图。
 - **备注**：`page.setTexture()` 会把贴图回填到该页的所有 region，所以顺序必须在 `AtlasAttachmentLoader` 之前。
 
-## 29 · 不要再额外翻一次 Y
+## 31 · 不要再额外翻一次 Y
 
 - **位置**：`composables/useSpineStage.ts`
 - **表现**：立绘上下颠倒，或者整体镜像。
@@ -315,7 +332,7 @@
 - **效果**：立绘方向正确。
 - **备注**：WebGL 侧投影用 `Matrix4.ortho(0, w, h, 0, 1, -1)`（y 轴向下），与 canvas 2d 语义一致，不要再引入额外的翻转。
 
-## 30 · `readEntries` 一次最多返回 100 条
+## 32 · `readEntries` 一次最多返回 100 条
 
 - **位置**：`spinePackage.ts`
 - **表现**：拖入整个 `skeletons/` 根目录时静默丢文件，识别出的角色少了一大半，还不报错。
@@ -324,7 +341,7 @@
 - **效果**：大目录能完整展开（整个 `skeletons/` 600+ 个目录可直接拖入）。
 - **备注**：`toSpineFilesFromDrop()` 里递归展开时同样要处理。
 
-## 31 · 快速换角色要用 `loadToken` 丢弃过期载入
+## 33 · 快速换角色要用 `loadToken` 丢弃过期载入
 
 - **位置**：`composables/useSpineStage.ts`
 - **表现**：连续点几个角色后，画面显示的骨骼和面板显示的 id 对不上。
@@ -333,7 +350,7 @@
 - **效果**：永远只显示最后一次选择的角色。
 - **备注**：`disposeStage()` 同时负责停 `requestAnimationFrame`、断开 `ResizeObserver`、释放 GL 贴图与着色器。
 
-## 32 · 「静态」模式要按需重绘
+## 34 · 「静态」模式要按需重绘
 
 - **位置**：`composables/useSpineStage.ts`
 - **表现**：选「静态（不播放动作）」时 GPU / CPU 仍然满载，笔记本风扇狂转。
@@ -346,7 +363,7 @@
 
 # 六、构建 / 资源 / 数据
 
-## 33 · 手写 JSON / YAML 带 BOM 会让解析失败
+## 35 · 手写 JSON / YAML 带 BOM 会让解析失败
 
 - **位置**：`res/*/characters/characters.json`、`res/*/index/music_info.json`、`package.yml`（由服务端读取，但由前端资源包作者手写）
 - **表现**：资源包在列表里显示 `valid: false`，或者角色 / 音乐数量为 0，但文件肉眼看着完全正常。
@@ -355,7 +372,7 @@
 - **效果**：清单能正常解析，计数正确。
 - **备注**：写这类文件优先用编辑器或带 `utf-8` 显式编码的脚本；服务端已经对 `package.yml` / `characters.json` / `music_info.json` 都做了 BOM 剥离。
 
-## 34 · 进度条消失后内容不能硬切
+## 36 · 进度条消失后内容不能硬切
 
 - **位置**：`composables/useEnterAnimation.ts`、`style.css` 的 `oa-swap` / `oa-fade`，以及资源管理、资源包、角色详情、立绘预览等页
 - **表现**：本地接口很快，进度条一闪而过；或者请求稍慢时，进度条走到头、卡片直接出现，没有飞入动画。返回上一页时也有页面整页硬切。

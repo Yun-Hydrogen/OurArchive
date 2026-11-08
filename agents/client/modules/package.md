@@ -1,8 +1,12 @@
 关联前端文件：
 `packages/client/src/views/PackageView.vue` — 资源包大卡片（左侧分类栏 + 右侧内容区）
 `packages/client/src/views/PackageCharacterView.vue` — 角色详情
-`packages/client/src/composables/usePackageContent.ts` — 单个资源包的内容（详情 + 角色 + 立绘 + 音乐 + 音效 + 背景）
+`packages/client/src/composables/usePackageContent.ts` — 单个资源包的内容（详情 + 角色 + 立绘 + 音乐 + 音效 + 背景 + 表情）
 `packages/client/src/api/packages.ts` — 资源包相关 HTTP 请求
+`packages/client/src/components/tools/OAEmotionPreview.vue` — 表情预览（立绘 + 表情叠加层 + 表情按钮）
+`packages/client/src/components/tools/OAEmotionPlayer.vue` — 通用表情播放层（只解释关键帧，不含表情专属逻辑）
+`packages/client/src/components/common/OACharacterPickerDialog.vue` — 角色选择对话框（Provider 的渲染端）
+`packages/client/src/composables/useCharacterPicker.ts` — 角色选择 Provider（模块单例 + Promise API）
 
 用法：
 
@@ -66,6 +70,29 @@
 1. 作用：背景分类同样是**侧边栏子条目**（`bg:<分类 id>`）；后端下发的每个分类最多只有一层图片，前端不做递归。
 2. 逻辑：`activeBackgroundCategory` 是 `string | null`——`null` 表示「全部」（进分类默认），空串是合法的「未分类」（直接放在背景目录根下的图片）。`backgroundGroups` 按选中分类过滤、再按搜索词过滤图片，`showBackgroundGroupTitle` 决定要不要显示分类标题（看全部时显示）。
 3. 注意：`category.yml` 的说明文字在 `activeBackgroundCategoryInfo.description`，只在选中具体分类时展示；点击缩略图走 `openBackgroundPreview(image)` 开大图弹窗（`isBackgroundDialogOpen` 是可写 computed），切分类时弹窗自动关闭；缩略图 `loading="lazy"`，上百张图也不会一次性解码。
+
+### 表情：预览角色选择（`useCharacterPicker` + `OACharacterPickerDialog`）
+
+1. 作用：`openCharacterPicker(items, options)` 返回 `Promise<CharacterPickItem | null>`，由常驻的 `OACharacterPickerDialog` 渲染；页面不需要自己维护弹窗状态，任何组件都能唤起同一个对话框。
+2. 候选列表由 `PackageView.buildCharacterChoices()` 组装：
+   - `角色立绘`：`characters` 里每条 `spines[].exists === true` 的记录（`label` 用角色名，`skeletonId` 用立绘目录 id）；
+   - `独立立绘`：`skeletons` 里 `complete` 且没被任何角色引用的目录。
+3. 注意事项：`openCharacterPicker` 会先把上一次未完成的 Promise 以 `null` 结束，避免两个选择流程叠在一起；`PackageView` 卸载时要 `disposeCharacterPicker()`，否则 Promise 永远挂着。
+
+### 表情：`OAEmotionPreview`
+
+1. 作用：左侧 `useSpineStage` 画立绘（与工具页同一条渲染管线），右侧列出表情按钮；点按钮把表情交给 `OAEmotionPlayer` 播放。立绘下载走 `loadSpineCharacterFromPackage(packageId, skeletonId)`。
+2. 对齐：`useSpineStage` 额外暴露 `metrics`（`unit` / `anchorX` / `anchorY`）——`unit = 角色屏幕高度 / 1012`，`anchorY` 是包围盒上沿（头顶）。表情层据此定位与缩放，所以拖动 / 缩放立绘时表情跟着走。
+3. 注意事项：没有选立绘时点表情会改为唤起选择框（避免「点了没反应」）；`emotionPreview.stop()` 在切走分类时调用，切走时正在播放的表情会被清掉。
+
+### 表情：`OAEmotionPlayer`（关键帧解释器）
+
+> 表情配置的完整写法（坐标系、图层、关键帧、模板与排错）见 [docs/configs_doc/emotions.md](../../../docs/configs_doc/emotions.md)；
+> 第三方播放器的逆向记录与后续待办见 [agents/emotionstodo.md](../../emotionstodo.md)。
+
+1. 作用：把 `PackageEmotion.layers[].keyframes` 翻译成 Web Animations（`element.animate`），播完自动销毁；音效跟随「预览音频 / 音效音量」，并压住主界面 BGM。
+2. 数据口径：根层宽度 = `scale × 540 × unit`；子层宽度 = `scale × 父层宽度`；`position` 根层按 `540 × unit` 换算、子层按父层宽度换算（x/y 同乘宽度）；关键帧里 `zoom` 是相对基准宽度的倍率，`x/y` 是 540 设计单位位移，`rotate` 是角度。
+3. 注意事项：**图层容器必须是 `div`**，`<img>` 是替换元素、不能承载子层；关键帧 `offset` 必须严格递增，重复时间点会让 `animate()` 抛错（代码里已去重并补末帧）。
 
 ### `isDescDialogOpen`（可写 computed）
 

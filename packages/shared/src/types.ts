@@ -117,6 +117,62 @@ export interface PackageSoundCategory {
   duration: number;
 }
 
+/** 表情里的一层图（一张 PNG；`parent >= 0` 表示相对于另一层定位） */
+export interface PackageEmotionLayer {
+  /** 图片可访问 URL；文件缺失时为空串 */
+  image: string;
+  /** 图片是否真的存在 */
+  exists: boolean;
+  /** 相对父层宽度（或 540 设计宽度）的比例，决定这一层的基准宽度 */
+  scale: number;
+  /** 这一层的动画时长（秒） */
+  duration: number;
+  /** 补间缓动，与 CSS `animation-timing-function` 同名 */
+  ease: string;
+  /** 变换原点（0–1，可为负），默认 [0,0] */
+  anchor: [number, number];
+  /** 相对父层（或舞台）的基准位置，单位为父层宽度 / 540 的倍数 */
+  position: [number, number];
+  /** 父层下标；`-1` 表示直接挂在舞台 */
+  parent: number;
+  /** 关键帧（时间为秒，从表情开始计） */
+  keyframes: PackageEmotionKeyframe[];
+}
+
+/** 单层的一个关键帧；未写的属性沿用上一帧 */
+export interface PackageEmotionKeyframe {
+  /** 距离表情开始的时间（秒） */
+  at: number;
+  /** 不透明度 0–1 */
+  opacity?: number;
+  /** 相对基准宽度的缩放倍率 */
+  zoom?: number;
+  /** 设计单位位移（×540 后换算成像素） */
+  x?: number;
+  y?: number;
+  /** 旋转角度（度） */
+  rotate?: number;
+}
+
+/** 一个表情（`index/emotions.yml` 的一条） */
+export interface PackageEmotion {
+  /** 表情 id，如 `heart`；同时也是音效名 */
+  id: string;
+  /** 展示名，如「爱心」 */
+  name: string;
+  description: string;
+  /** 相对角色头顶锚点的偏移（540 设计宽度倍数） */
+  offset: [number, number];
+  /** 整个表情的总时长（秒） */
+  duration: number;
+  /** 音效可访问 URL；无音效时为空串 */
+  soundUrl: string;
+  /** 音效文件是否真的存在 */
+  soundExists: boolean;
+  /** 合成用的图层，顺序即叠放顺序 */
+  layers: PackageEmotionLayer[];
+}
+
 /** 一张背景图（背景目录下的一级文件） */
 export interface PackageBackground {
   /** 文件名（含扩展名），如 `BG_ClassRoom.jpg` */

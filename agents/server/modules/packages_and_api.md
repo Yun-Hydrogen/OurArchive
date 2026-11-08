@@ -1,5 +1,5 @@
 关联后端文件：
-`packages/server/src/routes/packages.ts` — 资源包 API（13 个端点）
+`packages/server/src/routes/packages.ts` — 资源包 API（15 个端点）
 `packages/server/src/routes/config.ts` — 全局配置 API
 `packages/server/src/routes/preload.ts` — 预加载资源 API
 `packages/server/src/config/packages.ts` — 资源包读取与派生（`readPackage*` / `readSkeletonFiles` / `resolveMusicFile` / `resolveSoundFile` / `resolveBackgroundFile`）
@@ -8,7 +8,7 @@
 
 ### `createPackagesRouter()`
 
-1. 作用：13 个端点都走「`resolvePackageDir(id)` + `scanResourcePackages().find(id)`」找包，找不到统一 404。
+1. 作用：15 个端点都走「`resolvePackageDir(id)` + `scanResourcePackages().find(id)`」找包，找不到统一 404。
 2. 端点列表：
    - `GET /api/packages` → 全部资源包（含 `resourcesDir`、`total`）；
    - `GET /api/packages/:id` → 单包详情；
@@ -19,7 +19,8 @@
    - `GET /api/packages/:id/avatar/:file(*)` → 头像；
    - `GET /api/packages/:id/music` → 曲目索引；`GET /api/packages/:id/music/:file(*)` → 音频本体；
    - `GET /api/packages/:id/sounds` → 音效列表与类别映射（读 `index/sound_info.json` + `index/categories.json`）；`GET /api/packages/:id/sounds/:file(*)` → 音频本体；
-   - `GET /api/packages/:id/backgrounds` → 背景图与分类（读 `index/category.yml`，缺省只读根下一层）；`GET /api/packages/:id/backgrounds/:file(*)` → 图片本体。
+   - `GET /api/packages/:id/backgrounds` → 背景图与分类（读 `index/category.yml`，缺省只读根下一层）；`GET /api/packages/:id/backgrounds/:file(*)` → 图片本体；
+   - `GET /api/packages/:id/emotions` → 表情清单（读 `index/emotions.yml`，含合成层与关键帧）；`GET /api/packages/:id/emotions/:file(*)` → 表情图片 / 音效本体。
 3. 注意事项：**路由顺序不能乱**——带通配符的都必须在同前缀的列表路由之后挂载；`sendFile` 内部用白名单 `MIME_BY_EXTENSION` 过滤类型，非白名单返回 404。
 
 ### `failNotFound(res, message)` / `failInternal(res, error)`
@@ -53,13 +54,19 @@
 3. 注意事项：`categories.json` 未被索引引用的键不下发（避免空条目）；索引里 `category` 为空的按 `Other` 计；映射缺失时 `label` 回退为类别键本身。`countEntries` 里 `Sounds` 与 `BackgroundMusic` 的计数都读各自的 `index/*.json` 长度。文件退化匹配同 `readPackageMusic`（`original_filename` → `id_name` + 后缀 → 大小写不敏感同名 → 前缀）。
 
 ### `readPackageBackgrounds(packageDir, pkg)` / `resolveBackgroundFile(...)`
-
 1. 作用：读背景图与分类。有 `<path>/index/category.yml` 时按清单里每个 `category[].path` 目录读图（顺序即清单顺序，`name`/`description` 原样下发）；没有清单时只读 `<path>/` 根下一层。两种情况下，直接放在根下的图片都归「未分类」（`id: ''`，排在最后）。
 2. 输入输出：`PackageBackgroundCategory[]`（每项含 `images[]`，图片带 `url` / `ext` / `size`）；单文件 `string | null`。
 3. 注意事项：**只读目录根下一层，不递归**（分类目录内再分子目录不会被打平，也不会被读到）；`IMAGE_EXTENSIONS` 为 `.jpg/.jpeg/.png/.webp/.bmp/.gif/.avif`，非图片文件（如 `notes.txt`）既不进列表也 404；`index/` 本身是目录，不会被算作「未分类」。`countEntries` 里 `Backgrounds` 的计数也按同一口径（清单目录 + 根目录）数图片，所以卡片数字与点进去的列表一致。
 
-### `parseAudioDuration(filePath)`（音频时长，扫描时算好）
+### `readPackageEmotions(packageDir, pkg)` / `resolveEmotionFile(...)`
 
+> `emotions.yml` 的字段口径与示例见 [docs/configs_doc/emotions.md](../../../docs/configs_doc/emotions.md)。
+
+1. 作用：读 `<path>/index/emotions.yml`，把每个表情解析成「合成图层 + 关键帧」，并把 `image` / `sound` 转成可访问 URL；缺图时 `exists: false` 仍下发，前端显示为缺图。
+2. 图层口径：`scale` 是基准宽度（根层 `scale×540`，子层 `scale×父层宽度`）；`parent` 只允许引用**更早**的层（避免成环，非法值归一为 `-1`）；`position` 与关键帧的 `x/y` 都用「父层宽度 / 540」作单位（x、y 同乘宽度，与 BA 原实现一致）。
+3. 注意事项：`duration` 缺省取各层最大值；关键帧会自动补 0 秒起点、排序、丢弃非法项；`emotions.yml` 由第三方作者维护，解析失败只回空数组，不抛错。`countEntries` 里 `Emotions` 按索引条数计，不会把 `images/ sounds/ index/` 数成 3。
+
+### `parseAudioDuration(filePath)`（音频时长，扫描时算好）
 1. 作用：WAV 走 RIFF 块（`fmt ` 拿 `ByteRate` / `BlockAlign`，除以 `data` 块字节数），Ogg/Opus 走 Ogg 容器 + `OpusHead` 的 granule 与采样率；算不出返回 `-1`。
 2. 输入输出：`string → number`（秒，保留一位小数；`-1` 表示未知）。
 3. 注意事项：`fmt` 里 **通道数 / 采样率 / 位深的偏移是 2 / 4 / 14**（`AudioFormat` 占了前 2 字节），读错位会让整批时长变成 0；ByteRate 优先于「采样率 × 通道 × 位深/8」（后者对某些单声道素材会偏）。前端把 `-1` 显示为「时长未知」，不要把未知当 0。
