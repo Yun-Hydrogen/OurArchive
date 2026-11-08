@@ -2,6 +2,7 @@
 `packages/server/src/config/paths.ts` — 路径解析（纯函数，不碰磁盘）
 `packages/server/src/config/storage.ts` — 初始化与 `global_config.yml` 读写
 `packages/server/src/config/preload.ts` — 预加载清单校验与缓存
+`packages/server/src/config/spine.ts` — Spine 运行时插件检测与按需下载
 `packages/server/src/config/packages.ts` — 资源包索引与单包读取
 `packages/server/src/config/server.ts` — 端口与监听地址（见 `startup.md`）
 `packages/server/src/config/publicUrl.ts` — 对外地址（见 `startup.md`）
@@ -11,7 +12,7 @@
 
 ### `getStoragePaths()` / `resolvePreloadAssetsPath(currentDir)`
 
-1. 作用：全后端取路径的唯一入口；2. `getStoragePaths()` 返回 `StoragePaths`（`rootDir` / `resDir` / `preloadDir` / `configDir` / `configFile`）；3. `resolvePreloadAssetsPath` 按优先级找随分发的 `preload_assets.yml`（运行目录同级 → 父级 → 仓库根 → 客户端 `resources/`）。
+1. 作用：全后端取路径的唯一入口；2. `getStoragePaths()` 返回 `StoragePaths`（`rootDir` / `resDir` / `preloadDir` / `configDir` / `configFile` / `pluginsDir` / `spinePluginDir`）；3. `resolvePreloadAssetsPath` 按优先级找随分发的 `preload_assets.yml`（运行目录同级 → 父级 → 仓库根 → 客户端 `resources/`）。
 2. 输入：`getStoragePaths()` 无参；`resolvePreloadAssetsPath(currentDir: string)`。
 3. 注意事项：`paths.ts` 是纯函数，**可以随时调用**；业务代码不要拼路径，一律走 `getStoragePaths()`。资源根目录可用 `OUR_ARCHIVE_DATA_DIR` 覆盖。
 
@@ -32,6 +33,12 @@
 1. 作用：读随分发的清单，逐项比对用户 `preload/` 下文件是否存在；2. 清单 `assets` 数组每项：`id`（全小写）、`file`（以 `preload` 开头的相对路径）、`file_type`（只认这一种拼写，不兜底 `file_tpye` / `type`）；3. 结果缓存到模块级 `cachedPreloadResult`，`getPreloadCheckResult()` 供路由与横幅读取。
 2. 输入：当前目录与 `StoragePaths`；输出：`PreloadCheckResult`（`total` / `loaded` / `missing` / `isComplete` / `items` / `missingItems` / `warningMessage?`）。
 3. 注意事项：清单找不到、空、解析失败都返回「不完整」并带 `PRELOAD_INCOMPLETE_WARNING`，不会抛错；`id` 统一小写化后再比对。
+
+### `getSpineRuntimeStatus(paths)` / `ensureSpineRuntime(paths)`
+
+1. 作用：检查 `<root>/plugins/spine/` 下的 `spine-webgl.mjs`、`spine-canvas.mjs`、`LICENSE`；缺失时打印许可说明并给出三种选择——`auto` 自动下载、`manual` 手动放入、`none` 强制无 Spine；2. `auto` 从 npm CDN（jsDelivr，失败回退 unpkg）下载到该目录，先写 `.download` 再 `rename`；`manual` 打印目标目录、文件名和下载地址；`none` 只警告立绘预览不可用；3. 三种选择都**照常返回并启动服务**。
+2. 输入输出：`StoragePaths` → `SpineRuntimeStatus`（`dir` / `installed` / `missing`）。
+3. 注意事项：运行时**不能**重新变成 npm 依赖或提交进仓库（许可冲突）；下载目标固定为 `plugins/spine/`，前端通过 `/plugins/spine/*.mjs` 动态加载；非交互启动默认 `manual`，可用 `OUR_ARCHIVE_SPINE_MODE=auto|manual|none` 指定，`OUR_ARCHIVE_SPINE_DOWNLOAD=1` 仍兼容为 `auto`。
 
 ### `scanResourcePackages(paths?)` / `resolvePackageDir(id)`
 

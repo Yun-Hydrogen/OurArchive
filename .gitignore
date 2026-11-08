@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist_release/
+# 按需下载的第三方运行时不得随仓库分发
+resources/plugins/
 *.log
 .env
 .env.local

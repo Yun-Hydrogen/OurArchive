@@ -2,6 +2,7 @@ import pc from 'picocolors';
 import path from 'node:path';
 import type { StoragePaths } from '../config/paths.js';
 import type { PreloadCheckResult } from '../config/preload.js';
+import type { SpineRuntimeStatus } from '../config/spine.js';
 
 export interface StartupInfo {
   /** 后端监听端口 */
@@ -18,10 +19,12 @@ export interface StartupInfo {
   clientDistPath: string | null;
   /** 预加载资源检查结果 */
   preload?: PreloadCheckResult;
+  /** Spine 运行时插件状态 */
+  spine?: SpineRuntimeStatus;
 }
 
 export function printStartupInfo(info: StartupInfo) {
-  const { port, publicUrl, networkUrl, storage, firstRun, configCount, clientDistPath, preload } =
+  const { port, publicUrl, networkUrl, storage, firstRun, configCount, clientDistPath, preload, spine } =
     info;
   const line = pc.cyan('═'.repeat(58));
 
@@ -47,7 +50,7 @@ export function printStartupInfo(info: StartupInfo) {
   console.log(`  ${pc.green('➜')}  ${pc.bold('Storage:')}    ${pc.yellow(storage.rootDir)}`);
   console.log(
     `  ${pc.green('➜')}  ${pc.bold('Dirs:')}       ${pc.dim(
-      `${rel(storage.resDir)}/  ${rel(storage.preloadDir)}/  ${rel(storage.configDir)}/`
+      `${rel(storage.resDir)}/  ${rel(storage.preloadDir)}/  ${rel(storage.configDir)}/  ${rel(storage.pluginsDir)}/`
     )}`
   );
   console.log(
@@ -55,6 +58,13 @@ export function printStartupInfo(info: StartupInfo) {
       `${rel(storage.configFile)}  (${configCount} 项)`
     )}`
   );
+
+  if (spine) {
+    const status = spine.installed
+      ? pc.green('已安装')
+      : pc.yellow('未安装（立绘预览不可用）');
+    console.log(`  ${pc.green('➜')}  ${pc.bold('Spine:')}      ${status}`);
+  }
 
   if (preload) {
     const preloadStatus = preload.isComplete

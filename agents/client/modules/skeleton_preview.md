@@ -4,7 +4,9 @@
 `packages/client/src/components/tools/OASpineViewer.vue` — 预览舞台 + 面板（差分 / 动作 / 缩放 / 调试）
 `packages/client/src/spinePackage.ts` — 骨骼 / 图集 / 贴图识别（非 composable）
 `packages/client/src/composables/useSpineStage.ts` — 渲染舞台（坐标系与生命周期）
-`packages/client/src/spine/backend.ts` — 渲染后端工厂与模式
+`packages/client/src/spine/backend.ts` — 渲染后端工厂、模式选择、运行时加载入口
+`packages/client/src/spine/runtime.ts` — 从 `/plugins/spine/*.mjs` 动态加载运行时
+`packages/client/src/spine/types.ts` — 运行时最小结构类型（不复制官方类型）
 `packages/client/src/spine/webglBackend.ts` — WebGL 后端（`PolygonBatcher` 合批）
 `packages/client/src/spine/canvasBackend.ts` — canvas 2D 后端（兜底）
 `packages/client/src/spine/mode.ts` — 渲染器模式（三种）
@@ -37,7 +39,7 @@
 
 ### `useSpineStage(canvas, rendererMode)` / `load(character)`
 
-1. 作用：把立绘包丢进渲染后端；2. 载入顺序：`TextureAtlas(text)` → 逐页校验贴图存在 → `await backend.bindTextures(atlas, pageName => File)`（**贴图由后端自己解码**）→ `AtlasAttachmentLoader` → `SkeletonBinary` / `SkeletonJson` → `Skeleton` + `AnimationState`；3. `loadToken` 丢弃过期载入，避免快速换角色时旧结果覆盖新状态。
+1. 作用：把立绘包丢进渲染后端；2. 载入顺序：选后端并取回同源运行时 → `TextureAtlas(text)` → 逐页校验贴图存在 → `await backend.bindTextures(atlas, pageName => File)`（**贴图由后端自己解码**）→ `AtlasAttachmentLoader` → `SkeletonBinary` / `SkeletonJson` → `Skeleton` + `AnimationState`；3. `loadToken` 丢弃过期载入，避免快速换角色时旧结果覆盖新状态。
 2. 返回：`{ status, error, info, variants, activeVariant, actions, activeAction, backendKind, canvasKey, zoom, debugRendering, load, setVariant, setAction, setZoom, resetView, onPointerDown/Move/Up, onWheel }`（状态只读）。
 3. 注意事项：`TextureAtlas` 在 4.2 只接受文本，贴图必须自己 `setTexture()`，漏了会崩在 `region.texture.getImage()`；骨骼是 y 轴向上坐标系，靠 `skeleton.scaleY = -scale` 翻到画布，**不要再外层 `ctx.scale(1, -1)`**（region 内部已自带一次）。
 
@@ -49,9 +51,15 @@
 
 ### `createSpineBackend(canvas, mode)`（`spine/backend.ts`）
 
-1. 作用：按设置项 `spine_renderer` 选渲染路径——`aggressive` 仅 WebGL（不可用直接报错）、`stable` 优先 WebGL 失败回退、`conservative` 仅 canvas 2D。
-2. 输入：`HTMLCanvasElement`、`SpineRendererMode`；输出：`SpineBackend`（`kind` / `bindTextures` / `setViewport` / `render` / `dispose`）。
+1. 作用：按设置项 `spine_renderer` 选渲染路径——`aggressive` 仅 WebGL（不可用直接报错）、`stable` 优先 WebGL 失败回退、`conservative` 仅 canvas 2D；同时返回所选运行时的 core API。
+2. 输入：`HTMLCanvasElement`、`SpineRendererMode`；输出：`Promise<SpineBackendHandle>`（`backend` 含 `kind` / `bindTextures` / `setViewport` / `render` / `dispose`，`runtime` 含 `Skeleton` / `TextureAtlas` / `AnimationState` 等）。
 3. 注意事项：WebGL 能力先用一次性 canvas 探测，绝不在正式画布上试错；同一张 canvas 拿过 WebGL 上下文后拿不到 `2d`，所以换模式走 `canvasKey` 换画布重载。
+
+### `loadSpineWebglRuntime()` / `loadSpineCanvasRuntime()`（`spine/runtime.ts`）
+
+1. 作用：从 `/plugins/spine/spine-webgl.mjs` 或 `spine-canvas.mjs` 动态 `import()` 运行时；2. 每个文件只加载一次，失败后清空缓存以便重试；3. 加载失败时抛出中文提示，说明去后端启动日志查看安装位置。
+2. 输入：无；输出：`Promise<SpineWebglRuntime>` / `Promise<SpineCanvasRuntime>`。
+3. 注意事项：动态 `import()` 必须带 `/* @vite-ignore */`，否则 Vite 会在构建期尝试解析这个运行时路径；`spine-webgl.mjs` 与 `spine-canvas.mjs` 各自内含一份 core，**解析与渲染必须用同一个包**，不要把两者的类混用。
 
 ### `onWheel(event)`（滚轮缩放）
 

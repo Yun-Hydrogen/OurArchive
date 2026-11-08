@@ -5,15 +5,17 @@ import fs from 'node:fs';
 export type SupportedPlatform = 'windows' | 'linux' | 'android' | 'macos' | 'unknown';
 
 /**
- * 资源根目录下的三个固定子目录
+ * 资源根目录下的固定子目录
  * - res:     资源文件
  * - preload: 预加载内容
  * - config:  配置
+ * - plugins: 运行时插件（如按需下载的 Spine 运行时）
  */
 export const STORAGE_DIRS = {
   res: 'res',
   preload: 'preload',
   config: 'config',
+  plugins: 'plugins',
 } as const;
 
 export const CONFIG_FILE_NAME = 'global_config.yml';
@@ -27,6 +29,8 @@ export interface StoragePaths {
   preloadDir: string;
   configDir: string;
   configFile: string;
+  pluginsDir: string;
+  spinePluginDir: string;
 }
 
 /**
@@ -106,6 +110,8 @@ export function getStoragePaths(): StoragePaths {
     preloadDir: path.join(rootDir, STORAGE_DIRS.preload),
     configDir: path.join(rootDir, STORAGE_DIRS.config),
     configFile: path.join(rootDir, STORAGE_DIRS.config, CONFIG_FILE_NAME),
+    pluginsDir: path.join(rootDir, STORAGE_DIRS.plugins),
+    spinePluginDir: path.join(rootDir, STORAGE_DIRS.plugins, 'spine'),
   };
 }
 

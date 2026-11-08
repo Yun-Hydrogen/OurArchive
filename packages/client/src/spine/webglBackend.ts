@@ -12,19 +12,14 @@
  * 这样 mipmap 平均的是预乘后的颜色，半透明边缘不会混进「透明黑」，腮红 / 发丝这类细线
  * 缩小时会像 canvas 2d 一样平滑淡出，而不是变粗发黑。三者必须同时成立，改一个就要改全部。
  */
-import {
-  GLTexture,
-  ManagedWebGLRenderingContext,
-  Matrix4,
-  PolygonBatcher,
-  Shader,
-  ShapeRenderer,
-  SkeletonDebugRenderer,
-  SkeletonRenderer,
-  type Skeleton,
-  type TextureAtlas,
-} from '@esotericsoftware/spine-webgl';
 import type { SpineBackend } from './backend';
+import type {
+  SpineGlTexture,
+  SpineShader,
+  SpineSkeleton,
+  SpineTextureAtlas,
+  SpineWebglRuntime,
+} from './types';
 
 /**
  * 图集是「透明区 RGB 为黑」的直通 alpha 图，直接把 mipmap 建在它上面会让半透明边缘
@@ -38,7 +33,21 @@ function isPowerOfTwo(value: number): boolean {
   return value > 0 && (value & (value - 1)) === 0;
 }
 
-export function createWebglBackend(canvas: HTMLCanvasElement): SpineBackend {
+export function createWebglBackend(
+  canvas: HTMLCanvasElement,
+  runtime: SpineWebglRuntime
+): SpineBackend {
+  const {
+    GLTexture,
+    ManagedWebGLRenderingContext,
+    Matrix4,
+    PolygonBatcher,
+    Shader,
+    ShapeRenderer,
+    SkeletonDebugRenderer,
+    SkeletonRenderer,
+  } = runtime;
+
   const context = new ManagedWebGLRenderingContext(canvas, {
     alpha: true,
     premultipliedAlpha: true,
@@ -52,8 +61,8 @@ export function createWebglBackend(canvas: HTMLCanvasElement): SpineBackend {
     throw new Error('当前环境不支持 WebGL');
   }
 
-  let shader: Shader;
-  let shapeShader: Shader;
+  let shader: SpineShader;
+  let shapeShader: SpineShader;
   try {
     shader = Shader.newColoredTextured(context);
     shapeShader = Shader.newColored(context);
@@ -85,12 +94,12 @@ export function createWebglBackend(canvas: HTMLCanvasElement): SpineBackend {
   debugRenderer.drawSkeletonXY = false;
 
   const projection = new Matrix4();
-  const textures: GLTexture[] = [];
+  const textures: SpineGlTexture[] = [];
 
   return {
     kind: 'webgl',
 
-    async bindTextures(atlas: TextureAtlas, fileOf) {
+    async bindTextures(atlas: SpineTextureAtlas, fileOf) {
       for (const page of atlas.pages) {
         const file = fileOf(page.name);
         if (!file) {
@@ -113,7 +122,7 @@ export function createWebglBackend(canvas: HTMLCanvasElement): SpineBackend {
       projection.ortho(0, Math.max(1, canvas.width), Math.max(1, canvas.height), 0, 1, -1);
     },
 
-    render(skeleton: Skeleton, debug: boolean) {
+    render(skeleton: SpineSkeleton, debug: boolean) {
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);

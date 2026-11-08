@@ -67,7 +67,7 @@ function migrateLegacyConfigDir(paths: StoragePaths) {
 
 /**
  * 首次启动（及之后每次启动）的存储初始化：
- * 1. 创建资源根目录及 res / preload / config 三个子目录
+ * 1. 创建资源根目录及 res / preload / config / plugins 子目录
  * 2. 若全局配置文件不存在则创建空配置
  * 3. 读取并返回全局配置
  */
@@ -75,7 +75,14 @@ export function initializeStorage(): StorageInitResult {
   const paths = getStoragePaths();
   const firstRun = !fs.existsSync(paths.rootDir);
 
-  const dirs = [paths.rootDir, paths.resDir, paths.preloadDir, paths.configDir];
+  const dirs = [
+    paths.rootDir,
+    paths.resDir,
+    paths.preloadDir,
+    paths.configDir,
+    paths.pluginsDir,
+    paths.spinePluginDir,
+  ];
   for (const dir of dirs) {
     try {
       fs.mkdirSync(dir, { recursive: true });

@@ -1,11 +1,18 @@
 # 第三方许可与声明
 
 本项目自身代码以 AGPL-3.0-only 分发（见根目录 [LICENSE](../LICENSE)）。
-下列第三方组件随程序一同分发，其许可独立于本项目代码。
 
-## @esotericsoftware/spine-webgl / @esotericsoftware/spine-canvas / @esotericsoftware/spine-core
+## Spine Runtimes（按需下载，不随程序分发）
 
-用于「立绘骨骼预览」工具的 Spine 运行时（`packages/client` 依赖）：`spine-webgl` 为默认渲染路径，`spine-canvas` 为保守 / 回退路径，两者共用 `spine-core`。
+「立绘骨骼预览」使用的 Spine Runtimes **不包含在本仓库或发行包中**。后端首次启动时检查用户资源根目录下的 `plugins/spine/`：
+
+- `spine-webgl.mjs`（默认 WebGL 路径）
+- `spine-canvas.mjs`（保守 / 回退路径）
+- `LICENSE`（Spine Runtimes License Agreement）
+
+缺失时会在终端说明许可并给出三种选择：自动下载并加载、手动放入文件夹、强制无 Spine 加载（不推荐）。自动下载会从官方 npm 包的 CDN 写入该目录；手动放置会打印目标路径与下载地址；强制无 Spine 则只警告立绘预览不可用。三种选择都不会阻止服务启动。前端只通过 `/plugins/spine/*.mjs` 动态加载本地缓存，构建期不依赖 `@esotericsoftware/*` 包。
+
+下载的 `LICENSE` 文件即下列全文；使用者需要自行拥有 Spine Editor 许可证。
 
 ```
 Spine Runtimes License Agreement

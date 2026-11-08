@@ -27,7 +27,7 @@ packages/client/src/
 ├── api/                   # 网络层
 ├── utils/                 # 工具函数
 ├── spinePackage.ts        # 立绘包识别
-├── spine/                 # 渲染适配
+├── spine/                 # 运行时加载与渲染适配
 ├── composables/           # 组合式逻辑
 ├── components/            # 可复用组件
 └── views/                 # 路由页面

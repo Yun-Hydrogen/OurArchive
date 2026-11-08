@@ -17,6 +17,7 @@
 | 二、配置与清单 | 06 – 09 |
 | 三、资源包索引 | 10 – 15 |
 | 四、API 与静态托管 | 16 – 20 |
+| 五、Spine 运行时插件 | 21 – 24 |
 
 前端踩坑见 [agents/client/NeedNotice.md](../client/NeedNotice.md)。
 
@@ -183,8 +184,8 @@
 ## 17 · 未知 API 路由不能返回 HTML
 
 - **位置**：`packages/server/src/app/mountClient.ts`
-- **表现**：前端调错接口地址时收到 `index.html`，控制台报 JSON 解析失败，难以定位。
-- **解决方案**：SPA fallback 里先判断 `req.path.startsWith('/api/')`——是则 `next()`（走 404），不是才下发 `index.html`。
+- **表现**：前端调错接口地址时收到 `index.html`，控制台报 JSON 解析失败，难以定位；缺失的 `/plugins/spine/*.mjs` 也会拿到 HTML，动态 `import()` 报 MIME 错误。
+- **解决方案**：SPA fallback 里先判断 `req.path === '/api'` / `startsWith('/api/')`，以及 `'/plugins'` / `'/plugins/'` 前缀——命中则 `next()`（走 404），否则才下发 `index.html`。
 - **原理**：fallback 的职责是让深层地址刷新不 404，不是兜底一切未知路径。
 - **效果**：调错接口得到真正的 404 JSON。
 - **备注**：`express.static` 的 `index: false` 是必须的，否则根路径会被静态中间件和 fallback 打架。
@@ -215,6 +216,47 @@
 - **原理**：外载资源包来自第三方，不能假设都是可安全下发的文件；Range 是音频进度条可拖动的必要条件。
 - **效果**：只下发已知可预览的文件类型，音频可 seek。
 - **备注**：新文件类型先扩白名单再说，不要为单个文件类型放开全目录。
+
+---
+
+# 五、Spine 运行时插件
+
+## 21 · Spine 运行时不能再作为 npm 依赖打包
+
+- **位置**：`packages/client/package.json`、`packages/server/src/config/spine.ts`、`packages/client/src/spine/runtime.ts`
+- **表现**：把 `@esotericsoftware/spine-*` 加回前端依赖，运行时会被打进构建产物，与 Spine Runtimes License 的再分发条款冲突。
+- **解决方案**：首次启动检测 `<root>/plugins/spine/`，缺失时说明协议并给出 `auto`（自动下载）/ `manual`（手动放入）/ `none`（强制无 Spine）三种选择；前端用带 `@vite-ignore` 的动态 `import('/plugins/spine/*.mjs')`。
+- **原理**：许可允许集成，但要求每个使用者自行取得 Spine Editor 许可、再分发时保留许可证；把下载交给用户并保留 `LICENSE`，发行包就不包含运行时。
+- **效果**：`package.json` 与 `package-lock.json` 里没有 `@esotericsoftware/*`，前端产物也不含运行时。
+- **备注**：不要为了「离线可用」把下载得到的文件提交进仓库，也不要改成构建期 alias；浏览器不能执行 `.ts`，所以检查的是官方 ESM 产物 `.mjs`。
+
+## 22 · 一次立绘只能使用同一份运行时（core 不能混用）
+
+- **位置**：`packages/client/src/spine/backend.ts`、`composables/useSpineStage.ts`
+- **表现**：用 WebGL 包解析骨骼、却用 Canvas 包渲染时，内部 `instanceof` 检查失败，画面空白或直接报错。
+- **解决方案**：`createSpineBackend()` 返回 `{ backend, runtime }`；`Skeleton` / `TextureAtlas` / `AnimationState` / `AttachmentTimeline` 全部取自返回的 `runtime`。
+- **原理**：`spine-webgl.mjs` 与 `spine-canvas.mjs` 各自打包了一份 spine-core，两个 bundle 的同名类不是同一个构造器。
+- **效果**：两条渲染路径各自自洽，回退也正常。
+- **备注**：`src/spine/types.ts` 只声明本项目用到的最小接口，不要复制运行时类型。
+
+## 23 · `/plugins` 必须绕开 SPA fallback，并且开发代理要带上
+
+- **位置**：`packages/server/src/index.ts`、`packages/server/src/app/mountClient.ts`、`packages/client/vite.config.ts`
+- **表现**：插件缺失时动态 `import()` 拿到 `index.html`，浏览器报 MIME 错误；开发模式 5173 请求 `/plugins` 直接 404。
+- **解决方案**：后端在 API 之前 `express.static(pluginsDir)`，并给 `.mjs` 显式设置 `text/javascript`；fallback 里 `/plugins/` 与 `/api/` 一样 `next()`；Vite 代理加 `/plugins`。
+- **原理**：fallback 只该服务前端路由；模块脚本必须拿到 JS MIME 才能执行。
+- **效果**：存在时 200 且 MIME 正确，缺失时干净的 404。
+- **备注**：以后新增其他运行时插件目录，这三处要一起改。
+
+## 24 · 启动选择在 dev / 非交互环境会挂住或读不到输入
+
+- **位置**：`package.json`（根 `dev`）、`packages/server/package.json`（server `dev`）、`packages/server/src/config/spine.ts`（`askForChoice`）
+- **表现**：`npm run dev` 里即使加了 `--handle-input`，仍然提示「当前不是交互式启动」；输入 A/B/C 没有反应。
+- **原因**：① `concurrently` 给子进程的 stdin 是**管道**，`process.stdin.isTTY` 为假；② 原来的 `tsx watch` 自己监听 stdin 的 Return 键用于重启（`[tsx] Return key Restarting...`），会把输入吞掉。
+- **解决方案**：server 的 dev 脚本改成 `node --watch --import tsx src/index.ts`（Node 内建 watch 会转发 stdin）；根 `dev` 脚本用 `cross-env OUR_ARCHIVE_INTERACTIVE=1` 允许管道 stdin 参与交互；`askWithTimeout()` 30 秒无输入时回退 `manual`。
+- **原理**：`process.stdin.isTTY` 只表示「当前进程是否直接接终端」，管道 stdin 仍然可以读到 `concurrently` 转发来的输入；因此不能只靠 `isTTY` 判断。
+- **效果**：`npm run dev` 下 A/B/C 可以正常选择；CI / 无输入环境 30 秒后默认 manual，不会永久卡死。
+- **备注**：如果把 server dev 脚本换回 `tsx watch`，交互会再次失效；`OUR_ARCHIVE_SPINE_MODE=auto|manual|none` 可直接跳过询问。
 
 ---
 

@@ -339,16 +339,16 @@
 
 ## 33 · canvas 渲染成本 = 三角形数（这是最核心的一条）
 
-- **位置**：`composables/spine/canvasBackend.ts`、`composables/spine/webglBackend.ts`
+- **位置**：`spine/canvasBackend.ts`、`spine/webglBackend.ts`
 - **表现**：阿罗娜、普拉娜的立绘明显的掉帧（个位数 fps），其他角色正常。
 - **解决方案**：默认走 WebGL 后端（`spine-webgl` 的 `PolygonBatcher` 合批），canvas 2d 只作「保守」模式与兜底。
 - **原理**：`spine-canvas` 的 `triangleRendering` 对**每个三角形**做一次 `save + transform + clip + drawImage(整页 2048² 贴图) + restore`，成本与三角形数线性相关。全库 631 个骨骼实测（setup pose 下真实绘制的三角形/帧）：`arona_spr` 阿罗娜 202 骨 / 80 附件 → **5863**；`np0035_spr` 普拉娜 315 骨 / 89 附件 → **5463**；第三名 `np0186_spr` 只有 377（14 骨 / 17 附件）；全库平均 **126**（3~7 骨 / 5~10 附件）。只有这两个「真动态」立绘是其他角色的 40~80 倍，每帧 5000+ 次 clip+drawImage 必然掉到个位数帧率。
-- **效果**：5863 次 draw call 合成 1~2 次，满帧；首屏 chunk 也从 822 kB 降到 643 kB（Spine 运行时进入异步路由 chunk）。
+- **效果**：5863 次 draw call 合成 1~2 次，满帧；Spine 运行时只进入异步路由 chunk，且现在从本地插件目录动态加载。
 - **备注**：模式由设置项 `spine_renderer` 控制（`aggressive` 仅 WebGL / `stable` 优先 WebGL / `conservative` 仅 canvas 2d）。
 
 ## 34 · 直通 alpha 图集 + mipmap = 细线变粗发黑
 
-- **位置**：`composables/spine/webglBackend.ts`
+- **位置**：`spine/webglBackend.ts`
 - **表现**：阿罗娜脸上的腮红线条明显变粗、发黑；发丝边缘出现暗边。整张图的其他颜色却是对的。
 - **解决方案**：走**预乘 alpha（PMA）**管道，三条必须同时成立 —— ① 解码：`createImageBitmap(file, { premultiplyAlpha: 'premultiply' })`；② 上传：`GLTexture.DISABLE_UNPACK_PREMULTIPLIED_ALPHA_WEBGL = true`（**名字是反的**：置 true 才会 `pixelStorei(UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)`，避免二次预乘）；③ 渲染：`SkeletonRenderer.premultipliedAlpha = true`（混合变成 `ONE / ONE_MINUS_SRC_ALPHA`，加法用 `ONE / ONE`）。三者齐备之后才允许 `USE_MIPMAPS = true`。canvas 2d 后端**不能**吃预乘贴图，所以 `bindTextures` 的契约是「页名 → 文件」，由各后端自己解码。
 - **原理**：BA 图集的透明区 RGB 是黑的（实测 2048² 里采样 421 257 个全透明像素，**23.7% 精确为 `(0,0,0)`**，其余全是近黑）。mipmap 是按 RGB 做盒式平均的，于是每级 mip 都把「透明黑」平均进半透明边缘；区域之间只有 1px 留边，还会跨区域串色。预乘之后半透明像素的 RGB 已经乘过 alpha、透明像素是真正的零贡献，平均才是正确的。
@@ -366,21 +366,21 @@
 
 ## 36 · WebGL 能力要先用一次性 canvas 探测
 
-- **位置**：`composables/spine/backend.ts`（`canUseWebGL()`）
+- **位置**：`spine/backend.ts`（`canUseWebGL()`）
 - **表现**：「稳定」模式下本该回退 canvas 2d，结果两个后端都起不来。
 - **解决方案**：先用 `document.createElement('canvas')` 试 `getContext('webgl2') ?? getContext('webgl')`，拿到后 `WEBGL_lose_context.loseContext()` 立刻释放；确认可用才动正式画布。
 - **原理**：在正式画布上尝试 WebGL 失败时可能已经占用了上下文槽位，此时再要 2d 也拿不到——回退路径被自己堵死。
 - **效果**：不支持 WebGL 的环境能干净地落到 canvas 2d。
 - **备注**：探测产生的上下文记得主动丢弃，避免占满浏览器的上下文配额。
 
-## 37 · 三个 Spine 包必须锁在同一 4.2.x
+## 37 · Spine 运行时不进依赖，WebGL / Canvas 包不能混用
 
-- **位置**：`packages/client/package.json`
-- **表现**：渲染时 `instanceof RegionAttachment` 判定全部为 `false`，画面一片空白但没有任何报错。
-- **解决方案**：`@esotericsoftware/spine-webgl` 与 `spine-canvas` 都写**精确版本** `4.2.120`（不要 `^`），并确认 `node_modules` 下只有**一份** `spine-core`。
-- **原理**：`^4.2.120` 会解析到 4.3.x，而 spine-webgl 4.3 依赖 core 4.3 → 装上第二份 core。两份模块的类不是同一个类，`instanceof` 跨副本必然失败；同时 4.2 的骨骼数据也不能被 4.3 运行时正确读取。
-- **效果**：判型正常，骨骼解析正常。
-- **备注**：升级时三个包必须同时、同版本升。
+- **位置**：`spine/runtime.ts`、`spine/backend.ts`、`packages/client/package.json`
+- **表现**：把 `@esotericsoftware/*` 加回依赖会再次触发许可冲突；用 WebGL 包解析骨骼、却用 Canvas 包渲染时，内部 `instanceof` 判定全为 `false`，画面空白但不报错。
+- **解决方案**：运行时从 `/plugins/spine/*.mjs` 动态加载（`import()` 必须带 `/* @vite-ignore */`）；`createSpineBackend()` 返回 `{ backend, runtime }`，解析与渲染只用同一份 runtime。
+- **原理**：`spine-webgl.mjs` 与 `spine-canvas.mjs` 各自打包了一份 spine-core，同名类不是同一个构造器；同时 npm 依赖会把运行时打进产物，与许可条款冲突。
+- **效果**：前端依赖里没有 Spine 包，两条渲染路径都正常。
+- **备注**：运行时版本由后端 `config/spine.ts` 固定；升级时改版本号并对照 `spine/types.ts` 的最小接口。
 
 ## 38 · `TextureAtlas` 在 4.2 只接受文本，贴图要自己 `setTexture()`
 
@@ -411,7 +411,7 @@
 
 ## 41 · `readEntries` 一次最多返回 100 条
 
-- **位置**：`composables/useSpinePackage.ts`
+- **位置**：`spinePackage.ts`
 - **表现**：拖入整个 `skeletons/` 根目录时静默丢文件，识别出的角色少了一大半，还不报错。
 - **解决方案**：循环 `readEntries` 直到返回空数组为止。
 - **原理**：FileSystem API 的分批约定，不是错误而是设计。

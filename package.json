@@ -10,7 +10,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,green\" \"npm run dev -w @our-archive/server\" \"npm run dev -w @our-archive/client\"",
+    "dev": "cross-env OUR_ARCHIVE_INTERACTIVE=1 concurrently -n \"SERVER,CLIENT\" -c \"blue,green\" --handle-input --default-input-target SERVER \"npm run dev -w @our-archive/server\" \"npm run dev -w @our-archive/client\"",
     "dev:server": "npm run dev -w @our-archive/server",
     "dev:client": "npm run dev -w @our-archive/client",
     "build": "npm run build -w @our-archive/client && npm run build -w @our-archive/server",

@@ -15,19 +15,6 @@
  */
 import { onBeforeUnmount, ref, shallowRef, watch, type Ref } from 'vue';
 import {
-  AnimationState,
-  AnimationStateData,
-  AtlasAttachmentLoader,
-  AttachmentTimeline,
-  Physics,
-  Skeleton,
-  SkeletonBinary,
-  SkeletonJson,
-  TextureAtlas,
-  type SkeletonData,
-  type Timeline,
-} from '@esotericsoftware/spine-webgl';
-import {
   createSpineBackend,
   normalizeSpineRendererMode,
   SpineCanvasLockedError,
@@ -35,6 +22,14 @@ import {
   type SpineBackendKind,
   type SpineRendererMode,
 } from '@/spine/backend';
+import type {
+  SpineAnimationState,
+  SpineAttachmentTimeline,
+  SpineCoreRuntime,
+  SpineSkeleton,
+  SpineSkeletonData,
+  SpineTimeline,
+} from '@/spine/types';
 import { matchTexture, type SpineCharacter } from '@/spinePackage';
 import { readonlyRef } from '@/utils/reactivity';
 
@@ -90,12 +85,18 @@ function describeAttachment(name: string | null): string | null {
   return prettify(stripped);
 }
 
-function isAttachmentTimeline(timeline: Timeline): timeline is AttachmentTimeline {
-  return timeline instanceof AttachmentTimeline;
+function isAttachmentTimeline(
+  timeline: SpineTimeline,
+  attachmentTimeline: SpineCoreRuntime['AttachmentTimeline']
+): timeline is SpineAttachmentTimeline {
+  return timeline instanceof attachmentTimeline;
 }
 
 /** 抽出全部差分；同一组图层只保留最先出现的一条，避免 `99` 这类重复项刷屏 */
-export function extractSpineVariants(data: SkeletonData): SpineVariant[] {
+export function extractSpineVariants(
+  data: SpineSkeletonData,
+  runtime: SpineCoreRuntime
+): SpineVariant[] {
   // 角色自身名字（`ako_spr` / `shiroko`）会出现在附件名里，当成标签没有信息量
   const noise = new Set<string>();
   for (const token of String(data.name ?? '').toLowerCase().split(/[^a-z0-9]+/)) {
@@ -115,7 +116,7 @@ export function extractSpineVariants(data: SkeletonData): SpineVariant[] {
     }
     const layers: SpineLayer[] = [];
     for (const timeline of animation.timelines) {
-      if (!isAttachmentTimeline(timeline)) {
+      if (!isAttachmentTimeline(timeline, runtime.AttachmentTimeline)) {
         continue;
       }
       const names = timeline.attachmentNames ?? [];
@@ -151,7 +152,7 @@ export function extractSpineVariants(data: SkeletonData): SpineVariant[] {
 }
 
 /** 除差分外的循环 / 单次动画，作为「动作」下拉项 */
-function extractSpineActions(data: SkeletonData): string[] {
+function extractSpineActions(data: SpineSkeletonData): string[] {
   return data.animations
     .filter((animation) => !/^\d+$/.test(animation.name))
     .map((animation) => animation.name)
@@ -184,9 +185,10 @@ export function useSpineStage(
   /** 换模式时需要一张全新的 <canvas>（同一张画布不能既 webgl 又 2d），交给模板做 :key */
   const canvasKey = ref(0);
 
-  let skeleton: Skeleton | null = null;
-  let state: AnimationState | null = null;
-  let data: SkeletonData | null = null;
+  let runtime: SpineCoreRuntime | null = null;
+  let skeleton: SpineSkeleton | null = null;
+  let state: SpineAnimationState | null = null;
+  let data: SpineSkeletonData | null = null;
   let backend: SpineBackend | null = null;
   let bounds = { x: 0, y: 0, width: 1, height: 1 };
   let frame = 0;
@@ -229,7 +231,7 @@ export function useSpineStage(
   }
 
   function measure() {
-    if (!skeleton) {
+    if (!skeleton || !runtime) {
       return;
     }
     // 量尺寸时把根变换清干净，否则上一次渲染的位移 / 缩放会混进包围盒
@@ -238,7 +240,7 @@ export function useSpineStage(
     skeleton.scaleX = 1;
     skeleton.scaleY = 1;
     skeleton.setToSetupPose();
-    skeleton.updateWorldTransform(Physics.update);
+    skeleton.updateWorldTransform(runtime.Physics.update);
     bounds = skeleton.getBoundsRect();
   }
 
@@ -273,7 +275,7 @@ export function useSpineStage(
 
   function draw(now: number) {
     frame = requestAnimationFrame(draw);
-    if (!skeleton || !backend) {
+    if (!skeleton || !backend || !runtime) {
       return;
     }
 
@@ -293,7 +295,7 @@ export function useSpineStage(
       state.apply(skeleton);
     }
     applyVariantLayers();
-    skeleton.updateWorldTransform(Physics.update);
+    skeleton.updateWorldTransform(runtime.Physics.update);
 
     const fit = Math.min(
       (viewWidth * 0.94) / Math.max(bounds.width, 1),
@@ -324,6 +326,7 @@ export function useSpineStage(
     resizeObserver = null;
     backend?.dispose();
     backend = null;
+    runtime = null;
     skeleton = null;
     state = null;
     data = null;
@@ -354,45 +357,54 @@ export function useSpineStage(
       disposeStage();
 
       const mode = normalizeSpineRendererMode(rendererMode.value);
-      backend = createSpineBackend(element, mode);
-      backendKind.value = backend.kind;
+      const handle = await createSpineBackend(element, mode);
+      if (token !== loadToken) {
+        handle.backend.dispose();
+        return;
+      }
 
-      const atlas = new TextureAtlas(await character.atlas.text());
+      const activeBackend = handle.backend;
+      const activeRuntime = handle.runtime;
+      backend = activeBackend;
+      runtime = activeRuntime;
+      backendKind.value = activeBackend.kind;
+
+      const atlas = new activeRuntime.TextureAtlas(await character.atlas.text());
       for (const page of atlas.pages) {
         if (!matchTexture(character.textures, page.name)) {
           throw new Error(`图集页 ${page.name} 缺少对应贴图`);
         }
       }
-      await backend.bindTextures(atlas, (pageName) =>
+      await activeBackend.bindTextures(atlas, (pageName) =>
         matchTexture(character.textures, pageName)
       );
       if (token !== loadToken) {
         return;
       }
 
-      const loader = new AtlasAttachmentLoader(atlas);
-      let skeletonData: SkeletonData;
+      const loader = new activeRuntime.AtlasAttachmentLoader(atlas);
+      let skeletonData: SpineSkeletonData;
       if (character.skeleton.name.toLowerCase().endsWith('.json')) {
         const json = JSON.parse(await character.skeleton.text());
-        skeletonData = new SkeletonJson(loader).readSkeletonData(json);
+        skeletonData = new activeRuntime.SkeletonJson(loader).readSkeletonData(json);
       } else {
         const bytes = new Uint8Array(await character.skeleton.arrayBuffer());
-        skeletonData = new SkeletonBinary(loader).readSkeletonData(bytes);
+        skeletonData = new activeRuntime.SkeletonBinary(loader).readSkeletonData(bytes);
       }
       if (token !== loadToken) {
         return;
       }
 
       data = skeletonData;
-      skeleton = new Skeleton(skeletonData);
+      skeleton = new activeRuntime.Skeleton(skeletonData);
       skeleton.setToSetupPose();
 
-      const stateData = new AnimationStateData(skeletonData);
+      const stateData = new activeRuntime.AnimationStateData(skeletonData);
       stateData.defaultMix = 0.15;
-      const nextState = new AnimationState(stateData);
+      const nextState = new activeRuntime.AnimationState(stateData);
       state = nextState;
 
-      const parsedVariants = extractSpineVariants(skeletonData);
+      const parsedVariants = extractSpineVariants(skeletonData, activeRuntime);
       variants.value = parsedVariants;
       variantByName.value = new Map(parsedVariants.map((item) => [item.name, item]));
       activeVariant.value = parsedVariants[0]?.name ?? '';

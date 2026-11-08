@@ -52,8 +52,10 @@ export function mountClient(app: Express, clientDistPath: string | null) {
   app.use(express.static(clientDistPath, { index: false }));
 
   app.get('*', (req: Request, res: Response, next: NextFunction) => {
-    // 未知 API 路由不返回 HTML
-    if (req.path.startsWith('/api/')) return next();
+    // 未知 API / 插件路由不返回 HTML，避免把 index.html 当成脚本或 JSON
+    const isApi = req.path === '/api' || req.path.startsWith('/api/');
+    const isPlugin = req.path === '/plugins' || req.path.startsWith('/plugins/');
+    if (isApi || isPlugin) return next();
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 }

@@ -18,7 +18,7 @@
 | 网络层 | `api/request.ts`（封装）、`api/<domain>.ts`（接口） | `api/packages.ts` |
 | 工具 | `utils/<topic>.ts` | `utils/format.ts` |
 | Spine 资源解析 | 顶层 `spinePackage.ts` | — |
-| Spine 渲染适配 | `spine/{backend,mode,webglBackend,canvasBackend}.ts` | — |
+| Spine 渲染适配 | `spine/{runtime,types,backend,mode,webglBackend,canvasBackend}.ts` | — |
 | 后端配置 | `config/<domain>.ts` | `config/publicUrl.ts` |
 | 后端路由 | `routes/<domain>.ts` + `create<Domain>Router()` | `routes/packages.ts` |
 | 共享 DTO | `packages/shared/src/types.ts` | — |
