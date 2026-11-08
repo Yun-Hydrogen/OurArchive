@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { rizui_infobox, rizui_progress } from 'riz-ui';
 import OASpineUploader from '@/components/tools/OASpineUploader.vue';
 import OASpineViewer from '@/components/tools/OASpineViewer.vue';
 import { ROUTE_NAMES } from '@/config/routes';
+import { SHELL_TIMING } from '@/config/transition';
 import {
   loadSpineCharacterFromPackage,
   type SpineCharacter,
@@ -24,21 +25,40 @@ const sourceCharacterId = ref('');
 const isAutoLoading = ref(false);
 const autoLoadError = ref('');
 
+/** 离场：先淡出页面，再切路由，避免和上一页硬切 */
+const isLeaving = ref(false);
+let leaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function leaveTo(target: {
+  name: string;
+  params?: Record<string, string>;
+  query?: Record<string, string>;
+}) {
+  if (isLeaving.value) {
+    return;
+  }
+  isLeaving.value = true;
+  leaveTimer = setTimeout(() => {
+    leaveTimer = null;
+    void router.push(target);
+  }, SHELL_TIMING.cardsExitWait);
+}
+
 function backToSource() {
   if (!sourcePackageId.value) {
-    void router.push({ name: ROUTE_NAMES.tools });
+    leaveTo({ name: ROUTE_NAMES.tools });
     return;
   }
 
   if (sourceCharacterId.value) {
-    void router.push({
+    leaveTo({
       name: ROUTE_NAMES.packageCharacter,
       params: { packageId: sourcePackageId.value, nameId: sourceCharacterId.value },
     });
     return;
   }
 
-  void router.push({
+  leaveTo({
     name: ROUTE_NAMES.packageDetail,
     params: { packageId: sourcePackageId.value },
   });
@@ -82,10 +102,21 @@ async function autoLoad() {
 onMounted(() => {
   void autoLoad();
 });
+
+onBeforeUnmount(() => {
+  if (leaveTimer) {
+    clearTimeout(leaveTimer);
+    leaveTimer = null;
+  }
+});
 </script>
 
 <template>
-  <main class="oa-skel-preview">
+  <main
+    class="oa-skel-preview"
+    :class="{ 'is-leaving': isLeaving }"
+    :style="{ '--cards-exit': `${SHELL_TIMING.cardsExit}ms` }"
+  >
     <header class="oa-skel-preview__head">
       <button type="button" class="oa-skel-preview__back" @click="backToSource">
         <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -110,28 +141,30 @@ onMounted(() => {
     </header>
 
     <section class="oa-skel-preview__body">
-      <div v-if="isAutoLoading" class="oa-skel-preview__picker oa-skel-preview__loading">
-        <p class="oa-skel-preview__loading-text">正在从资源包载入立绘…</p>
-        <rizui_progress :indeterminate="true" :height="6" rounded />
-      </div>
+      <Transition name="oa-swap" mode="out-in">
+        <div v-if="isAutoLoading" key="loading" class="oa-skel-preview__picker oa-skel-preview__loading">
+          <p class="oa-skel-preview__loading-text">正在从资源包载入立绘…</p>
+          <rizui_progress :indeterminate="true" :height="6" rounded />
+        </div>
 
-      <OASpineViewer
-        v-else-if="character"
-        :key="`${character.id}-${character.skeleton.name}`"
-        :character="character"
-        @back="backToSource"
-        @reselect="handleSpineReselect"
-      />
-
-      <div v-else class="oa-skel-preview__picker">
-        <rizui_infobox
-          v-if="autoLoadError"
-          class="oa-skel-preview__error"
-          type="error"
-          :text="`自动载入失败：${autoLoadError}`"
+        <OASpineViewer
+          v-else-if="character"
+          :key="`${character.id}-${character.skeleton.name}`"
+          :character="character"
+          @back="backToSource"
+          @reselect="handleSpineReselect"
         />
-        <OASpineUploader @select="handleSpinePicked" />
-      </div>
+
+        <div v-else key="picker" class="oa-skel-preview__picker">
+          <rizui_infobox
+            v-if="autoLoadError"
+            class="oa-skel-preview__error"
+            type="error"
+            :text="`自动载入失败：${autoLoadError}`"
+          />
+          <OASpineUploader @select="handleSpinePicked" />
+        </div>
+      </Transition>
     </section>
   </main>
 </template>
@@ -176,6 +209,19 @@ onMounted(() => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* 返回上一页时整页淡出，别让路由切换硬切 */
+.oa-skel-preview.is-leaving .oa-skel-preview__head,
+.oa-skel-preview.is-leaving .oa-skel-preview__body {
+  animation: oa-panel-out var(--cards-exit, 260ms) cubic-bezier(0.4, 0, 0.8, 0.24) forwards;
+}
+
+@keyframes oa-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(22px);
   }
 }
 

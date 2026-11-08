@@ -22,7 +22,7 @@
 
 1. 作用：从 splash 进来时卡片错峰飞入；本页挂载即带 `is-entering`，跑 `oa-slot-in 780ms`，`fill-mode: backwards`，关键帧首尾都带 `--peek-x / --peek-s`。
 2. 延迟：`--enter-delay = cardsEnterBase（120ms）+ 错峰`（模式卡 `60 + 90n`，功能卡 `220 + 90n`，宽卡 `400`）；1500ms 后移除 `is-entering`。
-3. 注意事项：**只能用于 `animation-delay`，不能写成 `transition-delay`**，否则后续每次叠卡切换都被拖慢；入场用 `animation` 而不是 `transition`（见 `WARN.md` 条目 12/13）。
+3. 注意事项：**只能用于 `animation-delay`，不能写成 `transition-delay`**，否则后续每次叠卡切换都被拖慢；入场用 `animation` 而不是 `transition`（见 `NeedNotice.md` 条目 08/09）。
 
 ### `HOME_MENU`（`config/home.ts`）
 

@@ -6,6 +6,7 @@ import type { NavItem } from 'riz-ui';
 import { ROUTE_NAMES } from '@/config/routes';
 import { SHELL_TIMING } from '@/config/transition';
 import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
+import { useEnterAnimation } from '@/composables/useEnterAnimation';
 import { useGlobalConfig } from '@/composables/useGlobalConfig';
 import { formatBytes, formatDuration } from '@/utils/format';
 import {
@@ -90,9 +91,8 @@ watch(
   { flush: 'post' }
 );
 
-/** 与资源管理 / 工具页同一套卡片进退场 */
-const isEntering = ref(true);
-let enterTimer: ReturnType<typeof setTimeout> | null = null;
+/** 与资源管理 / 工具页同一套卡片进退场；等详情读完再播入场，避免进度条消失后卡片硬切 */
+const { isEntering } = useEnterAnimation(() => !loading.value, 900);
 const isLeaving = ref(false);
 let leaveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -548,18 +548,9 @@ watch(activeSection, (section) => {
 
 onMounted(() => {
   void load();
-
-  enterTimer = setTimeout(() => {
-    isEntering.value = false;
-    enterTimer = null;
-  }, 760);
 });
 
 onBeforeUnmount(() => {
-  if (enterTimer) {
-    clearTimeout(enterTimer);
-    enterTimer = null;
-  }
   if (leaveTimer) {
     clearTimeout(leaveTimer);
     leaveTimer = null;
@@ -646,14 +637,17 @@ function openCharacter(character: PackageCharacter) {
       </label>
     </header>
 
-    <div v-if="loading" class="oa-pkg__state">
-      <p class="oa-pkg__state-text">正在读取资源包…</p>
-      <rizui_progress :indeterminate="true" :height="12" rounded />
-    </div>
+    <Transition name="oa-swap" mode="out-in">
+      <div v-if="loading" key="loading" class="oa-pkg__state">
+        <p class="oa-pkg__state-text">正在读取资源包…</p>
+        <rizui_progress :indeterminate="true" :height="12" rounded />
+      </div>
 
-    <rizui_infobox v-else-if="error" type="error" :text="`读取资源包失败：${error}`" />
+      <div v-else-if="error" key="error" class="oa-pkg__notice">
+        <rizui_infobox type="error" :text="`读取资源包失败：${error}`" />
+      </div>
 
-    <section v-else ref="cardEl" class="oa-pkg__card">
+      <section v-else key="card" ref="cardEl" class="oa-pkg__card">
       <rizui_sidebar
         v-model="navModel"
         class="oa-pkg__nav"
@@ -758,18 +752,20 @@ function openCharacter(character: PackageCharacter) {
             </p>
           </div>
 
-          <div v-if="skeletonsLoading" class="oa-pkg__state oa-pkg__state--inline">
-            <p class="oa-pkg__state-text">正在读取立绘目录（约 600 项）…</p>
-            <rizui_progress :indeterminate="true" :height="6" rounded />
-          </div>
+          <Transition name="oa-swap" mode="out-in">
+            <div v-if="skeletonsLoading" key="loading" class="oa-pkg__state oa-pkg__state--inline">
+              <p class="oa-pkg__state-text">正在读取立绘目录（约 600 项）…</p>
+              <rizui_progress :indeterminate="true" :height="6" rounded />
+            </div>
 
-          <rizui_infobox
-            v-else-if="skeletonsError"
-            type="error"
-            :text="`读取立绘目录失败：${skeletonsError}`"
-          />
+            <div v-else-if="skeletonsError" key="error" class="oa-pkg__notice">
+              <rizui_infobox
+                type="error"
+                :text="`读取立绘目录失败：${skeletonsError}`"
+              />
+            </div>
 
-          <div v-else-if="filteredSkeletons.length" class="oa-pkg__skel-list">
+            <div v-else-if="filteredSkeletons.length" key="list" class="oa-pkg__skel-list">
             <div
               v-for="item in filteredSkeletons"
               :key="item.id"
@@ -843,6 +839,7 @@ function openCharacter(character: PackageCharacter) {
           <div v-else class="oa-pkg__empty">
             <p>{{ skeletonKeyword ? '没有匹配的立绘。' : '这个资源包没有立绘目录。' }}</p>
           </div>
+          </Transition>
         </template>
 
         <!-- 背景音乐 -->
@@ -858,18 +855,20 @@ function openCharacter(character: PackageCharacter) {
             </p>
           </div>
 
-          <div v-if="musicLoading && !music.length" class="oa-pkg__state oa-pkg__state--inline">
-            <p class="oa-pkg__state-text">正在读取背景音乐索引…</p>
-            <rizui_progress :indeterminate="true" :height="6" rounded />
-          </div>
+          <Transition name="oa-swap" mode="out-in">
+            <div v-if="musicLoading && !music.length" key="loading" class="oa-pkg__state oa-pkg__state--inline">
+              <p class="oa-pkg__state-text">正在读取背景音乐索引…</p>
+              <rizui_progress :indeterminate="true" :height="6" rounded />
+            </div>
 
-          <rizui_infobox
-            v-else-if="musicError"
-            type="error"
-            :text="`读取背景音乐失败：${musicError}`"
-          />
+            <div v-else-if="musicError" key="error" class="oa-pkg__notice">
+              <rizui_infobox
+                type="error"
+                :text="`读取背景音乐失败：${musicError}`"
+              />
+            </div>
 
-          <div v-else-if="filteredMusic.length" class="oa-pkg__music-list">
+            <div v-else-if="filteredMusic.length" key="list" class="oa-pkg__music-list">
             <article
               v-for="item in filteredMusic"
               :key="item.name_id"
@@ -937,6 +936,7 @@ function openCharacter(character: PackageCharacter) {
           <div v-else class="oa-pkg__empty">
             <p>{{ musicKeyword ? '没有匹配的曲目。' : '索引里没有曲目。' }}</p>
           </div>
+          </Transition>
 
           <audio
             ref="audioEl"
@@ -968,6 +968,7 @@ function openCharacter(character: PackageCharacter) {
         </div>
       </div>
     </section>
+    </Transition>
 
     <!-- 曲目完整描述：rizui_dialog 自带 Teleport，放页面根部避免随分类卸载 -->
     <rizui_dialog
@@ -1090,6 +1091,12 @@ function openCharacter(character: PackageCharacter) {
 .oa-pkg__state-text {
   font-size: 12.5px;
   color: #6f8ba4;
+}
+
+/* 错误 / 空态容器：和加载态占同一列，切换时由 oa-swap 淡入淡出 */
+.oa-pkg__notice {
+  width: min(1320px, 100%);
+  margin: 0 auto;
 }
 
 /* ---------- 大卡片 ---------- */

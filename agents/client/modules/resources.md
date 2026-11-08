@@ -9,7 +9,7 @@
 
 1. 作用：进页面即扫一次资源包（磁盘上的文件随时可能增删，不做缓存）；「刷新」按钮再次重扫；失败时清空列表并把原因写进 `error`。
 2. 输入：无；输出：无（内部改 `packages` / `resourcesDir` / `loading` / `error`）。
-3. 注意事项：`loading` 与 `error` 用于工具栏按钮的禁用与提示；错误文案走 `apiErrorMessage()`。
+3. 注意事项：`loading` 与 `error` 用于工具栏按钮的禁用与提示；错误文案走 `apiErrorMessage()`；卡片入场用 `useEnterAnimation(() => !loading.value, …)`，等扫描结束才播（见 `NeedNotice.md` 33）。
 
 ### `useResourcePackages()` 的返回值
 

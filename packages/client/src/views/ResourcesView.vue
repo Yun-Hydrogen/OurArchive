@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { rizui_button, rizui_infobox, rizui_progress } from 'riz-ui';
 import { ROUTE_NAMES } from '@/config/routes';
 import { SHELL_TIMING } from '@/config/transition';
+import { useEnterAnimation } from '@/composables/useEnterAnimation';
 import { useResourcePackages, type ResourcePackage } from '@/composables/useResourcePackages';
 import { formatCount, formatDateTime } from '@/utils/format';
 
@@ -30,30 +31,21 @@ const TABS: TabDef[] = [
 const activeTab = ref<TabId>('packages');
 const activeTabDef = computed(() => TABS.find((tab) => tab.id === activeTab.value) ?? TABS[0]);
 
-/** 入场：卡片错峰飞入，播完撤掉 class，避免影响后续离场动画 */
-const isEntering = ref(true);
-let enterTimer: ReturnType<typeof setTimeout> | null = null;
+/** 入场：等列表读完再播卡片入场，进度条消失与卡片飞入衔接 */
+const { isEntering } = useEnterAnimation(() => !loading.value, 1800);
 
 /** 离场：卡片下坠回主界面，播完再切路由 */
 const isLeaving = ref(false);
 let leaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-const cardDelay = (step: number) => `${60 + step * 90}ms`;
+/** 错峰延迟封顶，避免资源包很多时最后一张卡要等太久 */
+const cardDelay = (step: number) => `${60 + Math.min(step, 8) * 90}ms`;
 
 onMounted(() => {
   void refresh();
-
-  enterTimer = setTimeout(() => {
-    isEntering.value = false;
-    enterTimer = null;
-  }, 900);
 });
 
 onBeforeUnmount(() => {
-  if (enterTimer) {
-    clearTimeout(enterTimer);
-    enterTimer = null;
-  }
   if (leaveTimer) {
     clearTimeout(leaveTimer);
     leaveTimer = null;
@@ -149,24 +141,24 @@ function activeContents(pkg: ResourcePackage) {
               <rizui_button text="刷新" :disabled="loading" @click="refresh" />
             </div>
 
-            <div v-if="loading" class="oa-res__loading">
-              <p class="oa-res__loading-text">正在扫描资源目录…</p>
-              <rizui_progress :indeterminate="true" :height="12" rounded />
-            </div>
+            <Transition name="oa-swap" mode="out-in">
+              <div v-if="loading" key="loading" class="oa-res__loading">
+                <p class="oa-res__loading-text">正在扫描资源目录…</p>
+                <rizui_progress :indeterminate="true" :height="12" rounded />
+              </div>
 
-            <rizui_infobox
-              v-else-if="error"
-              type="error"
-              :text="`扫描资源包失败：${error}`"
-            />
+              <div v-else-if="error" key="error" class="oa-res__notice">
+                <rizui_infobox type="error" :text="`扫描资源包失败：${error}`" />
+              </div>
 
-            <rizui_infobox
-              v-else-if="!packages.length"
-              type="info"
-              :text="`还没有资源包。把带 package.yml 的文件夹放进 ${resourcesDir || 'res 目录'} 后点刷新。`"
-            />
+              <div v-else-if="!packages.length" key="empty" class="oa-res__notice">
+                <rizui_infobox
+                  type="info"
+                  :text="`还没有资源包。把带 package.yml 的文件夹放进 ${resourcesDir || 'res 目录'} 后点刷新。`"
+                />
+              </div>
 
-            <div v-else class="oa-res__grid">
+              <div v-else key="grid" class="oa-res__grid">
               <article
                 v-for="(pkg, index) in packages"
                 :key="pkg.id"
@@ -230,7 +222,8 @@ function activeContents(pkg: ResourcePackage) {
                   />
                 </div>
               </article>
-            </div>
+              </div>
+            </Transition>
           </template>
 
           <div v-else class="oa-res__placeholder">

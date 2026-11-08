@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { rizui_infobox, rizui_progress } from 'riz-ui';
 import { ROUTE_NAMES } from '@/config/routes';
 import { SHELL_TIMING } from '@/config/transition';
+import { useEnterAnimation } from '@/composables/useEnterAnimation';
 import { usePackageContent, type PackageCharacter } from '@/composables/usePackageContent';
 
 const route = useRoute();
@@ -18,24 +19,16 @@ const character = computed<PackageCharacter | null>(
   () => characters.value.find((item) => item.name_id === nameId.value) ?? null
 );
 
-const isEntering = ref(true);
-let enterTimer: ReturnType<typeof setTimeout> | null = null;
+/** 入场等角色数据到齐后再播，避免进度条消失后卡片硬切 */
+const { isEntering } = useEnterAnimation(() => !loading.value, 900);
 const isLeaving = ref(false);
 let leaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMounted(() => {
   void load();
-  enterTimer = setTimeout(() => {
-    isEntering.value = false;
-    enterTimer = null;
-  }, 760);
 });
 
 onBeforeUnmount(() => {
-  if (enterTimer) {
-    clearTimeout(enterTimer);
-    enterTimer = null;
-  }
   if (leaveTimer) {
     clearTimeout(leaveTimer);
     leaveTimer = null;
@@ -99,20 +92,24 @@ function openSkeleton(skeletonId: string) {
       </div>
     </header>
 
-    <div v-if="loading" class="oa-charview__state">
-      <p class="oa-charview__state-text">正在读取角色信息…</p>
-      <rizui_progress :indeterminate="true" :height="12" rounded />
-    </div>
+    <Transition name="oa-swap" mode="out-in">
+      <div v-if="loading" key="loading" class="oa-charview__state">
+        <p class="oa-charview__state-text">正在读取角色信息…</p>
+        <rizui_progress :indeterminate="true" :height="12" rounded />
+      </div>
 
-    <rizui_infobox v-else-if="error" type="error" :text="`读取角色失败：${error}`" />
+      <div v-else-if="error" key="error" class="oa-charview__notice">
+        <rizui_infobox type="error" :text="`读取角色失败：${error}`" />
+      </div>
 
-    <rizui_infobox
-      v-else-if="!character"
-      type="warning"
-      :text="`资源包里没有这个角色：${nameId}`"
-    />
+      <div v-else-if="!character" key="missing" class="oa-charview__notice">
+        <rizui_infobox
+          type="warning"
+          :text="`资源包里没有这个角色：${nameId}`"
+        />
+      </div>
 
-    <section v-else class="oa-charview__card">
+      <section v-else key="card" class="oa-charview__card">
       <div class="oa-charview__portrait">
         <div class="oa-charview__avatar">
           <img v-if="character.avatarUrl" :src="character.avatarUrl" :alt="character.name" />
@@ -174,6 +171,7 @@ function openSkeleton(skeletonId: string) {
         </div>
       </div>
     </section>
+    </Transition>
   </main>
 </template>
 
@@ -268,6 +266,12 @@ function openSkeleton(skeletonId: string) {
 .oa-charview__state-text {
   font-size: 12.5px;
   color: #6f8ba4;
+}
+
+/* 错误 / 缺失提示：和加载态共用同一列，切换时淡入淡出 */
+.oa-charview__notice {
+  width: min(1120px, 100%);
+  margin: 0 auto;
 }
 
 /* ---------- 卡片 ---------- */

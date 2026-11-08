@@ -96,18 +96,24 @@ watch(
         @wheel.prevent="onWheel"
       />
 
-      <div v-if="status === 'loading'" class="oa-spine-viewer__overlay">
-        <p>正在解析骨骼与图集…</p>
-        <rizui_progress :indeterminate="true" :height="6" rounded />
-      </div>
+      <Transition name="oa-fade">
+        <div v-if="status === 'loading'" key="loading" class="oa-spine-viewer__overlay">
+          <p>正在解析骨骼与图集…</p>
+          <rizui_progress :indeterminate="true" :height="6" rounded />
+        </div>
 
-      <div v-else-if="status === 'error'" class="oa-spine-viewer__overlay oa-spine-viewer__overlay--error">
-        <p class="oa-spine-viewer__overlay-title">载入失败</p>
-        <p class="oa-spine-viewer__overlay-text">{{ error }}</p>
-        <rizui_button text="重新选择文件" @click="emit('reselect')" />
-      </div>
+        <div
+          v-else-if="status === 'error'"
+          key="error"
+          class="oa-spine-viewer__overlay oa-spine-viewer__overlay--error"
+        >
+          <p class="oa-spine-viewer__overlay-title">载入失败</p>
+          <p class="oa-spine-viewer__overlay-text">{{ error }}</p>
+          <rizui_button text="重新选择文件" @click="emit('reselect')" />
+        </div>
 
-      <p v-else class="oa-spine-viewer__tip">拖动画布平移 · 滚轮缩放</p>
+        <p v-else key="tip" class="oa-spine-viewer__tip">拖动画布平移 · 滚轮缩放</p>
+      </Transition>
     </section>
 
     <aside class="oa-spine-viewer__panel">

@@ -150,10 +150,12 @@ function clearAll() {
         />
       </div>
 
-      <div v-if="reading" class="oa-spine-uploader__reading">
-        <rizui_progress :indeterminate="true" :height="5" rounded />
-        <span>正在读取文件…</span>
-      </div>
+      <Transition name="oa-fade">
+        <div v-if="reading" class="oa-spine-uploader__reading">
+          <rizui_progress :indeterminate="true" :height="5" rounded />
+          <span>正在读取文件…</span>
+        </div>
+      </Transition>
 
       <input
         ref="dirInput"

@@ -91,8 +91,41 @@ select {
 }
 
 /* ---------------------------------------------------------------------------
- * ?????Home / Tools / Resources ???????
- * ????? `.oa-slot` ??????????? / ?????
+ * 加载态 ↔ 内容切换
+ *
+ * 进度条与结果之间统一走这组过渡：进度条淡出，结果淡入后再接卡片入场，
+ * 避免「进度条一闪而过 / 内容硬切」。
+ * ------------------------------------------------------------------------- */
+.oa-swap-enter-active,
+.oa-swap-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.oa-swap-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.oa-swap-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* 绝对定位的遮罩只做淡入淡出，位移会和底图错位 */
+.oa-fade-enter-active,
+.oa-fade-leave-active {
+  transition: opacity 180ms ease;
+}
+
+.oa-fade-enter-from,
+.oa-fade-leave-to {
+  opacity: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * 卡片槽位（Home / Tools / Resources 共用）
  * ------------------------------------------------------------------------- */
 .oa-slot {
   display: flex;
