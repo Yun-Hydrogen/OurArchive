@@ -68,6 +68,11 @@ function backHome() {
     :style="{ '--cards-exit': `${SHELL_TIMING.cardsExit}ms`, '--exit-y': exitOffset }"
   >
     <header class="oa-tools__head">
+      <div class="oa-tools__titles">
+        <h1 class="oa-tools__title">更多功能</h1>
+        <p class="oa-tools__subtitle">更多辅助剧情写作/播放的使用工具</p>
+      </div>
+
       <button type="button" class="oa-tools__back" @click="backHome">
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path
@@ -81,11 +86,6 @@ function backHome() {
         </svg>
         主界面
       </button>
-
-      <div class="oa-tools__titles">
-        <h1 class="oa-tools__title">更多功能</h1>
-        <p class="oa-tools__subtitle">更多辅助剧情写作/播放的使用工具</p>
-      </div>
     </header>
 
     <section class="oa-tools__grid">
@@ -123,33 +123,37 @@ function backHome() {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: clamp(16px, 2.4vh, 26px);
+  gap: clamp(10px, 1.4vh, 16px);
   min-height: 100vh;
-  padding: clamp(14px, 2.2vh, 24px) clamp(24px, 4.4vw, 84px) clamp(40px, 5vh, 56px);
-  padding-top: clamp(56px, 8vh, 84px);
+  padding: clamp(10px, 1.3vh, 16px) clamp(14px, 2.4vw, 44px) clamp(12px, 1.8vh, 24px);
+  /* 顶部只留窗口呼吸感：页头自己撑开，不再额外堆一段空白 */
+  padding-top: clamp(14px, 2vh, 22px);
   color: var(--oa-dark-blue);
 }
 
+/* 标题与返回同一行 */
 .oa-tools__head {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px clamp(12px, 1.6vw, 22px);
   width: min(1080px, 100%);
   margin: 0 auto;
 }
 
 .oa-tools__back {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  align-self: flex-start;
-  padding: 5px 11px 5px 7px;
+  padding: 5px 11px 5px 8px;
   border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   color: #35628a;
   cursor: pointer;
   transition:
@@ -170,26 +174,33 @@ function backHome() {
 .oa-tools__titles {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .oa-tools__title {
-  font-size: clamp(20px, 2vw, 28px);
+  font-size: clamp(19px, 1.7vw, 25px);
   font-weight: 700;
+  line-height: 1.25;
   letter-spacing: 0.01em;
   color: #123a5c;
 }
 
 .oa-tools__subtitle {
-  font-size: clamp(12px, 0.95vw, 13.5px);
-  line-height: 1.6;
+  overflow: hidden;
+  font-size: clamp(11.5px, 0.9vw, 13px);
+  line-height: 1.5;
   color: #6f8ba4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* 工具卡：小卡片网格，插画在上、标题与说明在下 */
 .oa-tools__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
   gap: clamp(14px, 1.6vw, 24px);
+  align-content: start;
   width: min(1080px, 100%);
   margin: 0 auto;
 }
@@ -237,6 +248,8 @@ function backHome() {
   display: flex;
   flex-direction: column;
   gap: clamp(9px, 1.2vh, 14px);
+  width: 100%;
+  height: 100%;
   padding: clamp(13px, 1.5vw, 20px);
   border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 10px;
@@ -250,6 +263,17 @@ function backHome() {
   text-align: center;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
+}
+
+.oa-tool-card:hover {
+  box-shadow:
+    0 16px 32px rgba(36, 92, 138, 0.18),
+    0 2px 5px rgba(36, 92, 138, 0.07),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
 }
 
 .oa-tool-card:focus-visible {

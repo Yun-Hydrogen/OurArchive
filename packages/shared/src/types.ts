@@ -117,6 +117,32 @@ export interface PackageSoundCategory {
   duration: number;
 }
 
+/** 一张背景图（背景目录下的一级文件） */
+export interface PackageBackground {
+  /** 文件名（含扩展名），如 `BG_ClassRoom.jpg` */
+  name: string;
+  /** 相对背景目录的路径（含分类子目录），用于拼下发 URL */
+  path: string;
+  /** 小写扩展名，含点（`.jpg` / `.png`） */
+  ext: string;
+  /** 字节数 */
+  size: number;
+  url: string;
+}
+
+/** 背景分类（`index/category.yml` 的一条；未分类的 `id` 为空串） */
+export interface PackageBackgroundCategory {
+  /** 分类 id；未分类为空串 */
+  id: string;
+  /** 展示名，如「学校相关」；未分类为「未分类」 */
+  label: string;
+  /** 分类说明；未分类为空串 */
+  description: string;
+  /** 该分类下的图片数 */
+  count: number;
+  images: PackageBackground[];
+}
+
 /** 一首背景音乐（`index/music_info.json` 的一条） */
 export interface PackageMusic {
   /** 曲目 id，如 `theme_01` */

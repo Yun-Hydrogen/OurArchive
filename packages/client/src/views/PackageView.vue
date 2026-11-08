@@ -11,6 +11,7 @@ import { useGlobalConfig } from '@/composables/useGlobalConfig';
 import { formatBytes, formatDuration, formatDurationDecimal, formatDurationLong } from '@/utils/format';
 import {
   usePackageContent,
+  type PackageBackground,
   type PackageCharacter,
   type PackageMusic,
   type PackageSound,
@@ -26,10 +27,14 @@ const SECTION_SKELETONS = 'Skeletons';
 const SECTION_MUSIC = 'BackgroundMusic';
 /** 侧边栏里「音效」分类的 id */
 const SECTION_SOUNDS = 'Sounds';
+/** 侧边栏里「背景」分类的 id */
+const SECTION_BACKGROUNDS = 'Backgrounds';
 /** 侧边栏学院子条目的 id 前缀（只做定位，不切换分类） */
 const SCHOOL_PREFIX = 'school:';
 /** 侧边栏音效类别子条目的 id 前缀；`sound:` 本身表示「全部」 */
 const SOUND_CATEGORY_PREFIX = 'sound:';
+/** 侧边栏背景分类子条目的 id 前缀；`bg:` 本身表示「未分类」 */
+const BACKGROUND_CATEGORY_PREFIX = 'bg:';
 
 /** package.yml 的键 → 侧边栏 id（只有 hasCharacter 需要归一） */
 function navIdOf(key: string): string {
@@ -47,6 +52,7 @@ const {
   music,
   sounds,
   soundCategories,
+  backgrounds,
   loading,
   error,
   skeletonsLoading,
@@ -55,10 +61,13 @@ const {
   musicError,
   soundsLoading,
   soundsError,
+  backgroundsLoading,
+  backgroundsError,
   load,
   loadSkeletons,
   loadMusic,
   loadSounds,
+  loadBackgrounds,
 } = usePackageContent(packageId.value);
 
 /** 侧边栏当前条目（永远停在分类上，学院子条目只做定位） */
@@ -147,6 +156,24 @@ const navItems = computed<NavItem[]>(() => {
       };
     }
 
+    // 背景分类（index/category.yml）同样做成子条目；未分类的 id 为空串
+    if (
+      content.key === SECTION_BACKGROUNDS &&
+      content.supported &&
+      backgrounds.value.length
+    ) {
+      return {
+        id: SECTION_BACKGROUNDS,
+        label: content.label,
+        badge: content.count > 0 ? content.count : undefined,
+        children: backgrounds.value.map((category) => ({
+          id: `${BACKGROUND_CATEGORY_PREFIX}${category.id}`,
+          label: category.label,
+          badge: category.count,
+        })),
+      };
+    }
+
     return {
       id: navIdOf(content.key),
       label: content.label,
@@ -165,7 +192,12 @@ const navModel = computed<string>({
   get: () => activeSection.value,
   set: (value) => {
     const next = String(value ?? '');
-    if (!next || next.startsWith(SCHOOL_PREFIX) || next.startsWith(SOUND_CATEGORY_PREFIX)) {
+    if (
+      !next ||
+      next.startsWith(SCHOOL_PREFIX) ||
+      next.startsWith(SOUND_CATEGORY_PREFIX) ||
+      next.startsWith(BACKGROUND_CATEGORY_PREFIX)
+    ) {
       return;
     }
     activeSection.value = next;
@@ -181,7 +213,7 @@ function handleNavToggle(payload: { item: NavItem; expanded: boolean }) {
     return;
   }
   const id = String(payload.item?.id ?? '');
-  if (id === SECTION_SOUNDS || id === SECTION_CHARACTERS) {
+  if (id === SECTION_SOUNDS || id === SECTION_CHARACTERS || id === SECTION_BACKGROUNDS) {
     if (activeSection.value !== id) {
       activeSection.value = id;
     }
@@ -217,6 +249,21 @@ async function handleNavSelect(item: NavItem) {
     // 首次进入音效分类时数据还没到，先拉完再滚动，否则列表还是空的
     if (!sounds.value.length) {
       await loadSounds();
+    }
+
+    void nextTick(() => {
+      contentEl.value?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    return;
+  }
+
+  if (id.startsWith(BACKGROUND_CATEGORY_PREFIX)) {
+    const category = id.slice(BACKGROUND_CATEGORY_PREFIX.length);
+    activeSection.value = SECTION_BACKGROUNDS;
+    activeBackgroundCategory.value = category;
+
+    if (!backgrounds.value.length) {
+      await loadBackgrounds();
     }
 
     void nextTick(() => {
@@ -285,6 +332,9 @@ const activeKeyword = computed({
     if (activeSection.value === SECTION_SOUNDS) {
       return soundKeyword.value;
     }
+    if (activeSection.value === SECTION_BACKGROUNDS) {
+      return backgroundKeyword.value;
+    }
     return keyword.value;
   },
   set: (value: string) => {
@@ -294,6 +344,8 @@ const activeKeyword = computed({
       musicKeyword.value = value;
     } else if (activeSection.value === SECTION_SOUNDS) {
       soundKeyword.value = value;
+    } else if (activeSection.value === SECTION_BACKGROUNDS) {
+      backgroundKeyword.value = value;
     } else {
       keyword.value = value;
     }
@@ -316,6 +368,9 @@ const searchPlaceholder = computed(() => {
   }
   if (activeSection.value === SECTION_SOUNDS) {
     return '搜索 id / 描述 / 文件名';
+  }
+  if (activeSection.value === SECTION_BACKGROUNDS) {
+    return '搜索背景文件名';
   }
   return '';
 });
@@ -480,6 +535,8 @@ watch(
       void loadMusic();
     } else if (section === SECTION_SOUNDS) {
       void loadSounds();
+    } else if (section === SECTION_BACKGROUNDS) {
+      void loadBackgrounds();
     }
   },
   { immediate: true }
@@ -794,6 +851,79 @@ function stopSound() {
   stopMusic();
 }
 
+/* ------------------------------ 背景 ------------------------------ */
+
+/** 背景搜索词 */
+const backgroundKeyword = ref('');
+
+/**
+ * 当前选中的背景分类 id；`null` 表示「全部」（进分类时默认看全部）。
+ * 空串是合法值，代表 `category.yml` 之外的「未分类」。
+ */
+const activeBackgroundCategory = ref<string | null>(null);
+
+/** 当前分类的展示名与说明（`null` 时是「全部背景」） */
+const activeBackgroundCategoryInfo = computed(() => {
+  if (activeBackgroundCategory.value === null) {
+    return { label: '全部背景', description: '' };
+  }
+  const category = backgrounds.value.find(
+    (item) => item.id === activeBackgroundCategory.value
+  );
+  return {
+    label: category?.label ?? '未分类',
+    description: category?.description ?? '',
+  };
+});
+
+/** 是否显示分组标题：看全部时按分类分组，选中某一类就不用再标一次 */
+const showBackgroundGroupTitle = computed(() => activeBackgroundCategory.value === null);
+
+/**
+ * 当前要展示的背景分组：
+ * - 选「全部」→ 每个分类一组（空组已被后端过滤）
+ * - 选了某一类 → 只有这一组，标题隐藏
+ */
+const backgroundGroups = computed(() => {
+  const word = backgroundKeyword.value.trim().toLowerCase();
+  const selected = activeBackgroundCategory.value;
+
+  return backgrounds.value
+    .filter((category) => selected === null || category.id === selected)
+    .map((category) => ({
+      ...category,
+      images: word
+        ? category.images.filter((image) => image.name.toLowerCase().includes(word))
+        : category.images,
+    }))
+    .filter((category) => category.images.length > 0);
+});
+
+/** 当前筛选结果的图片总数 */
+const filteredBackgroundCount = computed(() =>
+  backgroundGroups.value.reduce((sum, group) => sum + group.images.length, 0)
+);
+
+/** 背景预览弹窗 */
+const previewBackground = ref<PackageBackground | null>(null);
+
+const isBackgroundDialogOpen = computed({
+  get: () => previewBackground.value !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      previewBackground.value = null;
+    }
+  },
+});
+
+function openBackgroundPreview(image: PackageBackground) {
+  previewBackground.value = image;
+}
+
+function closeBackgroundPreview() {
+  previewBackground.value = null;
+}
+
 watch(activeSection, (section) => {
   if (section !== SECTION_MUSIC) {
     stopMusic();
@@ -801,6 +931,9 @@ watch(activeSection, (section) => {
   }
   if (section !== SECTION_SOUNDS) {
     stopSound();
+  }
+  if (section !== SECTION_BACKGROUNDS) {
+    closeBackgroundPreview();
   }
 });
 
@@ -857,6 +990,31 @@ function openCharacter(character: PackageCharacter) {
   >
     <header class="oa-pkg__head">
       <div class="oa-pkg__head-main">
+        <div class="oa-pkg__titles">
+          <h1 class="oa-pkg__title">{{ pkg?.name || packageId }}</h1>
+          <p class="oa-pkg__subtitle">
+            {{ pkg?.description || '这个资源包还没有填写描述。' }}
+          </p>
+        </div>
+      </div>
+
+      <!-- 右侧：搜索 + 返回同排在页头一行，标题区与卡片左边缘对齐 -->
+      <div class="oa-pkg__head-actions">
+        <!-- 搜索固定在整张卡片之外的右上角，内容随当前分类切换 -->
+        <label v-if="searchPlaceholder" class="oa-pkg__search oa-pkg__search--head">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path
+              d="m10.4 10.4 3 3"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+          </svg>
+          <input v-model="activeKeyword" type="search" :placeholder="searchPlaceholder" />
+        </label>
+
         <button type="button" class="oa-pkg__back" @click="backToResources">
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path
@@ -870,29 +1028,7 @@ function openCharacter(character: PackageCharacter) {
           </svg>
           资源管理
         </button>
-
-        <div class="oa-pkg__titles">
-          <h1 class="oa-pkg__title">{{ pkg?.name || packageId }}</h1>
-          <p class="oa-pkg__subtitle">
-            {{ pkg?.description || '这个资源包还没有填写描述。' }}
-          </p>
-        </div>
       </div>
-
-      <!-- 搜索固定在整张卡片之外的右上角，内容随当前分类切换 -->
-      <label v-if="searchPlaceholder" class="oa-pkg__search oa-pkg__search--head">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.6" />
-          <path
-            d="m10.4 10.4 3 3"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linecap="round"
-          />
-        </svg>
-        <input v-model="activeKeyword" type="search" :placeholder="searchPlaceholder" />
-      </label>
     </header>
 
     <Transition name="oa-swap" mode="out-in">
@@ -1307,6 +1443,75 @@ function openCharacter(character: PackageCharacter) {
           </Transition>
         </template>
 
+        <!-- 背景：分类走左侧子条目，右侧按分类展示缩略图 -->
+        <template v-else-if="activeSection === SECTION_BACKGROUNDS && activeContent?.supported">
+          <div class="oa-pkg__toolbar">
+            <p class="oa-pkg__summary">
+              <template v-if="backgroundsLoading && !backgrounds.length">正在读取背景目录…</template>
+              <template v-else>
+                <strong>{{ filteredBackgroundCount }}</strong> 张背景
+                <span class="oa-pkg__dot" aria-hidden="true">·</span>
+                {{ activeBackgroundCategoryInfo.label }}
+                <template v-if="backgroundKeyword">
+                  <span class="oa-pkg__dot" aria-hidden="true">·</span>
+                  已筛选
+                </template>
+              </template>
+            </p>
+          </div>
+
+          <p v-if="activeBackgroundCategoryInfo.description" class="oa-pkg__bg-desc">
+            {{ activeBackgroundCategoryInfo.description }}
+          </p>
+
+          <Transition name="oa-swap" mode="out-in">
+            <div v-if="backgroundsLoading && !backgrounds.length" key="loading" class="oa-pkg__state oa-pkg__state--inline">
+              <p class="oa-pkg__state-text">正在读取背景目录…</p>
+              <rizui_progress :indeterminate="true" :height="6" rounded />
+            </div>
+
+            <div v-else-if="backgroundsError" key="error" class="oa-pkg__notice">
+              <rizui_infobox
+                type="error"
+                :text="`读取背景失败：${backgroundsError}`"
+              />
+            </div>
+
+            <div v-else-if="filteredBackgroundCount" key="list" class="oa-pkg__bg-list">
+              <section
+                v-for="group in backgroundGroups"
+                :key="group.id || '__uncategorized__'"
+                class="oa-pkg__bg-group"
+              >
+                <p v-if="showBackgroundGroupTitle" class="oa-pkg__sound-group__title">
+                  {{ group.label }}
+                  <span class="oa-pkg__sound-group__count">{{ group.images.length }}</span>
+                </p>
+
+                <div class="oa-pkg__bg-grid">
+                  <button
+                    v-for="image in group.images"
+                    :key="image.path"
+                    type="button"
+                    class="oa-pkg__bg"
+                    :title="`${image.name} · ${formatBytes(image.size)}`"
+                    @click="openBackgroundPreview(image)"
+                  >
+                    <span class="oa-pkg__bg__thumb">
+                      <img :src="image.url" :alt="image.name" loading="lazy" decoding="async" />
+                    </span>
+                    <span class="oa-pkg__bg__name">{{ image.name }}</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <div v-else class="oa-pkg__empty">
+              <p>{{ backgroundKeyword ? '没有匹配的背景。' : '背景目录里没有图片。' }}</p>
+            </div>
+          </Transition>
+        </template>
+
         <!-- 未声明该分类：统一提示 -->
         <div v-else-if="activeContent && !activeContent.supported" class="oa-pkg__placeholder">
           <span class="oa-pkg__placeholder-badge oa-pkg__placeholder-badge--off">未包含</span>
@@ -1342,6 +1547,36 @@ function openCharacter(character: PackageCharacter) {
       @loadedmetadata="musicDuration = audioEl?.duration ?? 0"
     />
 
+    <!-- 背景预览：大图 + 文件名，同样放页面根部 -->
+    <rizui_dialog
+      v-model:show="isBackgroundDialogOpen"
+      :title="previewBackground?.name || '背景预览'"
+      width="min(1080px, 92vw)"
+      mask-close
+      @close="closeBackgroundPreview"
+    >
+      <div class="oa-pkg__bg-preview">
+        <img
+          v-if="previewBackground"
+          :src="previewBackground.url"
+          :alt="previewBackground.name"
+          class="oa-pkg__bg-preview__image"
+        />
+        <p class="oa-pkg__bg-preview__meta">
+          <span>{{ previewBackground?.name }}</span>
+          <span v-if="previewBackground">{{ formatBytes(previewBackground.size) }}</span>
+          <a
+            v-if="previewBackground"
+            :href="previewBackground.url"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            新标签打开
+          </a>
+        </p>
+      </div>
+    </rizui_dialog>
+
     <!-- 曲目完整描述：rizui_dialog 自带 Teleport，放页面根部避免随分类卸载 -->
     <rizui_dialog
       v-model:show="isDescDialogOpen"
@@ -1371,42 +1606,60 @@ function openCharacter(character: PackageCharacter) {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: clamp(10px, 1.4vh, 16px);
+  gap: clamp(8px, 1.1vh, 14px);
   min-height: 100vh;
-  padding: clamp(12px, 1.8vh, 20px) clamp(14px, 2.4vw, 44px) clamp(24px, 3.2vh, 40px);
-  padding-top: clamp(48px, 6.6vh, 72px);
+  padding: clamp(10px, 1.3vh, 16px) clamp(14px, 2.4vw, 44px) clamp(12px, 1.8vh, 24px);
+  /* 顶部只留窗口呼吸感，标题区自己撑开，不再额外堆一大段空白 */
+  padding-top: clamp(14px, 2vh, 22px);
   color: var(--oa-dark-blue);
+  /*
+   * 入场时卡片从下方平移 38px，超出视口的部分只做视觉裁剪；
+   * 用 clip 而不是 hidden，页面不会因此产生可滚动区域。
+   */
+  overflow: clip;
 }
 
 .oa-pkg__head {
   display: flex;
-  align-items: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px clamp(14px, 2vw, 28px);
+  gap: 8px clamp(12px, 1.6vw, 22px);
   width: min(1320px, 100%);
   margin: 0 auto;
 }
 
-/* 左侧：返回 + 标题，右侧留给卡片外的搜索框 */
+/* 左侧标题块：与卡片左边缘对齐 */
 .oa-pkg__head-main {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
+}
+
+/* 右侧：搜索 + 返回，同一条水平线上 */
+.oa-pkg__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .oa-pkg__back {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  align-self: flex-start;
-  padding: 5px 11px 5px 7px;
+  align-self: center;
+  padding: 5px 11px 5px 8px;
   border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   color: #35628a;
   cursor: pointer;
   transition:
@@ -1427,26 +1680,26 @@ function openCharacter(character: PackageCharacter) {
 .oa-pkg__titles {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
 .oa-pkg__title {
-  font-size: clamp(20px, 2vw, 28px);
+  font-size: clamp(19px, 1.7vw, 25px);
   font-weight: 700;
+  line-height: 1.25;
   letter-spacing: 0.01em;
   color: #123a5c;
   overflow-wrap: anywhere;
 }
 
 .oa-pkg__subtitle {
-  display: -webkit-box;
   overflow: hidden;
-  font-size: clamp(12px, 0.95vw, 13.5px);
-  line-height: 1.6;
+  font-size: clamp(11.5px, 0.9vw, 13px);
+  line-height: 1.5;
   color: #6f8ba4;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- 状态 ---------- */
@@ -1457,7 +1710,7 @@ function openCharacter(character: PackageCharacter) {
   gap: 10px;
   width: min(1320px, 100%);
   margin: 0 auto;
-  padding: 18px 4px;
+  padding: 14px 4px;
 }
 
 .oa-pkg__state-text {
@@ -1477,7 +1730,12 @@ function openCharacter(character: PackageCharacter) {
   display: flex;
   gap: clamp(10px, 1.2vw, 18px);
   width: min(1320px, 100%);
-  height: clamp(420px, calc(100vh - 196px), 1000px);
+  /*
+   * 卡片吃掉「一屏减去页头」的高度：页面上/下内边距 + 间距约占 5vh，页头最高约 53px，
+   * 留 60px 余量保证任何窗口下都不会把整页顶出滚动条。
+   * 不能用 flex:1 —— .oa-shell 这条链上是 min-height 撑开的内容高度，没有可供分配的剩余空间。
+   */
+  height: clamp(420px, calc(95vh - 60px), 1400px);
   margin: 0 auto;
   padding: clamp(10px, 1.2vw, 16px);
   border: 1px solid rgba(255, 255, 255, 0.95);
@@ -1704,9 +1962,8 @@ function openCharacter(character: PackageCharacter) {
 /* 卡片外右上角的那一份：略高、略宽，跟随页头对齐 */
 .oa-pkg__search--head {
   flex: 0 0 auto;
-  align-self: flex-end;
-  margin-bottom: 2px;
-  padding: 6px 14px;
+  align-self: center;
+  padding: 5px 13px;
   border-color: rgba(255, 255, 255, 0.95);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
@@ -2271,6 +2528,119 @@ function openCharacter(character: PackageCharacter) {
 .oa-pkg__music__unknown {
   font-size: 10.5px;
   color: #a3b6c4;
+}
+
+/* ---------- 背景 ---------- */
+
+.oa-pkg__bg-desc {
+  margin-top: -4px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #7c99b0;
+}
+
+.oa-pkg__bg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 4px;
+}
+
+.oa-pkg__bg-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 缩略图按可用宽度自动铺满，图片再多也只是懒加载 */
+.oa-pkg__bg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.oa-pkg__bg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border: 1px solid rgba(190, 214, 231, 0.55);
+  border-radius: 10px;
+  background: #ffffff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.oa-pkg__bg:hover {
+  border-color: rgba(0, 144, 254, 0.42);
+  box-shadow: 0 6px 16px rgba(36, 92, 138, 0.12);
+}
+
+.oa-pkg__bg:focus-visible {
+  outline: 2px solid var(--oa-blue);
+  outline-offset: 2px;
+}
+
+.oa-pkg__bg__thumb {
+  display: block;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(180deg, #eaf6ff 0%, #d6ecfc 100%);
+  overflow: hidden;
+}
+
+.oa-pkg__bg__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.oa-pkg__bg__name {
+  padding: 0 8px 6px;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #6f8ba4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-pkg__bg-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.oa-pkg__bg-preview__image {
+  width: 100%;
+  max-height: min(70vh, 720px);
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(234, 246, 255, 0.6);
+}
+
+.oa-pkg__bg-preview__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11.5px;
+  color: #7c99b0;
+}
+
+.oa-pkg__bg-preview__meta a {
+  color: #0b7ad6;
+  text-decoration: none;
+}
+
+.oa-pkg__bg-preview__meta a:hover {
+  text-decoration: underline;
 }
 
 .oa-pkg__sound-group {

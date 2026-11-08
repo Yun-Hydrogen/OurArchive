@@ -133,9 +133,9 @@ onBeforeUnmount(() => {
       </button>
 
       <div class="oa-skel-preview__titles">
-        <h1 class="oa-skel-preview__title">BA 立绘骨骼预览</h1>
+        <h1 class="oa-skel-preview__title">立绘骨骼预览</h1>
         <p class="oa-skel-preview__subtitle">
-          载入解包得到的立绘包（骨骼 + 图集 + 贴图），预览立绘并切换差分
+          载入立绘包（骨骼 + 图集 + 贴图），预览立绘并切换差分
         </p>
       </div>
     </header>

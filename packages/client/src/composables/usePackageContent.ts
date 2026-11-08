@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import {
+  fetchPackageBackgrounds,
   fetchPackageCharacters,
   fetchPackageMusic,
   fetchPackageSkeletons,
@@ -9,6 +10,7 @@ import {
 import { apiErrorMessage } from '@/api/request';
 import { readonlyRef } from '@/utils/reactivity';
 import type {
+  PackageBackgroundCategory,
   PackageCharacter,
   PackageMusic,
   PackageSkeleton,
@@ -19,6 +21,8 @@ import type {
 
 /** 跨端 DTO 由 `@our-archive/shared` 提供，这里重新导出给视图使用 */
 export type {
+  PackageBackground,
+  PackageBackgroundCategory,
   PackageCharacter,
   PackageMusic,
   PackageSkeleton,
@@ -45,6 +49,7 @@ export function usePackageContent(packageId: string) {
   const music = ref<PackageMusic[]>([]);
   const sounds = ref<PackageSound[]>([]);
   const soundCategories = ref<PackageSoundCategory[]>([]);
+  const backgrounds = ref<PackageBackgroundCategory[]>([]);
   const loading = ref(false);
   const error = ref('');
 
@@ -62,6 +67,11 @@ export function usePackageContent(packageId: string) {
   const soundsLoading = ref(false);
   const soundsError = ref('');
   let soundsLoaded = false;
+
+  /** 背景图与分类同理（数量取决于外载资源，按需且只拉一次） */
+  const backgroundsLoading = ref(false);
+  const backgroundsError = ref('');
+  let backgroundsLoaded = false;
 
   async function load() {
     loading.value = true;
@@ -151,6 +161,29 @@ export function usePackageContent(packageId: string) {
     }
   }
 
+  /** 拉取背景图与分类（读 index/category.yml，缺省只读根下一层），同样按需且只拉一次 */
+  async function loadBackgrounds(force = false) {
+    if (backgroundsLoading.value) {
+      return;
+    }
+    if (backgroundsLoaded && !force) {
+      return;
+    }
+
+    backgroundsLoading.value = true;
+    backgroundsError.value = '';
+
+    try {
+      backgrounds.value = (await fetchPackageBackgrounds(packageId)).categories;
+      backgroundsLoaded = true;
+    } catch (err) {
+      backgroundsError.value = errorText(err);
+      backgrounds.value = [];
+    } finally {
+      backgroundsLoading.value = false;
+    }
+  }
+
   return {
     pkg: readonlyRef(pkg),
     characters: readonlyRef(characters),
@@ -158,6 +191,7 @@ export function usePackageContent(packageId: string) {
     music: readonlyRef(music),
     sounds: readonlyRef(sounds),
     soundCategories: readonlyRef(soundCategories),
+    backgrounds: readonlyRef(backgrounds),
     loading: readonlyRef(loading),
     error: readonlyRef(error),
     skeletonsLoading: readonlyRef(skeletonsLoading),
@@ -166,9 +200,12 @@ export function usePackageContent(packageId: string) {
     musicError: readonlyRef(musicError),
     soundsLoading: readonlyRef(soundsLoading),
     soundsError: readonlyRef(soundsError),
+    backgroundsLoading: readonlyRef(backgroundsLoading),
+    backgroundsError: readonlyRef(backgroundsError),
     load,
     loadSkeletons,
     loadMusic,
     loadSounds,
+    loadBackgrounds,
   };
 }

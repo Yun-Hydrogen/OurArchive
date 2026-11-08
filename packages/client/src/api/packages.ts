@@ -6,6 +6,7 @@
  */
 import { apiGet } from './request';
 import type {
+  PackageBackgroundCategory,
   PackageCharacter,
   PackageMusic,
   PackageSkeleton,
@@ -53,6 +54,12 @@ interface SoundsResponse {
   categories: PackageSoundCategory[];
 }
 
+interface BackgroundsResponse {
+  success: boolean;
+  total: number;
+  categories: PackageBackgroundCategory[];
+}
+
 interface SkeletonFilesResponse {
   success: boolean;
   id: string;
@@ -91,6 +98,13 @@ export function fetchPackageMusic(packageId: string): Promise<MusicResponse> {
 /** 音效列表与类别映射（读 `index/sound_info.json` + `categories.json`） */
 export function fetchPackageSounds(packageId: string): Promise<SoundsResponse> {
   return apiGet<SoundsResponse>(`/api/packages/${encodeURIComponent(packageId)}/sounds`);
+}
+
+/** 背景图与分类（读 `index/category.yml`，缺省只读背景目录根下一层） */
+export function fetchPackageBackgrounds(packageId: string): Promise<BackgroundsResponse> {
+  return apiGet<BackgroundsResponse>(
+    `/api/packages/${encodeURIComponent(packageId)}/backgrounds`
+  );
 }
 
 /** 单个立绘目录下的文件清单 */

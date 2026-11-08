@@ -2,11 +2,13 @@ import { Router, type Request, type Response } from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  readPackageBackgrounds,
   readPackageCharacters,
   readPackageMusic,
   readPackageSkeletons,
   readPackageSounds,
   readSkeletonFiles,
+  resolveBackgroundFile,
   resolveInside,
   resolveMusicFile,
   resolvePackageDir,
@@ -21,17 +23,25 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.gif': 'image/gif',
+  '.avif': 'image/avif',
   '.skel': 'application/octet-stream',
   '.atlas': 'text/plain; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.ogg': 'audio/ogg',
+  '.oga': 'audio/ogg',
   '.opus': 'audio/ogg',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
   '.m4a': 'audio/mp4',
+  '.m4b': 'audio/mp4',
   '.aac': 'audio/aac',
   '.flac': 'audio/flac',
   '.webm': 'audio/webm',
+  '.weba': 'audio/webm',
+  '.aif': 'audio/aiff',
+  '.aiff': 'audio/aiff',
 };
 
 function failNotFound(res: Response, message: string) {
@@ -74,6 +84,8 @@ function sendFile(res: Response, target: string | null) {
  * - `GET /api/packages/:id/music/*`             背景音乐音频本体
  * - `GET /api/packages/:id/sounds`              音效列表与类别映射（读 index/sound_info.json + categories.json）
  * - `GET /api/packages/:id/sounds/*`            音效音频本体
+ * - `GET /api/packages/:id/backgrounds`         背景图与分类（读 index/category.yml，缺省只读根目录）
+ * - `GET /api/packages/:id/backgrounds/*`       背景图本体
  * - `GET /api/packages/:id/avatar/*`            头像图片
  * - `GET /api/packages/:id/skeleton/:id/*`      立绘文件（.skel / .atlas / .png）
  */
@@ -190,6 +202,40 @@ export function createPackagesRouter(): Router {
     }
 
     sendFile(res, resolveSoundFile(packageDir, pkg, String(req.params.file ?? '')));
+  });
+
+  // 背景图与分类（读 <path>/index/category.yml，没有就只读根目录）
+  router.get('/:id/backgrounds', (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      failNotFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    try {
+      const categories = readPackageBackgrounds(packageDir, pkg);
+      const total = categories.reduce((sum, category) => sum + category.count, 0);
+      res.json({ success: true, total, categories });
+    } catch (error) {
+      failInternal(res, error);
+    }
+  });
+
+  // 背景图本体（路径含分类子目录）
+  router.get('/:id/backgrounds/:file(*)', (req: Request, res: Response) => {
+    const id = String(req.params.id ?? '');
+    const packageDir = resolvePackageDir(id);
+    const pkg = scanResourcePackages().find((item) => item.id === id);
+
+    if (!packageDir || !pkg) {
+      failNotFound(res, `资源包不存在：${id}`);
+      return;
+    }
+
+    sendFile(res, resolveBackgroundFile(packageDir, pkg, String(req.params.file ?? '')));
   });
 
   // 全部立绘目录（含文件清单与体积）

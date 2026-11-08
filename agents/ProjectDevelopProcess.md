@@ -43,8 +43,8 @@
 | Skeletons（侧边栏） | ✅ 立绘列表 / 展开文件 / 预览 |
 | BackgroundMusic（侧边栏） | ✅ 播放 / 进度 / 描述 |
 | Sounds 音效（侧边栏） | ✅ 类别子条目 / 搜索 / 播放 / 进度 / 时长 |
+| Backgrounds 背景（侧边栏） | ✅ 分类子条目 / 搜索 / 缩略图 / 大图预览 |
 | Emotions 表情（侧边栏） | ⬜ 「未包含」占位 |
-| Backgrounds 背景（侧边栏） | ⬜ 「未包含」占位 |
 
 ## 角色详情（`/resources/:packageId/character/:nameId`）
 

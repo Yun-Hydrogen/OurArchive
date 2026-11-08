@@ -1,14 +1,14 @@
 关联后端文件：
-`packages/server/src/routes/packages.ts` — 资源包 API（11 个端点）
+`packages/server/src/routes/packages.ts` — 资源包 API（13 个端点）
 `packages/server/src/routes/config.ts` — 全局配置 API
 `packages/server/src/routes/preload.ts` — 预加载资源 API
-`packages/server/src/config/packages.ts` — 资源包读取与派生（`readPackage*` / `readSkeletonFiles` / `resolveMusicFile` / `resolveSoundFile`）
+`packages/server/src/config/packages.ts` — 资源包读取与派生（`readPackage*` / `readSkeletonFiles` / `resolveMusicFile` / `resolveSoundFile` / `resolveBackgroundFile`）
 
 用法：
 
 ### `createPackagesRouter()`
 
-1. 作用：11 个端点都走「`resolvePackageDir(id)` + `scanResourcePackages().find(id)`」找包，找不到统一 404。
+1. 作用：13 个端点都走「`resolvePackageDir(id)` + `scanResourcePackages().find(id)`」找包，找不到统一 404。
 2. 端点列表：
    - `GET /api/packages` → 全部资源包（含 `resourcesDir`、`total`）；
    - `GET /api/packages/:id` → 单包详情；
@@ -18,8 +18,9 @@
    - `GET /api/packages/:id/skeleton/:skeletonId/:file(*)` → 立绘文件本体；
    - `GET /api/packages/:id/avatar/:file(*)` → 头像；
    - `GET /api/packages/:id/music` → 曲目索引；`GET /api/packages/:id/music/:file(*)` → 音频本体；
-   - `GET /api/packages/:id/sounds` → 音效列表与类别映射（读 `index/sound_info.json` + `index/categories.json`）；`GET /api/packages/:id/sounds/:file(*)` → 音频本体。
-3. 注意事项：**路由顺序不能乱**——`/:id/music/:file(*)`、`/:id/sounds/:file(*)`、`/:id/skeleton/:skeletonId/:file(*)` 必须在带同前缀的列表路由之后挂载；`sendFile` 内部用白名单 `MIME_BY_EXTENSION` 过滤类型，非白名单返回 404。
+   - `GET /api/packages/:id/sounds` → 音效列表与类别映射（读 `index/sound_info.json` + `index/categories.json`）；`GET /api/packages/:id/sounds/:file(*)` → 音频本体；
+   - `GET /api/packages/:id/backgrounds` → 背景图与分类（读 `index/category.yml`，缺省只读根下一层）；`GET /api/packages/:id/backgrounds/:file(*)` → 图片本体。
+3. 注意事项：**路由顺序不能乱**——带通配符的都必须在同前缀的列表路由之后挂载；`sendFile` 内部用白名单 `MIME_BY_EXTENSION` 过滤类型，非白名单返回 404。
 
 ### `failNotFound(res, message)` / `failInternal(res, error)`
 
@@ -43,13 +44,19 @@
 
 1. 作用：读 `<path>/index/music_info.json` 出曲目，并把每个曲目关联到磁盘上的实际音频文件；2. 找文件的退化顺序：`original_filename` → `name_id` + 同后缀 → 大小写不敏感地按 `name_id.` 名匹配；3. `resolveMusicFile` 是音频下发的守门人（后缀必须在 `AUDIO_EXTENSIONS` 内）。
 2. 输入输出：列表为 `PackageMusic[]`；单文件为 `string | null`。
-3. 注意事项：音频文件直接放在分类目录下（不在子目录），`path` 指向目录不是文件；`music_info.json` 里没有 `description` 的曲目前端不显示「查看详细」。
+3. 注意事项：音频文件直接放在分类目录下（不在子目录），`path` 指向目录不是文件；`music_info.json` 里没有 `description` 的曲目前端不显示「查看详细」。`AUDIO_EXTENSIONS` 覆盖 `.ogg/.oga/.mp3/.wav/.m4a/.m4b/.aac/.flac/.opus/.webm/.weba/.aif/.aiff`，音效与音乐共用这一份白名单。
 
 ### `readPackageSounds(packageDir, pkg)` / `resolveSoundFile(...)`
 
 1. 作用：读 `<path>/index/sound_info.json` 出音效，读 `<path>/index/categories.json`（键 → 中文名）给每个音效加 `categoryLabel`，并一次产出 `[{ id, label, count, duration }]` 的类别列表；`resolveSoundFile` 是音效下发的守门人（同 `resolveMusicFile` 后缀白名单）。
 2. 输入输出：`{ sounds: PackageSound[], categories: PackageSoundCategory[] }`；单文件 `string | null`。
 3. 注意事项：`categories.json` 未被索引引用的键不下发（避免空条目）；索引里 `category` 为空的按 `Other` 计；映射缺失时 `label` 回退为类别键本身。`countEntries` 里 `Sounds` 与 `BackgroundMusic` 的计数都读各自的 `index/*.json` 长度。文件退化匹配同 `readPackageMusic`（`original_filename` → `id_name` + 后缀 → 大小写不敏感同名 → 前缀）。
+
+### `readPackageBackgrounds(packageDir, pkg)` / `resolveBackgroundFile(...)`
+
+1. 作用：读背景图与分类。有 `<path>/index/category.yml` 时按清单里每个 `category[].path` 目录读图（顺序即清单顺序，`name`/`description` 原样下发）；没有清单时只读 `<path>/` 根下一层。两种情况下，直接放在根下的图片都归「未分类」（`id: ''`，排在最后）。
+2. 输入输出：`PackageBackgroundCategory[]`（每项含 `images[]`，图片带 `url` / `ext` / `size`）；单文件 `string | null`。
+3. 注意事项：**只读目录根下一层，不递归**（分类目录内再分子目录不会被打平，也不会被读到）；`IMAGE_EXTENSIONS` 为 `.jpg/.jpeg/.png/.webp/.bmp/.gif/.avif`，非图片文件（如 `notes.txt`）既不进列表也 404；`index/` 本身是目录，不会被算作「未分类」。`countEntries` 里 `Backgrounds` 的计数也按同一口径（清单目录 + 根目录）数图片，所以卡片数字与点进去的列表一致。
 
 ### `parseAudioDuration(filePath)`（音频时长，扫描时算好）
 

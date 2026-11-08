@@ -1,7 +1,7 @@
 关联前端文件：
 `packages/client/src/views/PackageView.vue` — 资源包大卡片（左侧分类栏 + 右侧内容区）
 `packages/client/src/views/PackageCharacterView.vue` — 角色详情
-`packages/client/src/composables/usePackageContent.ts` — 单个资源包的内容（详情 + 角色 + 立绘 + 音乐 + 音效）
+`packages/client/src/composables/usePackageContent.ts` — 单个资源包的内容（详情 + 角色 + 立绘 + 音乐 + 音效 + 背景）
 `packages/client/src/api/packages.ts` — 资源包相关 HTTP 请求
 
 用法：
@@ -44,9 +44,9 @@
 
 ### 骨骼清单按需加载
 
-1. 作用：骨骼清单的项数由用户资源包决定（数据量取决于外载资源，不设上限），进页面只拉详情 + 角色；切到「骨骼」分类再 `loadSkeletons()`，切到「背景音乐」再 `loadMusic()`，切到「音效」再 `loadSounds()`，composable 内用 `*Loaded` 去重；首次加载时摘要行显示「正在读取…」。
-2. 实现：`watch(activeSection)` 分支到 `loadSkeletons()` / `loadMusic()` / `loadSounds()`，`immediate: true` 保证初次进入分类时触发。
-3. 注意事项：骨骼、音乐、音效用各自独立的 `*Loading` / `*Error` / `*Loaded` 三件套，不要复用页面的 `loading`。音效 3000+ 条走同样的按需加载，不要进页面就拉。
+1. 作用：骨骼清单的项数由用户资源包决定（数据量取决于外载资源，不设上限），进页面只拉详情 + 角色；切到「骨骼」分类再 `loadSkeletons()`，切到「背景音乐」再 `loadMusic()`，切到「音效」再 `loadSounds()`，切到「背景」再 `loadBackgrounds()`，composable 内用 `*Loaded` 去重；首次加载时摘要行显示「正在读取…」。
+2. 实现：`watch(activeSection)` 分支到 `loadSkeletons()` / `loadMusic()` / `loadSounds()` / `loadBackgrounds()`，`immediate: true` 保证初次进入分类时触发。
+3. 注意事项：骨骼、音乐、音效、背景用各自独立的 `*Loading` / `*Error` / `*Loaded` 三件套，不要复用页面的 `loading`。音效 3000+ 条、背景上百张图都走同样的按需加载，不要进页面就拉。
 
 ### `toggleMusic(item)` / `toggleSound(item)`（试听与主界面 BGM 互斥）
 
@@ -60,6 +60,12 @@
 1. 作用：音效类别做成**侧边栏子条目**（和角色学院同一套交互：`全部` + 各中文类别，带条数），不使用顶部分类按钮。
 2. 逻辑：`activeSoundCategory` 存的是映射后的**中文标签**，`soundCategoryGroups` 把映射到同一标签的原始键合并（例如 `FX` / `Other` 都是「其他」），`activeSoundKeys` 再反查出这些键供 `filteredSounds` 过滤；`soundGroups` 负责内容区分组，组内保持索引顺序、组间按中文 label 排序（与后端一致）。
 3. 注意事项：`soundGroups` 的组内空类别回退 `Other`，与后端的 `category || 'Other'` 对齐；不要在前端硬编码类别名，也不要按原始键直接展示（会出现两个同名「其他」）。
+
+### 背景分类与缩略图（`index/category.yml`）
+
+1. 作用：背景分类同样是**侧边栏子条目**（`bg:<分类 id>`）；后端下发的每个分类最多只有一层图片，前端不做递归。
+2. 逻辑：`activeBackgroundCategory` 是 `string | null`——`null` 表示「全部」（进分类默认），空串是合法的「未分类」（直接放在背景目录根下的图片）。`backgroundGroups` 按选中分类过滤、再按搜索词过滤图片，`showBackgroundGroupTitle` 决定要不要显示分类标题（看全部时显示）。
+3. 注意：`category.yml` 的说明文字在 `activeBackgroundCategoryInfo.description`，只在选中具体分类时展示；点击缩略图走 `openBackgroundPreview(image)` 开大图弹窗（`isBackgroundDialogOpen` 是可写 computed），切分类时弹窗自动关闭；缩略图 `loading="lazy"`，上百张图也不会一次性解码。
 
 ### `isDescDialogOpen`（可写 computed）
 

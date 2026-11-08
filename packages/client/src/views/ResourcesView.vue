@@ -91,43 +91,43 @@ function activeContents(pkg: ResourcePackage) {
     :style="{ '--cards-exit': `${SHELL_TIMING.cardsExit}ms`, '--exit-y': '52px' }"
   >
     <header class="oa-res__head">
-      <button type="button" class="oa-res__back" @click="backHome">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path
-            d="M10 3.5 5.5 8 10 12.5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-        主界面
-      </button>
-
       <div class="oa-res__titles">
         <h1 class="oa-res__title">资源管理</h1>
         <p class="oa-res__subtitle">老师可以在此处管理资源包/工程/存档/插件哦~</p>
       </div>
-    </header>
 
-    <div class="oa-res__tabs-row">
-      <nav class="oa-res__tabs" role="tablist" aria-label="资源管理分类">
-        <button
-          v-for="tab in TABS"
-          :key="tab.id"
-          type="button"
-          role="tab"
-          class="oa-res__tab"
-          :class="{ 'is-active': tab.id === activeTab }"
-          :aria-selected="tab.id === activeTab"
-          @click="activeTab = tab.id"
-        >
-          <span class="oa-res__tab__label">{{ tab.label }}</span>
-          <span v-if="!tab.ready" class="oa-res__tab__badge">未完成</span>
+      <div class="oa-res__head-actions">
+        <nav class="oa-res__tabs" role="tablist" aria-label="资源管理分类">
+          <button
+            v-for="tab in TABS"
+            :key="tab.id"
+            type="button"
+            role="tab"
+            class="oa-res__tab"
+            :class="{ 'is-active': tab.id === activeTab }"
+            :aria-selected="tab.id === activeTab"
+            @click="activeTab = tab.id"
+          >
+            <span class="oa-res__tab__label">{{ tab.label }}</span>
+            <span v-if="!tab.ready" class="oa-res__tab__badge">未完成</span>
+          </button>
+        </nav>
+
+        <button type="button" class="oa-res__back" @click="backHome">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M10 3.5 5.5 8 10 12.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          主界面
         </button>
-      </nav>
-    </div>
+      </div>
+    </header>
 
     <section class="oa-res__body">
       <Transition name="oa-res-tab-fade" mode="out-in">
@@ -248,33 +248,46 @@ function activeContents(pkg: ResourcePackage) {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: clamp(14px, 2vh, 22px);
+  gap: clamp(10px, 1.4vh, 16px);
   min-height: 100vh;
-  padding: clamp(14px, 2.2vh, 24px) clamp(24px, 4.4vw, 84px) clamp(40px, 5vh, 56px);
-  padding-top: clamp(56px, 8vh, 84px);
+  padding: clamp(10px, 1.3vh, 16px) clamp(14px, 2.4vw, 44px) clamp(12px, 1.8vh, 24px);
+  /* 顶部只留窗口呼吸感：页头自己撑开，不再额外堆一段空白 */
+  padding-top: clamp(14px, 2vh, 22px);
   color: var(--oa-dark-blue);
 }
 
+/* 标题与「标签 + 返回」同一行，省掉标签单独占的一整行 */
 .oa-res__head {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(1120px, 100%);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px clamp(12px, 1.6vw, 22px);
+  width: min(1320px, 100%);
   margin: 0 auto;
+}
+
+.oa-res__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .oa-res__back {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  align-self: flex-start;
-  padding: 5px 11px 5px 7px;
+  padding: 5px 11px 5px 8px;
   border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   color: #35628a;
   cursor: pointer;
   transition:
@@ -295,54 +308,54 @@ function activeContents(pkg: ResourcePackage) {
 .oa-res__titles {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .oa-res__title {
-  font-size: clamp(20px, 2vw, 28px);
+  font-size: clamp(19px, 1.7vw, 25px);
   font-weight: 700;
+  line-height: 1.25;
   letter-spacing: 0.01em;
   color: #123a5c;
 }
 
 .oa-res__subtitle {
-  font-size: clamp(12px, 0.95vw, 13.5px);
-  line-height: 1.6;
+  overflow: hidden;
+  font-size: clamp(11.5px, 0.9vw, 13px);
+  line-height: 1.5;
   color: #6f8ba4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- 分类标签 ---------- */
 
-.oa-res__tabs-row {
-  width: min(1120px, 100%);
-  margin: 0 auto;
-}
-
 .oa-res__tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   width: fit-content;
   max-width: 100%;
-  padding: 4px;
+  padding: 3px;
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.55);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-  align-self: flex-start;
+  align-self: center;
 }
 
 .oa-res__tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 18px;
+  gap: 5px;
+  padding: 5px 14px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: #4d7799;
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 12.5px;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -380,15 +393,15 @@ function activeContents(pkg: ResourcePackage) {
 .oa-res__body {
   display: flex;
   flex-direction: column;
-  gap: clamp(12px, 1.6vh, 18px);
-  width: min(1120px, 100%);
+  gap: clamp(10px, 1.3vh, 16px);
+  width: min(1320px, 100%);
   margin: 0 auto;
 }
 
 .oa-res__panel {
   display: flex;
   flex-direction: column;
-  gap: clamp(12px, 1.6vh, 18px);
+  gap: clamp(10px, 1.3vh, 16px);
   width: 100%;
 }
 
