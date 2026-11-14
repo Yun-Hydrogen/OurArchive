@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import pc from 'picocolors';
-import type { StoragePaths } from './paths.js';
+import type { StoragePaths } from '@/modules/Initializer/paths.server';
 
 /**
  * Spine 运行时插件。

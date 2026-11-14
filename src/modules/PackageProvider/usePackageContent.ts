@@ -7,8 +7,8 @@ import {
   fetchPackageSkeletons,
   fetchPackageSounds,
   fetchResourcePackage,
-} from '@/api/packages';
-import { apiErrorMessage } from '@/api/request';
+} from '@/modules/API/packagesApi';
+import { apiErrorMessage } from '@/modules/API/request';
 import { readonlyRef } from '@/utils/reactivity';
 import type {
   PackageBackgroundCategory,
@@ -19,9 +19,9 @@ import type {
   PackageSound,
   PackageSoundCategory,
   ResourcePackage,
-} from '@our-archive/shared';
+} from '@/modules/API/types';
 
-/** 跨端 DTO 由 `@our-archive/shared` 提供，这里重新导出给视图使用 */
+/** 跨端 DTO 由 `@/modules/API/types` 提供，这里重新导出给视图使用 */
 export type {
   PackageBackground,
   PackageBackgroundCategory,
@@ -34,7 +34,7 @@ export type {
   PackageSkeletonItem,
   PackageSound,
   PackageSoundCategory,
-} from '@our-archive/shared';
+} from '@/modules/API/types';
 
 function errorText(err: unknown): string {
   return apiErrorMessage(err, '请求失败');

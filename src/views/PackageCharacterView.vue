@@ -2,10 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { rizui_infobox, rizui_progress } from 'riz-ui';
-import { ROUTE_NAMES } from '@/config/routes';
-import { SHELL_TIMING } from '@/config/transition';
-import { useEnterAnimation } from '@/composables/useEnterAnimation';
-import { usePackageContent, type PackageCharacter } from '@/composables/usePackageContent';
+import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
+import OAPageHeader from '@/modules/ViewsManager/OAPageHeader.vue';
+import OACharacterDetail from './OACharacterDetail.vue';
+import { SHELL_TIMING } from '@/modules/Shell/shellTiming';
+import { useEnterAnimation } from '@/modules/ViewsManager/useEnterAnimation';
+import { usePackageContent, type PackageCharacter } from '@/modules/PackageProvider/usePackageContent';
 
 const route = useRoute();
 const router = useRouter();
@@ -23,6 +25,15 @@ const character = computed<PackageCharacter | null>(
 const { isEntering } = useEnterAnimation(() => !loading.value, 900);
 const isLeaving = ref(false);
 let leaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 页头副标题：学院 · 社团（社团为空时只留学院） */
+const subtitle = computed(() => {
+  const school = character.value?.school || '未知学院';
+  const club = character.value?.club;
+  return club ? `${school} · ${club}` : school;
+});
+
+const backLabel = computed(() => pkg.value?.name || packageId.value);
 
 onMounted(() => {
   void load();
@@ -65,32 +76,14 @@ function openSkeleton(skeletonId: string) {
     :class="{ 'is-entering': isEntering, 'is-leaving': isLeaving }"
     :style="{ '--cards-exit': `${SHELL_TIMING.cardsExit}ms` }"
   >
-    <header class="oa-charview__head">
-      <button type="button" class="oa-charview__back" @click="backToPackage">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path
-            d="M10 3.5 5.5 8 10 12.5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-        {{ pkg?.name || packageId }}
-      </button>
-
-      <div class="oa-charview__titles">
-        <h1 class="oa-charview__title">{{ character?.name || nameId }}</h1>
-        <p class="oa-charview__subtitle">
-          {{ character?.school || '未知学院' }}
-          <template v-if="character?.club">
-            <span class="oa-charview__sep" aria-hidden="true">·</span>
-            {{ character.club }}
-          </template>
-        </p>
-      </div>
-    </header>
+    <OAPageHeader
+      class="oa-charview__head"
+      :title="character?.name || nameId"
+      :subtitle="subtitle"
+      :back-label="backLabel"
+      back-position="start"
+      @back="backToPackage"
+    />
 
     <Transition name="oa-swap" mode="out-in">
       <div v-if="loading" key="loading" class="oa-charview__state">
@@ -109,68 +102,12 @@ function openSkeleton(skeletonId: string) {
         />
       </div>
 
-      <section v-else key="card" class="oa-charview__card">
-      <div class="oa-charview__portrait">
-        <div class="oa-charview__avatar">
-          <img v-if="character.avatarUrl" :src="character.avatarUrl" :alt="character.name" />
-          <span v-else class="oa-charview__avatar-fallback">{{ character.name.slice(0, 1) }}</span>
-        </div>
-        <p class="oa-charview__avatar-name">{{ character.name }}</p>
-        <p v-if="character.club" class="oa-charview__avatar-club">{{ character.club }}</p>
-      </div>
-
-      <div class="oa-charview__info">
-        <dl class="oa-charview__rows">
-          <div class="oa-charview__row">
-            <dt>学院</dt>
-            <dd>{{ character.school || '—' }}</dd>
-          </div>
-          <div class="oa-charview__row">
-            <dt>所属组织</dt>
-            <dd>
-              <template v-if="character.club">{{ character.club }}</template>
-              <span v-else class="oa-charview__muted">无所属组织</span>
-            </dd>
-          </div>
-          <div class="oa-charview__row">
-            <dt>角色 ID</dt>
-            <dd><code>{{ character.name_id }}</code></dd>
-          </div>
-          <div class="oa-charview__row">
-            <dt>头像文件</dt>
-            <dd>
-              <template v-if="character.avatar"><code>{{ character.avatar }}</code></template>
-              <span v-else class="oa-charview__muted">无</span>
-            </dd>
-          </div>
-        </dl>
-
-        <div class="oa-charview__bones">
-          <div class="oa-charview__bones-head">
-            <h2 class="oa-charview__label">绑定的骨骼</h2>
-            <span class="oa-charview__count">{{ character.spines.length }} 条</span>
-          </div>
-
-          <div v-if="character.spines.length" class="oa-charview__bone-list">
-            <button
-              v-for="spine in character.spines"
-              :key="spine.id"
-              type="button"
-              class="oa-charview__bone"
-              :class="{ 'is-missing': !spine.exists }"
-              :disabled="!spine.exists"
-              :title="spine.exists ? '打开骨骼预览' : '资源包里缺少这个立绘目录'"
-              @click="openSkeleton(spine.id)"
-            >
-              <span class="oa-charview__bone__id">{{ spine.id }}</span>
-              <span class="oa-charview__bone__tag">{{ spine.exists ? '预览' : '缺失' }}</span>
-            </button>
-          </div>
-
-          <p v-else class="oa-charview__muted">这个角色没有绑定骨骼。</p>
-        </div>
-      </div>
-    </section>
+      <OACharacterDetail
+        v-else
+        key="card"
+        :character="character"
+        @open-skeleton="openSkeleton"
+      />
     </Transition>
   </main>
 </template>
@@ -190,68 +127,8 @@ function openSkeleton(skeletonId: string) {
 }
 
 .oa-charview__head {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   width: min(1120px, 100%);
   margin: 0 auto;
-}
-
-.oa-charview__back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  align-self: flex-start;
-  max-width: 100%;
-  padding: 5px 11px 5px 7px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
-  font-family: inherit;
-  font-size: 12.5px;
-  color: #35628a;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.oa-charview__back svg {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-}
-
-.oa-charview__back:hover {
-  color: var(--oa-blue);
-  box-shadow: 0 6px 16px rgba(36, 92, 138, 0.16);
-}
-
-.oa-charview__titles {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.oa-charview__title {
-  font-size: clamp(20px, 2vw, 28px);
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #123a5c;
-}
-
-.oa-charview__subtitle {
-  font-size: clamp(12px, 0.95vw, 13.5px);
-  color: #6f8ba4;
-}
-
-.oa-charview__sep {
-  margin: 0 5px;
-  color: #b3c6d4;
 }
 
 .oa-charview__state {
@@ -276,20 +153,7 @@ function openSkeleton(skeletonId: string) {
 
 /* ---------- 卡片 ---------- */
 
-.oa-charview__card {
-  display: flex;
-  gap: clamp(16px, 2.2vw, 30px);
-  width: min(1120px, 100%);
-  margin: 0 auto;
-  padding: clamp(16px, 2vw, 26px);
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fcff 66%, #f1f9ff 100%);
-  box-shadow:
-    0 12px 26px rgba(36, 92, 138, 0.14),
-    0 2px 5px rgba(36, 92, 138, 0.07),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.9);
-}
+/* 卡片本体在 OACharacterDetail.vue；这里只管整卡片的进退场动画 */
 
 .oa-charview.is-entering .oa-charview__card,
 .oa-charview__state {
@@ -317,206 +181,6 @@ function openSkeleton(skeletonId: string) {
     transform: translateY(38px) scale(0.985);
   }
 }
-
-/* ---------- 立绘头像 ---------- */
-
-.oa-charview__portrait {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: clamp(150px, 16vw, 200px);
-}
-
-.oa-charview__avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #eaf6ff 0%, #d6ecfc 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
-}
-
-.oa-charview__avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
-}
-
-.oa-charview__avatar-fallback {
-  font-size: 48px;
-  font-weight: 700;
-  color: #7fa8c6;
-}
-
-.oa-charview__avatar-name {
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1e4b76;
-  text-align: center;
-}
-
-.oa-charview__avatar-club {
-  font-size: 11.5px;
-  color: #8aa3b8;
-  text-align: center;
-}
-
-/* ---------- 信息 ---------- */
-
-.oa-charview__info {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: clamp(14px, 1.8vw, 22px);
-  min-width: 0;
-}
-
-.oa-charview__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.oa-charview__row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed rgba(190, 214, 231, 0.65);
-  font-size: 13px;
-}
-
-.oa-charview__row:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.oa-charview__row dt {
-  flex: 0 0 78px;
-  font-size: 12px;
-  color: #9ab0c2;
-}
-
-.oa-charview__row dd {
-  min-width: 0;
-  color: #1e4b76;
-  overflow-wrap: anywhere;
-}
-
-.oa-charview__row code {
-  padding: 1px 6px;
-  border-radius: 5px;
-  background: rgba(0, 144, 254, 0.08);
-  font-size: 12px;
-  color: #1769a8;
-}
-
-.oa-charview__muted {
-  color: #a8bccb;
-}
-
-/* ---------- 骨骼 ---------- */
-
-.oa-charview__bones {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.oa-charview__bones-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.oa-charview__label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1e4b76;
-}
-
-.oa-charview__count {
-  font-size: 11.5px;
-  color: #9ab0c2;
-}
-
-.oa-charview__bone-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.oa-charview__bone {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 10px 5px 12px;
-  border: 1px solid rgba(0, 144, 254, 0.24);
-  border-radius: 9px;
-  background: rgba(0, 144, 254, 0.06);
-  color: #1769a8;
-  font-family: inherit;
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    transform 0.2s ease;
-}
-
-.oa-charview__bone:hover:not(:disabled) {
-  border-color: rgba(0, 144, 254, 0.55);
-  background: rgba(0, 144, 254, 0.12);
-  transform: translateY(-1px);
-}
-
-.oa-charview__bone:focus-visible {
-  outline: 2px solid var(--oa-blue);
-  outline-offset: 2px;
-}
-
-.oa-charview__bone__id {
-  font-size: 12.5px;
-  letter-spacing: 0.01em;
-}
-
-.oa-charview__bone__tag {
-  padding: 0 6px;
-  border-radius: 999px;
-  background: rgba(0, 144, 254, 0.14);
-  font-size: 10px;
-  line-height: 1.7;
-}
-
-.oa-charview__bone.is-missing {
-  border-color: rgba(154, 176, 194, 0.4);
-  background: rgba(154, 176, 194, 0.1);
-  color: #97afc1;
-  cursor: not-allowed;
-}
-
-.oa-charview__bone.is-missing .oa-charview__bone__tag {
-  background: rgba(154, 176, 194, 0.2);
-}
-
-@media (max-width: 720px) {
-  .oa-charview__card {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .oa-charview__info {
-    width: 100%;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .oa-charview.is-entering .oa-charview__card,
   .oa-charview.is-leaving .oa-charview__card,

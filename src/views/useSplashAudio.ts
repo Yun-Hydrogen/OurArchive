@@ -1,5 +1,5 @@
 import { onBeforeUnmount, ref } from 'vue';
-import { SPLASH_SOUND_VOLUME } from '@/config/splash';
+import { SPLASH_SOUND_VOLUME } from '@/views/splashTiming';
 
 export interface SplashAudioOptions {
   /** 音量，范围 0-1 */

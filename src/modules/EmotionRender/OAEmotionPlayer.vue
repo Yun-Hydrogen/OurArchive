@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue';
-import type { PackageEmotion, PackageEmotionLayer } from '@our-archive/shared';
-import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
-import { useGlobalConfig } from '@/composables/useGlobalConfig';
+import type { PackageEmotion, PackageEmotionLayer } from '@/modules/API/types';
+import { useBackgroundMusic } from '@/modules/AudioPlayer/useBackgroundMusic';
+import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
 
 /**
  * 表情播放层：只负责「按关键帧摆图 + 放音效」，不含任何表情专属逻辑。

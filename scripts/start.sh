@@ -12,7 +12,7 @@ if [ -n "$TERMUX_VERSION" ] || [ -d "/sdcard" ]; then
     fi
 fi
 
-if [ ! -f "packages/client/dist/index.html" ]; then
+if [ ! -f "dist/client/index.html" ]; then
     echo "[Our Archive] Building frontend for first run..."
     npm run build
 fi

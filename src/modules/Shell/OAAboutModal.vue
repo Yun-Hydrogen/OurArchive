@@ -3,7 +3,7 @@ import {
   rizui_dialog,
   rizui_button,
 } from 'riz-ui';
-import { HOME_ASSETS } from '@/config/assets';
+import bannerTightUrl from '@resources/OurArchive/OurArchiveBanner-tp-tight-svg.svg?url';
 
 defineProps<{
   visible: boolean;
@@ -36,7 +36,7 @@ function handleClose() {
       <div class="oa-about__header">
         <img
           class="oa-about__logo"
-          :src="HOME_ASSETS.bannerTightUrl"
+          :src="bannerTightUrl"
           alt="Our Archive Logo"
           draggable="false"
         />

@@ -2,16 +2,16 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
-import { initializeStorage, type StorageInitResult } from './config/storage.js';
-import { loadPreloadAssets } from './config/preload.js';
-import { ensureSpineRuntime } from './config/spine.js';
-import { resolvePort, SERVER_HOST } from './config/server.js';
-import { resolvePublicUrl, resolveNetworkUrl } from './config/publicUrl.js';
-import { mountClient, resolveClientDistPath } from './app/mountClient.js';
-import { createPreloadRouter } from './routes/preload.js';
-import { createConfigRouter } from './routes/config.js';
-import { createPackagesRouter } from './routes/packages.js';
-import { printStartupInfo } from './utils/banner.js';
+import { initializeStorage, type StorageInitResult } from '@/modules/Initializer/storage.server';
+import { loadPreloadAssets } from '@/modules/Initializer/preload.server';
+import { ensureSpineRuntime } from '@/modules/Initializer/spinePlugin.server';
+import { resolvePort, SERVER_HOST } from '@/modules/Initializer/port.server';
+import { resolvePublicUrl, resolveNetworkUrl } from '@/modules/Initializer/publicUrl.server';
+import { mountClient, resolveClientDistPath } from '@/modules/Initializer/mountClient.server';
+import { createPreloadRouter } from '@/modules/API/preloadRoutes.server';
+import { createConfigRouter } from '@/modules/API/configRoutes.server';
+import { createPackagesRouter } from '@/modules/API/packagesRoutes.server';
+import { printStartupInfo } from '@/modules/Initializer/banner.server';
 
 dotenv.config();
 

@@ -21,7 +21,7 @@ import {
   type SpineBackend,
   type SpineBackendKind,
   type SpineRendererMode,
-} from '@/spine/backend';
+} from '@/modules/SkeletonRender/backend';
 import type {
   SpineAnimationState,
   SpineAttachmentTimeline,
@@ -29,8 +29,8 @@ import type {
   SpineSkeleton,
   SpineSkeletonData,
   SpineTimeline,
-} from '@/spine/types';
-import { matchTexture, type SpineCharacter } from '@/spinePackage';
+} from '@/modules/SkeletonRuntimeProvider/spineTypes';
+import { matchTexture, type SpineCharacter } from '@/modules/SkeletonRender/spinePackage';
 import { readonlyRef } from '@/utils/reactivity';
 
 /** 一条差分 = 若干个 slot 的 attachment 覆盖 */

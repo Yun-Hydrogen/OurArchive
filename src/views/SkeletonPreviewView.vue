@@ -2,14 +2,15 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { rizui_infobox, rizui_progress } from 'riz-ui';
-import OASpineUploader from '@/components/tools/OASpineUploader.vue';
-import OASpineViewer from '@/components/tools/OASpineViewer.vue';
-import { ROUTE_NAMES } from '@/config/routes';
-import { SHELL_TIMING } from '@/config/transition';
+import OASpineUploader from '@/modules/SkeletonRender/OASpineUploader.vue';
+import OASpineViewer from '@/modules/SkeletonRender/OASpineViewer.vue';
+import OAPageHeader from '@/modules/ViewsManager/OAPageHeader.vue';
+import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
+import { SHELL_TIMING } from '@/modules/Shell/shellTiming';
 import {
   loadSpineCharacterFromPackage,
   type SpineCharacter,
-} from '@/spinePackage';
+} from '@/modules/SkeletonRender/spinePackage';
 
 const route = useRoute();
 const router = useRouter();
@@ -117,28 +118,14 @@ onBeforeUnmount(() => {
     :class="{ 'is-leaving': isLeaving }"
     :style="{ '--cards-exit': `${SHELL_TIMING.cardsExit}ms` }"
   >
-    <header class="oa-skel-preview__head">
-      <button type="button" class="oa-skel-preview__back" @click="backToSource">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path
-            d="M10 3.5 5.5 8 10 12.5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-        {{ sourcePackageId ? (sourceCharacterId ? '角色详情' : '资源包') : '工具' }}
-      </button>
-
-      <div class="oa-skel-preview__titles">
-        <h1 class="oa-skel-preview__title">立绘骨骼预览</h1>
-        <p class="oa-skel-preview__subtitle">
-          载入立绘包（骨骼 + 图集 + 贴图），预览立绘并切换差分
-        </p>
-      </div>
-    </header>
+    <OAPageHeader
+      class="oa-skel-preview__head"
+      title="立绘骨骼预览"
+      subtitle="载入立绘包（骨骼 + 图集 + 贴图），预览立绘并切换差分"
+      :back-label="sourcePackageId ? (sourceCharacterId ? '角色详情' : '资源包') : '工具'"
+      back-position="start"
+      @back="backToSource"
+    />
 
     <section class="oa-skel-preview__body">
       <Transition name="oa-swap" mode="out-in">
@@ -187,11 +174,7 @@ onBeforeUnmount(() => {
 }
 
 .oa-skel-preview__head {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   max-width: 1180px;
-  width: 100%;
   margin: 0 auto;
   animation: oa-panel-in 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }

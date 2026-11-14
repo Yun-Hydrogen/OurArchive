@@ -1,5 +1,5 @@
 import { ref, watch } from 'vue';
-import { useGlobalConfig } from '@/composables/useGlobalConfig';
+import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
 import { readonlyRef } from '@/utils/reactivity';
 
 /** preload 清单中的主界面背景音乐 id */

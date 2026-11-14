@@ -1,7 +1,7 @@
 /* 项目统一字体：resources/UI.ttf，由 Vite 打包为静态资源 */
 @font-face {
   font-family: 'Our Archive UI';
-  src: url('../../../resources/UI.ttf') format('truetype');
+  src: url('../resources/UI.ttf') format('truetype');
   font-style: normal;
   font-display: swap;
 }

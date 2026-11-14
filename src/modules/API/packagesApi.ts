@@ -2,7 +2,7 @@
  * 资源包相关的 HTTP 请求。
  *
  * 只负责「发请求 + 校验包络」，不持有任何状态；状态与编排在 composable 里。
- * 返回值直接是响应体（已校验 `success`），字段见 `@our-archive/shared`。
+ * 返回值直接是响应体（已校验 `success`），字段见 `@/modules/API/types`。
  */
 import { apiGet } from './request';
 import type {
@@ -15,7 +15,7 @@ import type {
   PackageSound,
   PackageSoundCategory,
   ResourcePackage,
-} from '@our-archive/shared';
+} from '@/modules/API/types';
 
 /** 列表类响应都带 `total` */
 interface PackagesResponse {

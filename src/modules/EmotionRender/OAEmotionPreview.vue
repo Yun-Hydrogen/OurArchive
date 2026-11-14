@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { rizui_button, rizui_infobox, rizui_progress } from 'riz-ui';
-import OAEmotionPlayer from '@/components/tools/OAEmotionPlayer.vue';
-import { useSpineStage } from '@/composables/useSpineStage';
-import { useGlobalConfig } from '@/composables/useGlobalConfig';
-import type { PackageEmotion } from '@our-archive/shared';
-import type { SpineCharacter } from '@/spinePackage';
+import OAEmotionPlayer from '@/modules/EmotionRender/OAEmotionPlayer.vue';
+import { useSpineStage } from '@/modules/SkeletonRender/useSpineStage';
+import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
+import type { PackageEmotion } from '@/modules/API/types';
+import type { SpineCharacter } from '@/modules/SkeletonRender/spinePackage';
 
 /**
  * 表情预览区：左边立绘、右边表情按钮。
@@ -441,6 +441,14 @@ defineExpose({ stop: () => player.value?.stop() });
 @media (max-width: 900px) {
   .oa-emo {
     flex-direction: column;
+  }
+
+  /*
+   * 纵向排列后主轴变成高度，沿用 `flex: 3 1 0` 会把舞台压成 0 高
+   * （面板是 flex: 0 0 auto，抢不到可分配空间），所以这里改回按内容高度。
+   */
+  .oa-emo__stage-box {
+    flex: 0 0 auto;
   }
 
   .oa-emo__panel {

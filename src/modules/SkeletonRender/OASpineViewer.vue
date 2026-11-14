@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { rizui_button, rizui_cfgrow, rizui_infobox, rizui_progress, rizui_slider, rizui_switch } from 'riz-ui';
-import { useSpineStage } from '@/composables/useSpineStage';
-import { useGlobalConfig } from '@/composables/useGlobalConfig';
-import type { SpineCharacter } from '@/spinePackage';
+import { useSpineStage } from '@/modules/SkeletonRender/useSpineStage';
+import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
+import type { SpineCharacter } from '@/modules/SkeletonRender/spinePackage';
 
 const props = defineProps<{
   character: SpineCharacter;

@@ -12,14 +12,15 @@ import path from 'node:path';
  */
 export function resolveClientDistPath(currentDir: string): string | null {
   const candidates = [
+    // 单文件 exe / 发行包：客户端产物与后端同级或在其上级
     path.resolve(currentDir, './client'),
     path.resolve(currentDir, '../client'),
     path.resolve(process.cwd(), 'client'),
-    path.resolve(currentDir, '../../client/dist'),
-    path.resolve(currentDir, '../client/dist'),
-    path.resolve(currentDir, './client/dist'),
-    path.resolve(process.cwd(), 'packages/client/dist'),
-    path.resolve(process.cwd(), 'client/dist'),
+    // 开发（currentDir = src/）与生产（currentDir = dist/server/）
+    path.resolve(currentDir, '../dist/client'),
+    path.resolve(currentDir, '../../dist/client'),
+    path.resolve(process.cwd(), 'dist/client'),
+    // 兜底：dist/ 本身就是前端产物
     path.resolve(process.cwd(), 'dist'),
   ];
 

@@ -9,8 +9,8 @@ import {
   rizui_dropdown,
   rizui_infobox,
 } from 'riz-ui';
-import { useGlobalConfig } from '@/composables/useGlobalConfig';
-import { SPINE_RENDERER_OPTIONS, type SpineRendererMode } from '@/spine/mode';
+import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
+import { SPINE_RENDERER_OPTIONS, type SpineRendererMode } from '@/modules/ConfigProvider/rendererMode';
 
 const props = defineProps<{
   visible: boolean;

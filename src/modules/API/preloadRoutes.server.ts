@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import fs from 'node:fs';
-import { getPreloadCheckResult } from '../config/preload.js';
+import { getPreloadCheckResult } from '@/modules/Initializer/preload.server';
 
 /**
  * 预加载资源 API 路由。

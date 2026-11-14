@@ -6,24 +6,41 @@
   "description": "Our Archive - Blue Archive visual novel simulator",
   "author": "Yun-Hydrogen",
   "license": "AGPL-3.0-only",
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "cross-env OUR_ARCHIVE_INTERACTIVE=1 concurrently -n \"SERVER,CLIENT\" -c \"blue,green\" --handle-input --default-input-target SERVER \"npm run dev -w @our-archive/server\" \"npm run dev -w @our-archive/client\"",
-    "dev:server": "npm run dev -w @our-archive/server",
-    "dev:client": "npm run dev -w @our-archive/client",
-    "build": "npm run build -w @our-archive/client && npm run build -w @our-archive/server",
-    "build:client": "npm run build -w @our-archive/client",
-    "build:server": "npm run build -w @our-archive/server",
+    "dev": "cross-env OUR_ARCHIVE_INTERACTIVE=1 concurrently -n \"SERVER,CLIENT\" -c \"blue,green\" --handle-input --default-input-target SERVER \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "cross-env PORT=3000 node --watch --import tsx src/index.ts",
+    "dev:client": "vite",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vue-tsc -b && vite build",
+    "build:server": "tsup src/index.ts --format esm --out-dir dist/server --clean",
     "build:windows": "node scripts/package.js windows",
     "build:linux": "node scripts/package.js linux",
     "build:android": "node scripts/package.js android",
     "build:all": "node scripts/package.js all",
-    "start": "npm run start -w @our-archive/server"
+    "build:clean": "node scripts/package.js clean",
+    "start": "node dist/server/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "js-yaml": "^5.4.3",
+    "picocolors": "^1.1.1",
+    "riz-ui": "github:Yun-Hydrogen/riz-ui",
+    "vue": "^3.5.13",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.2",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@yao-pkg/pkg": "^6.25.0",
     "concurrently": "^9.1.2",
-    "cross-env": "^10.1.0"
+    "cross-env": "^10.1.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vue-tsc": "^2.2.0"
   }
 }

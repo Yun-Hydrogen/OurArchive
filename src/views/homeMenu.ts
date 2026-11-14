@@ -4,7 +4,7 @@
  * 入口只登记标题、副标题与插画；接入实际页面时在 `router` 中新增路由，
  * 并在对应入口补上 `route`（目标路由名）。没有 `route` 的入口仍是占位。
  */
-import { ROUTE_NAMES } from '@/config/routes';
+import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
 
 export type HomeArtVariant = 'editor' | 'reader' | 'scene3d' | 'assets' | 'more';
 

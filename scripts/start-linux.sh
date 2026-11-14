@@ -19,7 +19,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 # Build if client dist does not exist
-if [ ! -f "packages/client/dist/index.html" ]; then
+if [ ! -f "dist/client/index.html" ]; then
     echo "[Our Archive] Building frontend for production..."
     npm run build
 fi

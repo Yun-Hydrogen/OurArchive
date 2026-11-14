@@ -7,7 +7,7 @@ import {
   setCharacterPickerOpen,
   setCharacterPickerSelection,
   useCharacterPickerState,
-} from '@/composables/useCharacterPicker';
+} from '@/modules/ResourcePicker/useCharacterPicker';
 
 /**
  * 角色选择对话框：常驻挂载，由 `openCharacterPicker()` 唤起。

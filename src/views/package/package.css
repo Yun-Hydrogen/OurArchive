@@ -1,0 +1,1073 @@
+/*
+ * 资源包详情页的设计系统（block `oa-pkg*`）。
+ *
+ * 页面拆成「框架 + 6 个分类组件」后，行式列表、工具栏、空态这些基础件被多个
+ * 子组件共用，scoped 样式无法跨组件生效，所以集中在这里、按 block 前缀命名。
+ * 只有属于本页的类名才允许写在这个文件里。
+ */
+/*
+ * 页面本身透明：底色、气泡、banner 都由 App 层常驻。
+ */
+.oa-pkg {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: clamp(8px, 1.1vh, 14px);
+  min-height: 100vh;
+  padding: clamp(10px, 1.3vh, 16px) clamp(14px, 2.4vw, 44px) clamp(12px, 1.8vh, 24px);
+  /* 顶部只留窗口呼吸感，标题区自己撑开，不再额外堆一大段空白 */
+  padding-top: clamp(14px, 2vh, 22px);
+  color: var(--oa-dark-blue);
+  /*
+   * 入场时卡片从下方平移 38px，超出视口的部分只做视觉裁剪；
+   * 用 clip 而不是 hidden，页面不会因此产生可滚动区域。
+   */
+  overflow: clip;
+}
+
+/* 页头只保留宽度约束，搜索与返回由 OAPageHeader 排布 */
+.oa-pkg__head {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+}
+
+/* ---------- 状态 ---------- */
+
+.oa-pkg__state {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  padding: 14px 4px;
+}
+
+.oa-pkg__state-text {
+  font-size: 12.5px;
+  color: #6f8ba4;
+}
+
+/* 错误 / 空态容器：和加载态占同一列，切换时由 oa-swap 淡入淡出 */
+.oa-pkg__notice {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+}
+
+/* ---------- 大卡片 ---------- */
+
+.oa-pkg__card {
+  display: flex;
+  gap: clamp(10px, 1.2vw, 18px);
+  width: min(1320px, 100%);
+  /*
+   * 卡片吃掉「一屏减去页头」的高度：页面上/下内边距 + 间距约占 5vh，页头最高约 53px，
+   * 留 60px 余量保证任何窗口下都不会把整页顶出滚动条。
+   * 不能用 flex:1 —— .oa-shell 这条链上是 min-height 撑开的内容高度，没有可供分配的剩余空间。
+   */
+  height: clamp(420px, calc(95vh - 60px), 1400px);
+  margin: 0 auto;
+  padding: clamp(10px, 1.2vw, 16px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fcff 66%, #f1f9ff 100%);
+  box-shadow:
+    0 12px 26px rgba(36, 92, 138, 0.14),
+    0 2px 5px rgba(36, 92, 138, 0.07),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+}
+
+.oa-pkg.is-entering .oa-pkg__card,
+.oa-pkg__state {
+  animation: oa-panel-in 620ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.oa-pkg.is-leaving .oa-pkg__card {
+  animation: oa-panel-out var(--cards-exit, 260ms) cubic-bezier(0.4, 0, 0.8, 0.24) forwards;
+}
+
+@keyframes oa-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(38px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes oa-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(38px) scale(0.985);
+  }
+}
+
+/* 侧边栏自带底色，这里只让它拉伸到卡片高度 */
+.oa-pkg__nav {
+  height: 100%;
+}
+
+/* 学院子条目压小一号，长名字尽量塞得下 */
+.oa-pkg__nav :deep(.rnav-submenu .rnav-item-btn) {
+  padding: 6px 8px 6px 14px;
+  font-size: 12px;
+}
+
+.oa-pkg__nav :deep(.rnav-submenu .rnav-badge) {
+  height: 14px;
+  min-width: 14px;
+  padding: 0 5px;
+  font-size: 9.5px;
+  opacity: 0.75;
+}
+
+.oa-pkg__content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* ---------- 角色列表 ---------- */
+
+.oa-pkg__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+
+.oa-pkg__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #6f8ba4;
+}
+
+.oa-pkg__summary strong {
+  color: #1e4b76;
+  font-size: 15px;
+}
+
+.oa-pkg__dot {
+  color: #b3c6d4;
+}
+
+.oa-pkg__tools {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.oa-pkg__mini {
+  padding: 4px 10px;
+  border: 1px solid rgba(163, 190, 210, 0.5);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: 11.5px;
+  color: #5d7d97;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.oa-pkg__mini:hover {
+  border-color: rgba(0, 144, 254, 0.42);
+  color: #1769a8;
+}
+
+/* ---------- 学院分组 ---------- */
+
+.oa-pkg__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 4px;
+}
+
+/*
+ * rizui_card 自带 padding / 圆角 / 底部 margin，这里只补：
+ * 表头可点、右侧折叠箭头、展开动画的收口。
+ */
+.oa-pkg__school :deep(.ct-card) {
+  padding: 11px 14px;
+  border-radius: 12px;
+  transition:
+    box-shadow 0.24s ease,
+    border-color 0.24s ease;
+}
+
+.oa-pkg__school.is-highlight :deep(.ct-card) {
+  border-color: rgba(0, 144, 254, 0.55);
+  box-shadow:
+    0 0 0 3px rgba(0, 144, 254, 0.12),
+    0 2px 10px rgba(36, 92, 138, 0.12);
+}
+
+.oa-pkg__school :deep(.ct-card-head) {
+  cursor: pointer;
+  user-select: none;
+}
+
+.oa-pkg__school :deep(.ct-card-head)::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  border-right: 1.8px solid #8aa3b8;
+  border-bottom: 1.8px solid #8aa3b8;
+  transform: rotate(45deg) translate(-1px, -1px);
+  transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.oa-pkg__school.is-open :deep(.ct-card-head)::after {
+  transform: rotate(-135deg) translate(1px, 1px);
+}
+
+.oa-pkg__school :deep(.ct-card-title) {
+  font-size: 13.5px;
+  color: #1e4b76;
+}
+
+.oa-pkg__school :deep(.ct-card-desc) {
+  font-size: 11px;
+  color: #8aa3b8;
+}
+
+.oa-pkg__school :deep(.ct-card-body) {
+  margin-top: 0;
+}
+
+/*
+ * 展开 / 收起动画：grid-template-rows 0fr → 1fr。
+ * 内层必须 overflow: hidden + min-height: 0，否则 0fr 收不干净。
+ */
+.oa-pkg__school__collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.22s ease;
+}
+
+.oa-pkg__school__collapse.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.oa-pkg__school__collapse-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.oa-pkg__school__collapse.is-open .oa-pkg__school__collapse-inner {
+  padding-top: 10px;
+}
+
+.oa-pkg__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid rgba(163, 190, 210, 0.5);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #8aa3b8;
+  transition: border-color 0.2s ease;
+}
+
+/* 卡片外右上角的那一份：略高、略宽，跟随页头对齐 */
+.oa-pkg__search--head {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 5px 13px;
+  border-color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
+}
+
+.oa-pkg__search--head svg {
+  width: 14px;
+  height: 14px;
+}
+
+.oa-pkg__search--head input {
+  width: clamp(160px, 18vw, 230px);
+  font-size: 13px;
+}
+
+.oa-pkg__search:focus-within {
+  border-color: var(--oa-blue);
+}
+
+.oa-pkg__search svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+.oa-pkg__search input {
+  width: 170px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: #1e4b76;
+}
+
+.oa-pkg__search input::placeholder {
+  color: #a8bccb;
+}
+
+.oa-pkg__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.oa-pkg__char {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  min-height: 60px;
+  border: 1px solid rgba(190, 214, 231, 0.55);
+  border-radius: 10px;
+  background: #ffffff;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.oa-pkg__char:hover {
+  border-color: rgba(0, 144, 254, 0.42);
+  box-shadow: 0 6px 16px rgba(36, 92, 138, 0.12);
+}
+
+.oa-pkg__char:focus-visible {
+  outline: 2px solid var(--oa-blue);
+  outline-offset: 2px;
+}
+
+.oa-pkg__char__avatar {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #eaf6ff 0%, #d6ecfc 100%);
+}
+
+/* 未绑定骨骼：头像上加一个角标，省下整列的宽度给名字 */
+.oa-pkg__char.is-unbound .oa-pkg__char__avatar::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  background: #c2d1dc;
+}
+
+.oa-pkg__char__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.oa-pkg__char__avatar-fallback {
+  font-size: 16px;
+  font-weight: 700;
+  color: #7fa8c6;
+}
+
+.oa-pkg__char__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oa-pkg__char__name {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1e4b76;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.oa-pkg__char__club {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #8aa3b8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 骨骼列表 ---------- */
+
+.oa-pkg__skel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 4px;
+}
+
+.oa-pkg__skel {
+  border: 1px solid rgba(190, 214, 231, 0.55);
+  border-radius: 10px;
+  background: #ffffff;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.oa-pkg__skel.is-open {
+  border-color: rgba(0, 144, 254, 0.32);
+  box-shadow: 0 4px 14px rgba(36, 92, 138, 0.08);
+}
+
+.oa-pkg__skel__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.oa-pkg__skel__head:focus-visible {
+  outline: 2px solid var(--oa-blue);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.oa-pkg__skel__arrow {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-right: 1.8px solid #8aa3b8;
+  border-bottom: 1.8px solid #8aa3b8;
+  transform: rotate(-45deg);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.oa-pkg__skel.is-open .oa-pkg__skel__arrow {
+  transform: rotate(45deg);
+}
+
+.oa-pkg__skel__names {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.oa-pkg__skel__id {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1e4b76;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-pkg__skel__meta {
+  font-size: 11px;
+  color: #8aa3b8;
+}
+
+.oa-pkg__skel__warn {
+  color: #c07a00;
+}
+
+.oa-pkg__skel__preview {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px 4px 9px;
+  border: 1px solid rgba(0, 144, 254, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 144, 254, 0.07);
+  font-family: inherit;
+  font-size: 11.5px;
+  color: #1769a8;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.oa-pkg__skel__preview svg {
+  width: 13px;
+  height: 13px;
+}
+
+.oa-pkg__skel__preview:hover:not(:disabled) {
+  border-color: rgba(0, 144, 254, 0.55);
+  background: rgba(0, 144, 254, 0.14);
+}
+
+.oa-pkg__skel__preview:disabled {
+  border-color: rgba(154, 176, 194, 0.4);
+  background: rgba(154, 176, 194, 0.12);
+  color: #a3b6c4;
+  cursor: not-allowed;
+}
+
+/* 与学院分组同一套 grid 0fr→1fr 展开动画 */
+.oa-pkg__skel__collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease;
+}
+
+.oa-pkg__skel__collapse.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.oa-pkg__skel__collapse-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.oa-pkg__file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 10px 8px 24px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(190, 214, 231, 0.7);
+  list-style: none;
+}
+
+.oa-pkg__file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11.5px;
+}
+
+.oa-pkg__file__kind {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 144, 254, 0.08);
+  font-size: 10px;
+  line-height: 1.7;
+  color: #1769a8;
+}
+
+.oa-pkg__file__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #4d7799;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-pkg__file__size {
+  flex: 0 0 auto;
+  min-width: 62px;
+  text-align: right;
+  font-size: 10.5px;
+  color: #a3b6c4;
+}
+
+.oa-pkg__file__open {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: #0b7ad6;
+  font-size: 10.5px;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.oa-pkg__file__open:hover {
+  background: rgba(0, 144, 254, 0.1);
+}
+
+.oa-pkg__state--inline {
+  width: 100%;
+  padding: 14px 2px;
+}
+
+/* ---------- 背景音乐 ---------- */
+
+.oa-pkg__music-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 4px;
+}
+
+.oa-pkg__music {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(190, 214, 231, 0.55);
+  border-radius: 10px;
+  background: #ffffff;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.oa-pkg__music.is-active {
+  border-color: rgba(0, 144, 254, 0.42);
+  box-shadow: 0 4px 14px rgba(36, 92, 138, 0.1);
+}
+
+.oa-pkg__music__play {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 1px;
+  border: 1px solid rgba(0, 144, 254, 0.28);
+  border-radius: 50%;
+  background: rgba(0, 144, 254, 0.08);
+  color: #1769a8;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.oa-pkg__music__play svg {
+  width: 13px;
+  height: 13px;
+}
+
+.oa-pkg__music__play:hover:not(:disabled) {
+  border-color: rgba(0, 144, 254, 0.55);
+  background: rgba(0, 144, 254, 0.16);
+}
+
+.oa-pkg__music__play:disabled {
+  border-color: rgba(154, 176, 194, 0.4);
+  background: rgba(154, 176, 194, 0.12);
+  color: #a3b6c4;
+  cursor: not-allowed;
+}
+
+.oa-pkg__music__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.oa-pkg__music__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.oa-pkg__music__title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1e4b76;
+  overflow-wrap: anywhere;
+}
+
+/* 描述：默认只露两行，余下靠「查看详细」弹窗 */
+.oa-pkg__music__desc {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: #6f8ba4;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.oa-pkg__music__desc.is-folded {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.oa-pkg__music__more {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  color: #0b7ad6;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.oa-pkg__music__more:hover {
+  color: var(--oa-blue);
+  text-decoration: underline;
+}
+
+.oa-pkg__music-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.oa-pkg__music-detail__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #7c99b0;
+}
+
+.oa-pkg__music-detail__meta code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(0, 144, 254, 0.08);
+  font-size: 11px;
+  color: #1769a8;
+}
+
+.oa-pkg__music-detail__text {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: #4d7799;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.oa-pkg__music__artist {
+  font-size: 11.5px;
+  color: #7c99b0;
+}
+
+.oa-pkg__music__miss {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(192, 122, 0, 0.14);
+  font-size: 10px;
+  line-height: 1.7;
+  color: #a47500;
+}
+
+.oa-pkg__music__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10.5px;
+  color: #a3b6c4;
+}
+
+.oa-pkg__music__id {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: rgba(0, 144, 254, 0.08);
+  font-size: 10.5px;
+  color: #1769a8;
+}
+
+.oa-pkg__music__file {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #8aa3b8;
+}
+
+.oa-pkg__music__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  padding-right: 4px;
+}
+
+.oa-pkg__music__timeline {
+  flex: 1;
+  min-width: 0;
+}
+
+.oa-pkg__music__time {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: #8aa3b8;
+}
+
+.oa-pkg__music__audio {
+  display: none;
+}
+
+/* ---------- 音效 ---------- */
+
+.oa-pkg__sound-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.oa-pkg__music__unknown {
+  font-size: 10.5px;
+  color: #a3b6c4;
+}
+
+/* ---------- 表情 ---------- */
+
+.oa-pkg__emotion-stage {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+/* ---------- 背景 ---------- */
+
+.oa-pkg__bg-desc {
+  margin-top: -4px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #7c99b0;
+}
+
+.oa-pkg__bg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 4px;
+}
+
+.oa-pkg__bg-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 缩略图按可用宽度自动铺满，图片再多也只是懒加载 */
+.oa-pkg__bg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.oa-pkg__bg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border: 1px solid rgba(190, 214, 231, 0.55);
+  border-radius: 10px;
+  background: #ffffff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.oa-pkg__bg:hover {
+  border-color: rgba(0, 144, 254, 0.42);
+  box-shadow: 0 6px 16px rgba(36, 92, 138, 0.12);
+}
+
+.oa-pkg__bg:focus-visible {
+  outline: 2px solid var(--oa-blue);
+  outline-offset: 2px;
+}
+
+.oa-pkg__bg__thumb {
+  display: block;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(180deg, #eaf6ff 0%, #d6ecfc 100%);
+  overflow: hidden;
+}
+
+.oa-pkg__bg__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.oa-pkg__bg__name {
+  padding: 0 8px 6px;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #6f8ba4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-pkg__bg-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.oa-pkg__bg-preview__image {
+  width: 100%;
+  max-height: min(70vh, 720px);
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(234, 246, 255, 0.6);
+}
+
+.oa-pkg__bg-preview__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11.5px;
+  color: #7c99b0;
+}
+
+.oa-pkg__bg-preview__meta a {
+  color: #0b7ad6;
+  text-decoration: none;
+}
+
+.oa-pkg__bg-preview__meta a:hover {
+  text-decoration: underline;
+}
+
+.oa-pkg__sound-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.oa-pkg__sound-group__title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 2px 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e4b76;
+}
+
+.oa-pkg__sound-group__count {
+  font-size: 10.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: #a3b6c4;
+}
+
+.oa-pkg__placeholder-badge--off {
+  background: rgba(154, 176, 194, 0.2);
+  color: #7c99b0;
+}
+
+/* ---------- 空态 / 占位 ---------- */
+
+.oa-pkg__empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  color: #9ab0c2;
+}
+
+.oa-pkg__placeholder {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px dashed rgba(111, 139, 164, 0.35);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.oa-pkg__placeholder-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(248, 190, 0, 0.18);
+  color: #a47500;
+  font-size: 11px;
+}
+
+.oa-pkg__placeholder-title {
+  font-size: clamp(15px, 1.3vw, 18px);
+  font-weight: 700;
+  color: #1e4b76;
+}
+
+.oa-pkg__placeholder-text {
+  max-width: 32em;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #6f8ba4;
+}
+
+.oa-pkg__placeholder-text code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 144, 254, 0.08);
+  font-size: 11.5px;
+  color: #1769a8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-pkg.is-entering .oa-pkg__card,
+  .oa-pkg.is-leaving .oa-pkg__card,
+  .oa-pkg__state {
+    animation: none;
+  }
+}

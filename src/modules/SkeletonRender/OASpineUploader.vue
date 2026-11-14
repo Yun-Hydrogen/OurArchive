@@ -7,7 +7,7 @@ import {
   toSpineFilesFromDrop,
   type SpineCharacter,
   type SpineFile,
-} from '@/spinePackage';
+} from '@/modules/SkeletonRender/spinePackage';
 
 const emit = defineEmits<{
   (e: 'select', character: SpineCharacter): void;

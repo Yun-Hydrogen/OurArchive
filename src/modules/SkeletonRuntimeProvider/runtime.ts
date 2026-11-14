@@ -5,7 +5,7 @@
  * `/plugins` 静态托管。这里用运行时字符串 `import()` 拉取，Vite 不会把它
  * 打进入口 chunk，也不会在构建期解析 `@esotericsoftware/*`。
  */
-import type { SpineCanvasRuntime, SpineWebglRuntime } from './types';
+import type { SpineCanvasRuntime, SpineWebglRuntime } from './spineTypes';
 
 export const SPINE_RUNTIME_BASE = '/plugins/spine';
 export const SPINE_WEBGL_FILE = 'spine-webgl.mjs';

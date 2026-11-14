@@ -4,7 +4,7 @@
  * 主界面「更多功能」进入这里；每个工具一张卡片，`route` 指向工具自己的页面。
  * 新增工具时在这里追加一条，并在 `router` 里登记对应路由。
  */
-import { ROUTE_NAMES } from '@/config/routes';
+import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
 
 export type ToolArtVariant = 'skeleton';
 

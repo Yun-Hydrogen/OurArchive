@@ -1,11 +1,11 @@
 import { ref } from 'vue';
-import { fetchResourcePackages } from '@/api/packages';
-import { apiErrorMessage } from '@/api/request';
+import { fetchResourcePackages } from '@/modules/API/packagesApi';
+import { apiErrorMessage } from '@/modules/API/request';
 import { readonlyRef } from '@/utils/reactivity';
-import type { ResourcePackage } from '@our-archive/shared';
+import type { ResourcePackage } from '@/modules/API/types';
 
-/** 跨端 DTO 由 `@our-archive/shared` 提供，这里重新导出给视图使用 */
-export type { PackageContent, ResourcePackage } from '@our-archive/shared';
+/** 跨端 DTO 由 `@/modules/API/types` 提供，这里重新导出给视图使用 */
+export type { PackageContent, ResourcePackage } from '@/modules/API/types';
 
 /**
  * 资源包索引（后端扫描 `<root>/res` 下带 package.yml 的目录）。

@@ -6,7 +6,7 @@
  * 明显掉帧，所以这条路径只作为「保守」模式和 WebGL 不可用时的兜底。
  */
 import type { SpineBackend } from './backend';
-import type { SpineCanvasRuntime, SpineSkeleton, SpineTextureAtlas } from './types';
+import type { SpineCanvasRuntime, SpineSkeleton, SpineTextureAtlas } from '@/modules/SkeletonRuntimeProvider/spineTypes';
 
 /** 画布已被 WebGL 占用，`getContext('2d')` 永远拿不到上下文，只能换一张 <canvas> */
 export class SpineCanvasLockedError extends Error {

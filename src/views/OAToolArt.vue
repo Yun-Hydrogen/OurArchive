@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { ToolArtVariant } from '@/config/tools';
+import type { ToolArtVariant } from '@/views/tools';
 
 const props = defineProps<{
   variant: ToolArtVariant;

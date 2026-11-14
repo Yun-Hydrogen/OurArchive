@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import OAToolArt from '@/components/tools/OAToolArt.vue';
-import { ROUTE_NAMES } from '@/config/routes';
-import { TOOL_ENTRIES, type ToolEntry } from '@/config/tools';
-import { SHELL_TIMING } from '@/config/transition';
+import OAToolArt from '@/views/OAToolArt.vue';
+import OAPageHeader from '@/modules/ViewsManager/OAPageHeader.vue';
+import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
+import { TOOL_ENTRIES, type ToolEntry } from '@/views/tools';
+import { SHELL_TIMING } from '@/modules/Shell/shellTiming';
 
 const router = useRouter();
 
@@ -67,26 +68,13 @@ function backHome() {
     :class="{ 'is-entering': isEntering, 'is-leaving': isLeaving }"
     :style="{ '--cards-exit': `${SHELL_TIMING.cardsExit}ms`, '--exit-y': exitOffset }"
   >
-    <header class="oa-tools__head">
-      <div class="oa-tools__titles">
-        <h1 class="oa-tools__title">更多功能</h1>
-        <p class="oa-tools__subtitle">更多辅助剧情写作/播放的使用工具</p>
-      </div>
-
-      <button type="button" class="oa-tools__back" @click="backHome">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path
-            d="M10 3.5 5.5 8 10 12.5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-        主界面
-      </button>
-    </header>
+    <OAPageHeader
+      class="oa-tools__head"
+      title="更多功能"
+      subtitle="更多辅助剧情写作/播放的使用工具"
+      back-label="主界面"
+      @back="backHome"
+    />
 
     <section class="oa-tools__grid">
       <div
@@ -131,68 +119,10 @@ function backHome() {
   color: var(--oa-dark-blue);
 }
 
-/* 标题与返回同一行 */
+/* 页头只保留宽度约束，排版交给 OAPageHeader */
 .oa-tools__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px clamp(12px, 1.6vw, 22px);
   width: min(1080px, 100%);
   margin: 0 auto;
-}
-
-.oa-tools__back {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 11px 5px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 4px 12px rgba(36, 92, 138, 0.1);
-  font-family: inherit;
-  font-size: 12px;
-  color: #35628a;
-  cursor: pointer;
-  transition:
-    color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.oa-tools__back svg {
-  width: 14px;
-  height: 14px;
-}
-
-.oa-tools__back:hover {
-  color: var(--oa-blue);
-  box-shadow: 0 6px 16px rgba(36, 92, 138, 0.16);
-}
-
-.oa-tools__titles {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.oa-tools__title {
-  font-size: clamp(19px, 1.7vw, 25px);
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: 0.01em;
-  color: #123a5c;
-}
-
-.oa-tools__subtitle {
-  overflow: hidden;
-  font-size: clamp(11.5px, 0.9vw, 13px);
-  line-height: 1.5;
-  color: #6f8ba4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* 工具卡：小卡片网格，插画在上、标题与说明在下 */

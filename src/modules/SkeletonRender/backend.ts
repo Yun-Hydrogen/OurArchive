@@ -7,16 +7,16 @@
  * 运行时本身不在构建期解析：由 `runtime.ts` 从 `/plugins/spine/*.mjs` 动态加载，
  * 后端工厂返回所选 ESM 包里的 core API，保证解析器与渲染器来自同一份运行时。
  */
-import { loadSpineCanvasRuntime, loadSpineWebglRuntime } from './runtime';
-import { normalizeSpineRendererMode, type SpineRendererMode } from './mode';
-import type { SpineCoreRuntime, SpineSkeleton, SpineTextureAtlas } from './types';
+import { loadSpineCanvasRuntime, loadSpineWebglRuntime } from '@/modules/SkeletonRuntimeProvider/runtime';
+import { normalizeSpineRendererMode, type SpineRendererMode } from '@/modules/ConfigProvider/rendererMode';
+import type { SpineCoreRuntime, SpineSkeleton, SpineTextureAtlas } from '@/modules/SkeletonRuntimeProvider/spineTypes';
 import { createCanvasBackend } from './canvasBackend';
 import { createWebglBackend } from './webglBackend';
 
-export type { SpineRendererMode } from './mode';
-export { normalizeSpineRendererMode } from './mode';
+export type { SpineRendererMode } from '@/modules/ConfigProvider/rendererMode';
+export { normalizeSpineRendererMode } from '@/modules/ConfigProvider/rendererMode';
 export { SpineCanvasLockedError } from './canvasBackend';
-export { SPINE_RUNTIME_BASE } from './runtime';
+export { SPINE_RUNTIME_BASE } from '@/modules/SkeletonRuntimeProvider/runtime';
 
 export type SpineBackendKind = 'webgl' | 'canvas';
 

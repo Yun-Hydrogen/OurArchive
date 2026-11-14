@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import OABannerSvg from '@/components/splash/OABannerSvg.vue';
-import { HOME_ASSETS } from '@/config/assets';
-import { SHELL_TIMING } from '@/config/transition';
+import OABannerSvg from '@/modules/Shell/OABannerSvg.vue';
+import bannerTightUrl from '@resources/OurArchive/OurArchiveBanner-tp-tight-svg.svg?url';
+import { SHELL_TIMING } from '@/modules/Shell/shellTiming';
 
 const props = defineProps<{
   /** 是否停靠到左下角（主界面及所有内层页面） */
@@ -100,7 +100,7 @@ onBeforeUnmount(() => {
       <OABannerSvg :key="playToken" class="oa-banner-dock__anim" />
       <img
         class="oa-banner-dock__static"
-        :src="HOME_ASSETS.bannerTightUrl"
+        :src="bannerTightUrl"
         alt=""
         draggable="false"
       />

@@ -1,23 +1,18 @@
 import { Router, type Request, type Response } from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getStoragePaths } from '@/modules/Initializer/paths.server';
+import { readPackageBackgrounds, resolveBackgroundFile } from '@/modules/BackgroundProvider/backgrounds.server';
+import { readPackageCharacters } from '@/modules/CharacterProvider/characters.server';
+import { readPackageEmotions, resolveEmotionFile } from '@/modules/EmotionProvider/emotions.server';
+import { readPackageMusic, resolveMusicFile } from '@/modules/AudioProvider/music.server';
+import { readPackageSounds, resolveSoundFile } from '@/modules/AudioProvider/sounds.server';
 import {
-  readPackageBackgrounds,
-  readPackageCharacters,
-  readPackageEmotions,
-  readPackageMusic,
-  readPackageSkeletons,
-  readPackageSounds,
-  readSkeletonFiles,
-  resolveBackgroundFile,
-  resolveEmotionFile,
   resolveInside,
-  resolveMusicFile,
   resolvePackageDir,
-  resolveSoundFile,
   scanResourcePackages,
-} from '../config/packages.js';
-import { getStoragePaths } from '../config/paths.js';
+} from '@/modules/PackageProvider/packageManifest.server';
+import { readPackageSkeletons, readSkeletonFiles } from '@/modules/PackageProvider/skeletons.server';
 
 /** 允许直接下发的静态资源类型 */
 const MIME_BY_EXTENSION: Record<string, string> = {

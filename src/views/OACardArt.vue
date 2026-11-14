@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { HomeArtVariant } from '@/config/home';
+import type { HomeArtVariant } from '@/views/homeMenu';
 
 const props = defineProps<{
   variant: HomeArtVariant;

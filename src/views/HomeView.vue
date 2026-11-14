@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import OACardArt from '@/components/home/OACardArt.vue';
-import { HOME_MENU } from '@/config/home';
-import { SHELL_TIMING } from '@/config/transition';
-import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
-import { useGlobalConfig } from '@/composables/useGlobalConfig';
+import OACardArt from '@/views/OACardArt.vue';
+import { HOME_MENU } from '@/views/homeMenu';
+import { SHELL_TIMING } from '@/modules/Shell/shellTiming';
+import { useBackgroundMusic } from '@/modules/AudioPlayer/useBackgroundMusic';
+import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
 
 const router = useRouter();
 const { fetchConfig } = useGlobalConfig();

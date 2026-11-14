@@ -19,7 +19,7 @@ import type {
   SpineSkeleton,
   SpineTextureAtlas,
   SpineWebglRuntime,
-} from './types';
+} from '@/modules/SkeletonRuntimeProvider/spineTypes';
 
 /**
  * 图集是「透明区 RGB 为黑」的直通 alpha 图，直接把 mipmap 建在它上面会让半透明边缘

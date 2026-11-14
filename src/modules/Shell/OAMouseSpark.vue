@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useMouseSpark, type MouseSparkOptions } from '@/composables/useMouseSpark';
+import { useMouseSpark, type MouseSparkOptions } from '@/modules/Shell/useMouseSpark';
 
 const props = withDefaults(defineProps<MouseSparkOptions>(), {
   color: '45,175,255',

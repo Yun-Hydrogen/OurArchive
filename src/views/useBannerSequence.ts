@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { SPLASH_TIMING } from '@/config/splash';
+import { SPLASH_TIMING } from '@/views/splashTiming';
 
 export type SplashPhase = 'idle' | 'animating' | 'ready';
 

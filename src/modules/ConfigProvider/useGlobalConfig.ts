@@ -1,9 +1,9 @@
 import { ref } from 'vue';
-import { fetchGlobalConfig, saveGlobalConfig } from '@/api/config';
+import { fetchGlobalConfig, saveGlobalConfig } from '@/modules/API/configApi';
 import {
   normalizeSpineRendererMode,
   type SpineRendererMode,
-} from '@/spine/mode';
+} from '@/modules/ConfigProvider/rendererMode';
 import { readonlyRef } from '@/utils/reactivity';
 
 export type ConfigKey = 'main_bgm_volume' | 'preview_volume' | 'spine_renderer';

@@ -26,7 +26,7 @@ if [ ! -d "/sdcard" ] && [ ! -d "/storage/emulated/0" ]; then
 fi
 
 # Ensure frontend production build exists
-if [ ! -f "packages/client/dist/index.html" ]; then
+if [ ! -f "dist/client/index.html" ]; then
     echo "[Our Archive] Building frontend for production..."
     npm run build
 fi

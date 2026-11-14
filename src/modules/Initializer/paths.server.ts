@@ -124,12 +124,14 @@ export function getStoragePaths(): StoragePaths {
  */
 export function resolvePreloadAssetsPath(currentDir: string): string | null {
   const candidates = [
+    // 单文件 exe：清单与可执行文件同级
     path.resolve(currentDir, PRELOAD_ASSETS_FILE_NAME),
+    // 发行包：server/ 的上级
     path.resolve(currentDir, '..', PRELOAD_ASSETS_FILE_NAME),
-    path.resolve(process.cwd(), PRELOAD_ASSETS_FILE_NAME),
+    // 生产：dist/server/ 的上两级；开发：src/ 的上一级
     path.resolve(currentDir, '../../', PRELOAD_ASSETS_FILE_NAME),
-    path.resolve(currentDir, '../../../', PRELOAD_ASSETS_FILE_NAME),
-    path.resolve(process.cwd(), 'resources', PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(process.cwd(), PRELOAD_ASSETS_FILE_NAME),
+    path.resolve(process.cwd(), 'dist', PRELOAD_ASSETS_FILE_NAME),
   ];
 
   return candidates.find((filePath) => fs.existsSync(filePath)) ?? null;

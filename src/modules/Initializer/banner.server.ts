@@ -1,8 +1,8 @@
 import pc from 'picocolors';
 import path from 'node:path';
-import type { StoragePaths } from '../config/paths.js';
-import type { PreloadCheckResult } from '../config/preload.js';
-import type { SpineRuntimeStatus } from '../config/spine.js';
+import type { StoragePaths } from '@/modules/Initializer/paths.server';
+import type { PreloadCheckResult } from '@/modules/Initializer/preload.server';
+import type { SpineRuntimeStatus } from '@/modules/Initializer/spinePlugin.server';
 
 export interface StartupInfo {
   /** 后端监听端口 */

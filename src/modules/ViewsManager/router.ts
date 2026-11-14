@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { ROUTE_NAMES, ROUTE_PATHS } from '@/config/routes';
-import { isAppUnlocked } from '@/router/access';
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/modules/ViewsManager/routes';
+import { isAppUnlocked } from '@/modules/ViewsManager/access';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -36,7 +36,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.packageDetail,
     name: ROUTE_NAMES.packageDetail,
-    component: () => import('@/views/PackageView.vue'),
+    component: () => import('@/views/package/PackageView.vue'),
     meta: { title: 'Our Archive - 资源包' },
   },
   {

@@ -1,12 +1,17 @@
 /**
- * 立绘渲染器模式。
+ * 立绘渲染器模式（配置项 `spine_renderer`）。
  *
- * 单独成一个模块，是为了让设置项 / 全局配置只依赖「一个字符串字面量类型」，
- * 而不把 WebGL 与 canvas 两套渲染器拖进首屏 chunk。
+ * 客户端与服务端**共用这一份取值列表**：设置项要展示选项、服务端要校验入参，
+ * 过去两边各写一份，改一边忘一边就会出现「能选但保存时报非法」。
+ *
+ * 这个文件不 import 任何渲染器实现，首屏不会因此拖进 WebGL / Canvas 两套后端。
  */
 
+/** 渲染器模式的全部取值（顺序即设置项的展示顺序） */
+export const SPINE_RENDERER_MODES = ['aggressive', 'stable', 'conservative'] as const;
+
 /** 渲染器模式，对应设置项 `spine_renderer` */
-export type SpineRendererMode = 'aggressive' | 'stable' | 'conservative';
+export type SpineRendererMode = (typeof SPINE_RENDERER_MODES)[number];
 
 export interface SpineRendererModeOption {
   value: SpineRendererMode;
@@ -32,6 +37,15 @@ export const SPINE_RENDERER_OPTIONS: SpineRendererModeOption[] = [
   },
 ];
 
+/** 缺省值，服务端写默认配置与入参兜底都用它 */
+export const DEFAULT_SPINE_RENDERER: SpineRendererMode = 'stable';
+
+/** 服务端校验：只接受三个已知取值 */
+export function isSpineRendererMode(value: unknown): value is SpineRendererMode {
+  return SPINE_RENDERER_MODES.includes(value as SpineRendererMode);
+}
+
+/** 客户端容错：非法值一律退回 `stable` */
 export function normalizeSpineRendererMode(value: unknown): SpineRendererMode {
-  return value === 'aggressive' || value === 'conservative' ? value : 'stable';
+  return isSpineRendererMode(value) ? value : DEFAULT_SPINE_RENDERER;
 }

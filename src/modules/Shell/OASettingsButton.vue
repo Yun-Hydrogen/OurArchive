@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import OASettingsModal from '@/components/common/OASettingsModal.vue';
+import OASettingsModal from '@/modules/Shell/OASettingsModal.vue';
 
 const isOpen = ref(false);
 </script>

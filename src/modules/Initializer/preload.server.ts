@@ -5,7 +5,7 @@ import {
   resolvePreloadAssetsPath,
   getStoragePaths,
   type StoragePaths,
-} from './paths.js';
+} from '@/modules/Initializer/paths.server';
 
 export interface PreloadAssetItem {
   /** 资源唯一标识，全小写字母 */

@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAppShell } from '@/composables/useAppShell';
-import { useBannerSequence } from '@/composables/useBannerSequence';
-import { useBackgroundMusic } from '@/composables/useBackgroundMusic';
-import { useSplashAudio } from '@/composables/useSplashAudio';
-import { useGlobalConfig } from '@/composables/useGlobalConfig';
-import { SPLASH_ASSETS } from '@/config/assets';
-import { ROUTE_NAMES } from '@/config/routes';
-import { SPLASH_TIMING } from '@/config/splash';
-import { unlockApp } from '@/router/access';
+import { useAppShell } from '@/modules/Shell/useAppShell';
+import { useBannerSequence } from '@/views/useBannerSequence';
+import { useBackgroundMusic } from '@/modules/AudioPlayer/useBackgroundMusic';
+import { useSplashAudio } from '@/views/useSplashAudio';
+import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
+import titleSoundUrl from '@resources/OurArchive/sound.wav?url';
+import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
+import { SPLASH_TIMING } from '@/views/splashTiming';
+import { unlockApp } from '@/modules/ViewsManager/access';
 
 const router = useRouter();
 
 const { config, fetchConfig } = useGlobalConfig();
 const { isIdle, isReady, play: playBanner } = useBannerSequence();
-const { preload, play: playSound } = useSplashAudio(SPLASH_ASSETS.titleSoundUrl);
+const { preload, play: playSound } = useSplashAudio(titleSoundUrl);
 const { fadeIn: fadeInMainBgm } = useBackgroundMusic();
 const { gatePassed, enterHome, markGatePassed, playBannerAnimation } = useAppShell();
 

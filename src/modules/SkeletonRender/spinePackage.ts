@@ -191,7 +191,7 @@ export async function loadSpineCharacterFromPackage(
   skeletonId: string
 ): Promise<SpineCharacter> {
   // 动态引入，避免 spinePackage 被纯本地场景也拖上网络依赖
-  const { fetchSkeletonFiles } = await import('@/api/packages');
+  const { fetchSkeletonFiles } = await import('@/modules/API/packagesApi');
   const files = await fetchSkeletonFiles(packageId, skeletonId);
 
   if (!files.length) {

@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
-import { isSpineRendererMode, loadGlobalConfig, saveGlobalConfig } from '../config/storage.js';
+import { loadGlobalConfig, saveGlobalConfig } from '@/modules/ConfigProvider/configStore.server';
+import { isSpineRendererMode } from '@/modules/ConfigProvider/rendererMode';
 
 export function createConfigRouter(): Router {
   const router = Router();

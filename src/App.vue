@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import OABannerDock from '@/components/common/OABannerDock.vue';
-import OABubbles from '@/components/common/OABubbles.vue';
-import OASettingsButton from '@/components/common/OASettingsButton.vue';
-import OAAboutModal from '@/components/common/OAAboutModal.vue';
-import OAMouseSpark from '@/components/common/OAMouseSpark.vue';
-import { ROUTE_NAMES } from '@/config/routes';
-import { useAppShell } from '@/composables/useAppShell';
+import OABannerDock from '@/modules/Shell/OABannerDock.vue';
+import OABubbles from '@/modules/Shell/OABubbles.vue';
+import OASettingsButton from '@/modules/Shell/OASettingsButton.vue';
+import OAAboutModal from '@/modules/Shell/OAAboutModal.vue';
+import OAMouseSpark from '@/modules/Shell/OAMouseSpark.vue';
+import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
+import { useAppShell } from '@/modules/Shell/useAppShell';
 
 const route = useRoute();
 const { isHome, gatePassed, bannerPlayToken, enterHome, enterSplash } = useAppShell();

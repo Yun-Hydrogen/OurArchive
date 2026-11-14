@@ -5,6 +5,10 @@
 >
 > 素材来源：`C:\Users\YunHydrogen\Downloads\123\故事_files\index-BszzXD4_.js.download`（2.8 MB，已压缩）。
 > 文中 `变量名` 均为压缩后的原名，方便回溯原文；行号不适用，用「搜索关键字符串」定位。
+>
+> 我们自己的实现分三处：解析见 [modules/EmotionProvider.md](./modules/EmotionProvider.md)，
+> 渲染见 [modules/EmotionRender.md](./modules/EmotionRender.md)，
+> 资源写法见 [docs/configs_doc/emotions.md](../docs/configs_doc/emotions.md)。
 
 ---
 
@@ -254,7 +258,7 @@ function Kz(timeline, sprites) {
 
 ## 7. 与 Our Archive 现状的差异
 
-我们已实现的部分（`packages/client/src/components/tools/OAEmotionPlayer.vue` + `emotions.yml`）：
+我们已实现的部分（`src/modules/EmotionRender/OAEmotionPlayer.vue` + `emotions.yml`）：
 
 | 参考实现 | 我们的做法 | 是否等价 |
 | :--- | :--- | :--- |
