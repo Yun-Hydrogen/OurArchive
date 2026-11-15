@@ -23,6 +23,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.bmp': 'image/bmp',
   '.gif': 'image/gif',
   '.avif': 'image/avif',
+  '.svg': 'image/svg+xml; charset=utf-8',
   '.skel': 'application/octet-stream',
   '.atlas': 'text/plain; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
@@ -66,6 +67,16 @@ function sendFile(res: Response, target: string | null) {
 
   res.setHeader('Content-Type', mime);
   res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (path.extname(target).toLowerCase() === '.svg') {
+    // 表情 SVG 禁止执行任何脚本/外链：只声明画布内容，不拉取外部资源
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; media-src 'none'; frame-src 'none'; script-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'"
+    );
+    // 作为 <img> 加载时脚本本来就不执行，这里双保险
+    res.setHeader('Content-Disposition', 'inline');
+  }
   res.sendFile(target);
 }
 
@@ -83,8 +94,8 @@ function sendFile(res: Response, target: string | null) {
  * - `GET /api/packages/:id/sounds/*`            音效音频本体
  * - `GET /api/packages/:id/backgrounds`         背景图与分类（读 index/category.yml，缺省只读根目录）
  * - `GET /api/packages/:id/backgrounds/*`       背景图本体
- * - `GET /api/packages/:id/emotions`            表情清单（读 index/emotions.yml，含合成层与关键帧）
- * - `GET /api/packages/:id/emotions/*`          表情图片 / 音效本体
+ * - `GET /api/packages/:id/emotions`            表情清单（读 index/emotions.yml，每条指向一个自包含动画 SVG）
+ * - `GET /api/packages/:id/emotions/*`          表情 SVG 入口 / 音效本体
  * - `GET /api/packages/:id/avatar/*`            头像图片
  * - `GET /api/packages/:id/skeleton/:id/*`      立绘文件（.skel / .atlas / .png）
  */
@@ -237,7 +248,7 @@ export function createPackagesRouter(): Router {
     sendFile(res, resolveBackgroundFile(packageDir, pkg, String(req.params.file ?? '')));
   });
 
-  // 表情清单（读 <path>/index/emotions.yml，含合成层与关键帧）
+  // 表情清单（读 <path>/index/emotions.yml，每条指向一个 .svg）
   router.get('/:id/emotions', (req: Request, res: Response) => {
     const id = String(req.params.id ?? '');
     const packageDir = resolvePackageDir(id);
@@ -256,7 +267,7 @@ export function createPackagesRouter(): Router {
     }
   });
 
-  // 表情用到的图片 / 音效本体
+  // 表情 SVG 入口 / 音效本体
   router.get('/:id/emotions/:file(*)', (req: Request, res: Response) => {
     const id = String(req.params.id ?? '');
     const packageDir = resolvePackageDir(id);

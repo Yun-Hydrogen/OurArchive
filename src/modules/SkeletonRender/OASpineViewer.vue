@@ -57,7 +57,7 @@ const summary = computed(() => {
   if (!info.value) {
     return '';
   }
-  const renderer = backendKind.value === 'webgl' ? 'WebGL' : 'Canvas 2D';
+  const renderer = backendKind.value === 'pixi-webgl' || backendKind.value === 'webgl' ? 'Pixi (WebGL)' : 'Canvas 2D';
   return `Spine ${info.value.version} · 骨骼 ${info.value.bones} · 槽位 ${info.value.slots} · 动画 ${info.value.animations} · ${renderer}`;
 });
 

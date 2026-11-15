@@ -1,4 +1,4 @@
-# EmotionProvider — 表情 DSL 索引解析、图层树装配与关键帧归一化
+# EmotionProvider — 表情索引解析（SVG 条目）
 
 > 源码：`src/modules/EmotionProvider/`
 
@@ -6,78 +6,70 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `emotions.server.ts` | `emotions.yml` 表情配置解析、图层拓扑校验、关键帧归一化与静态资源定位（服务端专用，浏览器侧绝不能 import） |
+| `emotions.server.ts` | 解析 `index/emotions.yml`，校验 `entry` 指向的 `.svg`，从 SVG 首标签提取画布尺寸与锚点，生成入口 / 音效 URL。服务端专用，浏览器侧绝不能 import |
 
 ## 职责边界
 
-- 解析什么：解析 `Emotions` 分类的 `index/emotions.yml`；装配多图层树形结构；校验 `parent` 引用并防成环；归一化关键帧时间线并补全 0 秒起点；计算表情总时长并生成图片与音效 URL。
-- 不做什么：不执行关键帧补间渲染与动画循环（由 `OAEmotionPlayer` 负责）、不计算角色头顶锚点与贴合（由 `OAEmotionPreview` 负责）、不碰 Canvas/DOM 像素。表情 DSL 权威说明参见 [docs/configs_doc/emotions.md](../../docs/configs_doc/emotions.md)。
+- 解析什么：`Emotions` 分类的 `index/emotions.yml`；每条记录的 `entry`（`.svg`）是否存在；SVG 的 `width`/`height`/`viewBox`；显式锚点；音效路径与存在性。
+- 不做什么：**不展开动画**——动画全在 SVG 里；不渲染、不计算角色头顶锚点（那是 `SkeletonRender` 的 `metrics`）。
 
 ## 数据形状
 
-- `PackageEmotionKeyframe`：单个关键帧
-  - `at`：关键帧时刻（秒，>= 0）
-  - `opacity`：不透明度（0–1，可选）
-  - `zoom`：相对基准宽度的缩放倍率（可选）
-  - `x` / `y`：设计单位位移（×540 后换算像素，可选）
-  - `rotate`：旋转角度（度，可选）
-- `PackageEmotionLayer`：单个图层
-  - `image`：图片可访问 URL
-  - `exists`：图片文件物理存在性
-  - `scale`：相对父层宽度（或 540 设计基准宽度）的缩放比例
-  - `duration`：该图层动画时长（秒，>= 0.05）
-  - `ease`：缓动函数名（与 CSS `animation-timing-function` 同名，缺省 `linear`）
-  - `anchor`：变换原点 `[x, y]`（0–1，缺省 `[0, 0]`）
-  - `position`：基准位置 `[x, y]`（父层宽度/540 倍数，缺省 `[0, 0]`）
-  - `parent`：父层下标；`-1` 表示直接挂在舞台
-  - `keyframes`：`PackageEmotionKeyframe[]`，已补全 0 起点的关键帧数组
-- `PackageEmotion`：表情条目
-  - `id`：表情标识（如 `heart`）
-  - `name`：展示名（缺省回退 `id`）
-  - `description`：描述说明
-  - `offset`：相对角色头顶锚点偏移 `[x, y]`（540 设计宽度倍数）
-  - `duration`：总时长（秒；取声明值与各图层最大时长之大者）
-  - `soundUrl`：音效 URL；无音效或缺失为空串 `""`
-  - `soundExists`：音效物理存在性
-  - `layers`：`PackageEmotionLayer[]`，图层列表（顺序即叠放顺序）
+`PackageEmotion`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `id` | 表情标识（如 `heart`） |
+| `name` | 展示名；缺省回退 `id` |
+| `description` | 描述 |
+| `entry` | `.svg` 的可访问 URL；文件缺失时为空串 |
+| `exists` | `.svg` 是否存在且后缀合法 |
+| `width` / `height` | 从 SVG 读出的画布尺寸（px）；读不出时为 `0` |
+| `anchor` | `[x, y]`，SVG 画布内对齐头顶的位置（px） |
+| `duration` | 声明时长（秒）；`0` 表示未声明 |
+| `loop` | 是否无限循环 |
+| `soundUrl` | 音效 URL；无音效或缺失为空串 |
+| `soundExists` | 音效物理存在性 |
+
+> 已删除 `PackageEmotionLayer` / `PackageEmotionKeyframe`：不再支持手写图层 + 关键帧的旧 DSL。
 
 ## 关键实现
 
 ### `readPackageEmotions(packageDir, pkg)`
 
-1. 作用：读取 `index/emotions.yml` 并解析为结构化表情 DTO。
-2. 输入输出：`(packageDir: string, pkg: ResourcePackage) => PackageEmotion[]`。
-3. 注意事项：BOM 剥离；总时长自动由声明值与图层最大时长取大；音效缺失时 `soundExists: false` 并静默下发；解析失败返回空数组不抛错（见 [NeedNotice](../NeedNotice.md) 条目 12）。
+1. 输入输出：`(packageDir, pkg) => PackageEmotion[]`。
+2. 流程：读 `index/emotions.yml` → 逐条取 `id` / `entry` → 校验 `entry` 以 `.svg` 结尾且文件存在 → 读文本提取画布尺寸 → 解析锚点 → 解析音效。
+3. 容错：BOM 剥离；YAML 解析失败返回空数组不抛错；单条记录字段非法时跳过而非整体失败。
 
-### `parseEmotionLayer(root, packageId, raw, index)`
+### `readSvgCanvas(svgText)`
 
-1. 作用：解析单图层配置并进行拓扑校验。
-2. 输入输出：`(root: string, packageId: string, raw: unknown, index: number) => PackageEmotionLayer | null`。
-3. 注意事项：`parent` 必须严格小于当前图层下标（`0 <= parent < index`），非法值或成环风险统一归一化为 `-1`（直接挂在舞台）；缺图时 `exists: false` 仍下发。
+只匹配**首标签** `/`<svg\b[^>]*>/i`，不做完整 XML 解析（避免引入 XML 依赖）：
 
-### `parseEmotionKeyframes(raw, duration)`
+1. 优先用 `width` + `height`；
+2. 缺失时用 `viewBox` 的第 3、4 项；
+3. 都没有返回 `0 × 0`（前端会按 240 兜底）。
 
-1. 作用：关键帧数据清洗、排序与补点。
-2. 输入输出：`(raw: unknown, duration: number) => PackageEmotionKeyframe[]`。
-3. 注意事项：过滤无效时间帧；按 `at` 升序排序；若首帧 `at > 0` 自动补充 `{ at: 0 }` 起点；无关键帧时补 `[{ at: 0 }, { at: duration }]`。
+### `readSvgAnchor(svgText, width, height)`
+
+1. 优先读 `<metadata data-anchor="x y">`；
+2. 缺失时返回 `[width / 2, height * 0.1]`。
+
+`emotions.yml` 里的 `anchor:` 字段优先级最高，会覆盖这里的推断。
 
 ### `resolveEmotionFile(packageDir, pkg, relative)`
 
-1. 作用：表情图片与音效文件安全定位。
-2. 输入输出：`(packageDir: string, pkg: ResourcePackage, relative: string) => string | null`。
-3. 注意事项：通过 `resolveInside` 校验边界；扩展名必须满足 `IMAGE_EXTENSIONS` 或 `AUDIO_EXTENSIONS` 双白名单。
+路由层用它把 `/api/packages/:id/emotions/*` 映射到磁盘文件。经 `resolveInside` 越界校验，扩展名只允许 `.svg` 与 `AUDIO_EXTENSIONS`。
 
 ## 注意事项
 
-- 表情 DSL、关键帧语法与设计坐标系规范参见 [emotions.md](../../docs/configs_doc/emotions.md)，此处不重复定义。
-- 图层 `parent` 严格单向引用：只能引用下标小于自身的图层（`parent < index`），严禁成环与前向引用。
-- 坐标换算体系：以 540 基准设计宽度为单位，位移与相对位置按父层宽度 / 540 缩放换算。
-- 关键帧时间线必须自闭合：自动补齐 0 秒起点帧，保障起始状态确定。
-- 手写 `emotions.yml` 必须剥除 UTF-8 BOM 头（见 [NeedNotice](../NeedNotice.md) 条目 12）。
-- 计数口径对齐：`countEntries` 读取 `index/emotions.yml` 中的表情条目数，严禁将图片或音效目录当作条目计数（见 [NeedNotice](../NeedNotice.md) 条目 15）。
+- 表情 DSL 与 SVG 写法见 [emotions.md](../../docs/configs_doc/emotions.md)，此处不重复。
+- 手写 `emotions.yml` 必须剥除 UTF-8 BOM（NeedNotice 12）。
+- 计数口径：`countEntries` 读 `index/emotions.yml` 的条目数，不把 `svg/`、`sounds/` 目录条目算进去（NeedNotice 15）。
+- `.svg` 由 `packagesRoutes.server.ts` 下发，响应头带 `Content-Security-Policy` 与 `nosniff`；但**前端仍要自行净化**，因为最终是内联进页面（见 [EmotionRender](./EmotionRender.md)）。
 
 ## 相关文档
 
 - [PackageProvider](./PackageProvider.md)
-- [NeedNotice](../NeedNotice.md)
+- [EmotionRender](./EmotionRender.md)
 - [Emotions 配置规范](../../docs/configs_doc/emotions.md)
+- [NeedNotice](../NeedNotice.md)

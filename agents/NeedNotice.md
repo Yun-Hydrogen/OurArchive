@@ -27,6 +27,7 @@
 | 七、RizUI 集成 | 35 – 41 |
 | 八、立绘骨骼预览（Spine） | 42 – 51 |
 | 九、页面动画 / 构建 / 布局 | 52 – 55 |
+| 十、表情（Emotions）与 Pixi Spine 渲染 | 56 – 60 |
 
 ---
 
@@ -557,6 +558,71 @@
 - **原理**：发行包里没有 `node_modules`，也没有包自身的 `package.json`——模块解析的两种兜底（上溯 node_modules、`type` 字段）同时失效。`.cjs` 是唯一无歧义的 CommonJS 扩展名，而 CommonJS 输出里 `require` 是原生的，不用 esbuild 的 `__require` 垫片。
 - **效果**：三个平台的发行包都能在**干净目录**（无 node_modules、无仓库）里启动，`/`、`/api/*`、`/plugins/*` 全部正常。
 - **备注**：**这个坑在仓库里 100% 测不出来**——仓库根的 `"type": "module"` 让裸 `.js` 合法，上层的 `node_modules` 又让外部依赖能解析，所以本地 `node dist_release/.../server/index.js` 会「蒙对」。冒烟必须把发行目录**复制到仓库外**再跑。`npm run build:server` 产出的 `dist/server/index.js` 不受影响（它在仓库内，靠根 `package.json` 就是合法的 ESM）。
+
+---
+
+## 56 · `<img>` 引用的 SVG 不播放 SMIL，表情会停在第一帧
+
+- **位置**：`src/modules/EmotionRender/OAEmotionPlayer.vue`、`svgSandbox.ts`
+- **表现**：表情 SVG 里写了完整的 `<animateTransform>`，但在预览页里**永远是第一帧**；看起来「渲染坏了」。
+- **验证方式**：同一张 `heart.svg`
+  - 用 `<img src>` 引用：在 150 / 650 / 1150 ms 各截一帧，三张 PNG 的 MD5 完全一致；
+  - 取回文本内联进 DOM：三帧哈希各不相同，且末帧体积骤降（气泡已淡出）。
+- **解决方案**：宿主 `fetch` SVG 文本 → `DOMParser` 解析 → **净化** → `importNode` 内联插入。`<img>` 只用于静态图标，不能用于自带动画的表情。
+- **原理**：Chromium 在 SVG-as-image 模式下不驱动 SMIL 时间轴（CSS 动画与 GIF 可以，SMIL 不行）。内联后 SVG 成为文档树的一部分，SMIL 正常计时。
+- **副作用**：内联绕过了响应头里的 CSP，所以**必须在前端自行净化**（白名单元素、剔除 `on*`、只允许 `data:` / `#` 链接、剔除改 `href` 的 `animate`）。见 `svgSandbox.ts`。
+
+---
+
+## 57 · 表情锚点不能用「包围盒中心 / 包围盒顶沿」
+
+- **位置**：`src/modules/SkeletonRender/useSpineStage.ts`（`metrics`）
+- **表现**：表情整体漂到角色右上方，或者浮在天使环以上，看起来「没绑定到骨骼」。
+- **原因**：
+  1. **X 用包围盒中心**：立绘的武器 / 翅膀让包围盒明显偏向一侧，中心不等于头部中线（实测 ch0334_spr 偏 ~100px）；
+  2. **Y 用整张包围盒顶沿**：天使环、天线、枪口都会高于头顶。
+- **解决方案**：
+  - X / Y 优先用**头骨**；BA 立绘常常只有 `root`，那就用「**差分脸 slot**（`00_default`、`01_normal`…）挂的那根骨骼」——换脸差分一定挂在头部骨骼上，`slot.bone` 直接给出世界坐标；
+  - 候选多根时取 `worldY` 最大（最高）的那根，而不是「第一个匹配」；
+  - 都没有才退回「骨骼局部原点定 X + 身体包围盒顶沿定 Y」。
+- **效果**：ch0334_spr 上锚点从 `(247, 17)` 修正到 `(285, 92)`，正好落在头顶上方约 11px。
+
+---
+
+## 58 · SMIL 没有 `transform-origin`，缩放必须自己补 translate
+
+- **位置**：`res/DefaultPackage/emtions/svg/*.svg`（资源包侧写法）
+- **表现**：本该「原地放大 / 从底部弹出」的符号从画布左上角飞出来。
+- **原因**：`<animateTransform type="scale">` 永远绕当前坐标系原点 `(0,0)` 缩放；写 `transform-origin` 属性 SVGO 也不认（它只是 CSS 属性，在 SMIL 上无效）。
+- **解决方案**：三层嵌套 `translate(cx,cy) → [animateTransform] → translate(-w/2,-h/2)`，把支点挪到元素自身中心 / 底部。写法见 `docs/configs_doc/emotions.md` 3.4 节。
+- **备注**：旋转同理；`type="rotate"` 还支持 `values="deg cx cy"` 形式，但用嵌套 translate 更好读。
+
+---
+
+## 59 · 表情系统全面迁移 Pixi.js 场景图与 GSAP Timeline（弃用 SVG SMIL）
+
+- **位置**：`src/modules/EmotionRender/OAEmotionPlayer.vue`、`src/modules/EmotionRender/emotionPlayer.ts`、`src/modules/SkeletonRender/useSpineStage.ts`
+- **表现**：原先手写 SVG SMIL 导致动画生硬、缺失弹性与物理阻尼；DOM 悬浮计算导致不同身形的角色表情漂移或延迟脱节；`<img>` 不跑 SMIL 被迫繁琐内联净化。
+- **解决方案**：全面转向 Pixi.js 场景图 + GSAP Timeline。表情容器直接作为 `spineInstance.addChild(container)` 挂载到角色 Spine 节点；使用 BA 官方 24 张原生 PNG 纹理，参数移植自 BA-Story 的 19 组物理配置表，由 GSAP 驱动补间并由 `timelinePromise` 自动销毁。
+- **原理**：Spine 实例本身就是 Pixi `Container`，子节点天然继承角色的缩放与位移变换矩阵；GSAP 对 Pixi Sprite 的 properties（x/y/scale/angle/alpha/pivot）提供世界级的高性能物理补间。
+- **效果**：彻底解决动画生硬与漂移问题，实现与官方 100% 对齐的丝滑弹跳、音画同步与零内存泄漏。
+
+---
+
+## 60 · `spine-pixi` 的 `SpineTexture.from` 必须传 `BaseTexture` 而不是 `Texture`
+
+- **位置**：`src/modules/SkeletonRender/backend.ts`（`bindTextures`）
+- **表现**：载入 Spine 立绘时抛出 `TypeError: Cannot read properties of undefined (reading 'source')`。
+- **原因**：在 Pixi.js v7 中，`PIXI.Texture` 实例本身没有 `.resource` 属性（资源挂载在其底层 `texture.baseTexture.resource` 上）。`spine-pixi-v7` 内部的 `SpineTexture` 构造函数定义为：
+  ```javascript
+  constructor(image) {
+    super(image.resource.source);
+    this.texture = Texture.from(image);
+  }
+  ```
+  如果将 `new PIXI.Texture(baseTexture)` 传给 `SpineTexture.from`，访问 `image.resource.source` 时 `image.resource` 为 `undefined` 从而触发该异常。
+- **解决方案**：向 `runtime.SpineTexture.from` 显式传入 `baseTexture`（这也是 spine-pixi 官方 loader 的用法），并兜底校验 `baseTexture.resource.source` 确保其引用 `createImageBitmap` 结果。
+- **效果**：图集页面纹理正常装配进 Spine 渲染器，立绘加载平稳流畅。
 
 ---
 

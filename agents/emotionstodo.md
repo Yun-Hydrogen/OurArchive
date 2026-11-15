@@ -1,14 +1,17 @@
 # 表情系统：参考实现记录与待办
 
-> 本文记录从第三方故事播放器（<https://res.bluearchive.help/>）抓到的**表情（Emoticon）实现方法**，
-> 作为我们 `Emotions` 分类与未来剧情播放器的参考。
+> **状态（2026-11）**：表情已改为「资源包自带**自包含动画 SVG**」。
+> 本文第 2–6 节保留的是最初从第三方播放器抓到的实现分析，作为**动画编排的参考数据**
+> （每帧时长、复制几份、错开多少、何时硬隐藏），仍然是写 SVG 时的取值依据；
+> 但**我们不再用图层 + 关键帧 DSL**，也不再引入 Pixi / GSAP。
+>
+> 现行实现：
+> - 解析见 [modules/EmotionProvider.md](./modules/EmotionProvider.md)
+> - 渲染（内联 SVG + 净化）见 [modules/EmotionRender.md](./modules/EmotionRender.md)
+> - 资源写法见 [docs/configs_doc/emotions.md](../docs/configs_doc/emotions.md)
 >
 > 素材来源：`C:\Users\YunHydrogen\Downloads\123\故事_files\index-BszzXD4_.js.download`（2.8 MB，已压缩）。
 > 文中 `变量名` 均为压缩后的原名，方便回溯原文；行号不适用，用「搜索关键字符串」定位。
->
-> 我们自己的实现分三处：解析见 [modules/EmotionProvider.md](./modules/EmotionProvider.md)，
-> 渲染见 [modules/EmotionRender.md](./modules/EmotionRender.md)，
-> 资源写法见 [docs/configs_doc/emotions.md](../docs/configs_doc/emotions.md)。
 
 ---
 
@@ -256,27 +259,31 @@ function Kz(timeline, sprites) {
 
 ---
 
-## 7. 与 Our Archive 现状的差异
+## 7. 与 Our Archive 现状的差异（2026-11 起已改写）
 
-我们已实现的部分（`src/modules/EmotionRender/OAEmotionPlayer.vue` + `emotions.yml`）：
+> 本节记录的是**旧方案**（图层 + 关键帧 DSL + Web Animations）与参考实现的差距。
+> 该方案已被「资源包自带自包含动画 SVG」取代，差距项随之一并消失：
+> SVG 原生支持 `repeat`/`yoyo`（`repeatCount="indefinite"` + `values` 往返）、
+> 分组动画（容器级 `<g>` 上的 `animate`）、任意支点（嵌套 `translate`）、
+> 硬显隐（`<set>` / `opacity` 阶跃）。下表仅作历史保留。
 
-| 参考实现 | 我们的做法 | 是否等价 |
-| :--- | :--- | :--- |
-| Pixi Sprite + GSAP timeline | DOM 图层 + Web Animations | ✅ 视觉等价 |
-| 540 × 1012 设计基准、`scale × 540` | 同（`unit = 角色屏幕高 / 1012`） | ✅ |
-| 子层位置按父层**宽度**换算（x、y 同乘宽） | 同 | ✅ |
-| 容器挂在角色 Spine 容器上 | 挂在画布上的绝对定位层，锚点取包围盒上沿 | 近似（不随骨骼动画抖动） |
-| 单图弹一下 / 多图合成 / 同图复制 | 同（`layers[]` + `parent`） | ✅ |
-| `repeat:-1, yoyo` 循环（Twinkle、Upset） | 用关键帧写了有限往返 | 近似 |
-| 容器级整体位移 / 闪烁（Respond、Surprise） | 只能逐层写 | 近似 |
-| GSAP `pivot`（Chat 的 `width×(1+0.3)`） | 用 `anchor` 表达 | 近似 |
-| `async: false` 与其它特效并行 | 预览器一次只播一个 | 待做（剧情播放器时） |
+| 参考实现 | 旧做法 | 旧差距 | 现在的做法 |
+| :--- | :--- | :--- | :--- |
+| Pixi Sprite + GSAP timeline | DOM 图层 + Web Animations | — | SVG SMIL，宿主零补间 |
+| 540 × 1012 设计基准 | `unit = 角色屏幕高 / 1012` | — | 画布尺寸由 SVG 自己决定，按 `unit` 等比缩放 |
+| 容器挂在 Spine 容器上 | 绝对定位层，锚点取包围盒上沿 | 浮空 / 偏一侧 | 锚点取**头骨**（无头骨时用差分脸 slot 的骨骼） |
+| 同图复制多个 sprite | `layers[]` + `parent` | — | SVG 里直接写多个 `<image>` |
+| `repeat:-1, yoyo` | 有限往返关键帧 | 周期/相位对不上 | `repeatCount="indefinite"` |
+| 容器级整体位移 / 闪烁 | 逐层重复写 | 冗长 | `<g>` 上挂一条动画 |
+| GSAP `pivot` | 用 `anchor` 近似 | 偏移 | 嵌套 `translate` 精确控制支点 |
+| `async: false` 并行 | 一次只播一个 | 待做 | 仍待剧情播放器 |
 
 ---
 
 ## 8. TODO
 
-### 8.1 表情本身
+> 第 8.1 节列的是**旧 DSL** 的待办，已随方案切换作废（保留作记录）；
+> 现行待办见 8.2 / 8.3。
 
 - [ ] DSL 增加**容器级**动画：`group.keyframes`（整体 `opacity` / `x` / `y`），用于 `Respond` 的闪动与 `Surprise` 的跳跃。
 - [ ] DSL 增加 `repeat` / `yoyo` / `alternate` 字段，替换现在用有限关键帧凑出来的 `Twinkle` / `Upset` 循环。
@@ -296,5 +303,7 @@ function Kz(timeline, sprites) {
 ### 8.3 资源
 
 - [x] 24 张表情图 + 19 段音效已落盘到 `res/DefaultPackage/emtions/`（`images/`、`sounds/`）。
-- [x] `index/emotions.yml` 已按 19 个表情写好关键帧（`docs/configs_doc/emotions.md` 有格式说明）。
+- [x] `index/emotions.yml` 已改为 19 条 SVG 索引；19 个 `.svg` 已生成到 `emtions/svg/`。
+- [x] 表情 SVG 改为内联渲染（`<img>` 不跑 SMIL），锚点改由头骨 / 差分脸 slot 决定。
 - [ ] `BlueArchiveGameSound` 包里没有表情；若以后要「仅表情包」，把 `Emotions.path` 指向独立目录即可。
+- [ ] 19 个 SVG 目前是「按 BA 参数近似重绘」的版本，逐帧对齐参考实现仍可继续打磨（尤其 `Angry` 的三向旋转与 `Bulb` 的灯光交替）。

@@ -1,48 +1,38 @@
 /**
- * Spine 立绘舞台：把识别好的立绘包丢进渲染后端，并暴露「立绘差分」选择。
- *
- * BA 立绘骨骼的组织方式是：
- *   - 差分：`00`..`99` 这类纯数字动画，每一条只做一次 AttachmentTimeline 换图，
- *     也就是「换一张脸 / 表情 / 部件组合」。所以差分选择直接改 slot 的 attachment，
- *     不跑动画时间轴，切换是瞬时的。
- *   - 动作：`Idle_01` 这类循环动画，只驱动光环呼吸等部件，可与差分叠加。
- *
- * 每帧顺序固定为「复位 → 应用动作 → 覆盖差分 → 更新世界变换 → 交给后端绘制」，
- * 保证无论怎么组合，差分选择永远生效，且不会残留上一次的 attachment。
- *
- * 绘制本身委托给 `spine/backend` 里的两条路径（WebGL / canvas 2d），这里只做
- * 坐标系运算与生命周期管理：缩放、平移、y 轴翻转对两条路径是同一套算式。
+ * Spine 立绘舞台（基于 Pixi.js 引擎）：
+ * 把识别好的立绘包载入 Pixi 舞台，驱动差分、动作、缩放与平移，
+ * 并将 Spine 容器暴露给外部挂载表情与特效。
  */
 import { onBeforeUnmount, ref, shallowRef, watch, type Ref } from 'vue';
+import * as PIXI from 'pixi.js';
 import {
   createSpineBackend,
-  normalizeSpineRendererMode,
-  SpineCanvasLockedError,
   type SpineBackend,
   type SpineBackendKind,
-  type SpineRendererMode,
 } from '@/modules/SkeletonRender/backend';
 import type {
+  SpineAnimation,
   SpineAnimationState,
   SpineAttachmentTimeline,
-  SpineCoreRuntime,
+  SpineBone,
+  SpineBounds,
+  SpineInstance,
+  SpinePixiRuntime,
   SpineSkeleton,
   SpineSkeletonData,
+  SpineSlot,
   SpineTimeline,
 } from '@/modules/SkeletonRuntimeProvider/spineTypes';
 import { matchTexture, type SpineCharacter } from '@/modules/SkeletonRender/spinePackage';
 import { readonlyRef } from '@/utils/reactivity';
 
-/** 一条差分 = 若干个 slot 的 attachment 覆盖 */
-interface SpineLayer {
+export interface SpineLayer {
   slotIndex: number;
   attachmentName: string | null;
 }
 
 export interface SpineVariant {
-  /** 动画名，也就是差分编号（如 `03`） */
   name: string;
-  /** 展示用文案（如 `03 · 微笑`） */
   label: string;
   layers: SpineLayer[];
 }
@@ -55,54 +45,46 @@ const EXPRESSION_LABELS: Record<string, string> = {
   embarassed: '害羞',
   embarrassed: '害羞',
   serious: '认真',
-  shout: '喊叫',
-  depressed: '沮丧',
-  pero: '舔唇',
-  eyeclose: '闭眼',
+  angry: '生气',
+  sad: '难过',
+  cry: '哭泣',
+  surprise: '惊讶',
+  wink: '眨眼',
   close: '闭眼',
-  haircover: '刘海',
-  halo: '光环',
+  shy: '害羞',
 };
 
-/** `03_smile` → `微笑`；未知词条退化为首字母大写 */
-function prettify(token: string): string {
-  const key = token.replace(/[\s_-]/g, '').toLowerCase();
-  if (EXPRESSION_LABELS[key]) {
-    return EXPRESSION_LABELS[key];
-  }
-  return token.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/** 从附件名里抽出可读的部分：`03_smile` → `微笑`，纯编号则返回 null */
-function describeAttachment(name: string | null): string | null {
+function describeAttachment(name: string | null): string {
   if (!name) {
-    return null;
+    return '';
   }
-  const stripped = name.replace(/^\d+[_-]?/, '');
-  if (!stripped || /^\d+$/.test(stripped)) {
-    return null;
+  const clean = name.replace(/^.*[/\\]/, '').replace(/\.[^.]+$/, '');
+  const tokens = clean.toLowerCase().split(/[^a-z0-9]+/);
+  for (const token of tokens) {
+    if (EXPRESSION_LABELS[token]) {
+      return EXPRESSION_LABELS[token];
+    }
   }
-  return prettify(stripped);
+  return '';
 }
 
 function isAttachmentTimeline(
   timeline: SpineTimeline,
-  attachmentTimeline: SpineCoreRuntime['AttachmentTimeline']
+  timelineClass: unknown
 ): timeline is SpineAttachmentTimeline {
-  return timeline instanceof attachmentTimeline;
+  return (
+    typeof timelineClass === 'function' &&
+    timeline instanceof (timelineClass as new (...args: unknown[]) => SpineTimeline)
+  );
 }
 
-/** 抽出全部差分；同一组图层只保留最先出现的一条，避免 `99` 这类重复项刷屏 */
 export function extractSpineVariants(
   data: SpineSkeletonData,
-  runtime: SpineCoreRuntime
+  runtime: SpinePixiRuntime
 ): SpineVariant[] {
-  // 角色自身名字（`ako_spr` / `shiroko`）会出现在附件名里，当成标签没有信息量
   const noise = new Set<string>();
   for (const token of String(data.name ?? '').toLowerCase().split(/[^a-z0-9]+/)) {
-    if (!token) {
-      continue;
-    }
+    if (!token) continue;
     noise.add(token);
     noise.add(token.replace(/\d+$/, ''));
   }
@@ -151,84 +133,65 @@ export function extractSpineVariants(
   return variants.sort((a, b) => Number(a.name) - Number(b.name));
 }
 
-/** 除差分外的循环 / 单次动画，作为「动作」下拉项 */
 function extractSpineActions(data: SpineSkeletonData): string[] {
   return data.animations
     .filter((animation) => !/^\d+$/.test(animation.name))
-    .map((animation) => animation.name)
-    .sort((a, b) => {
-      // 待机动画排最前，其余按名称稳定排序
-      const rank = (name: string) => (/idle/i.test(name) ? 0 : 1);
-      return rank(a) - rank(b) || a.localeCompare(b);
-    });
+    .map((animation) => animation.name);
 }
-
-export type SpineStageStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export function useSpineStage(
   canvas: Ref<HTMLCanvasElement | null>,
-  rendererMode: Ref<SpineRendererMode> = ref<SpineRendererMode>('stable')
+  _rendererMode?: Ref<string>
 ) {
-  const status = ref<SpineStageStatus>('idle');
+  const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const error = ref('');
-  const variants = shallowRef<SpineVariant[]>([]);
+  const info = ref<{
+    bones: number;
+    slots: number;
+    animations: number;
+    version: string;
+  } | null>(null);
+  const variants = ref<SpineVariant[]>([]);
   const activeVariant = ref('');
-  const actions = shallowRef<string[]>([]);
+  const actions = ref<string[]>([]);
   const activeAction = ref('');
+  const backendKind = ref<SpineBackendKind>('pixi-webgl');
+  const canvasKey = ref(0);
   const zoom = ref(1);
   const debugRendering = ref(false);
-  const info = ref<{ bones: number; slots: number; animations: number; version: string } | null>(
-    null
-  );
-  /** 实际生效的渲染后端；切模式后由下一次载入刷新 */
-  const backendKind = ref<SpineBackendKind>('canvas');
-  /** 换模式时需要一张全新的 <canvas>（同一张画布不能既 webgl 又 2d），交给模板做 :key */
-  const canvasKey = ref(0);
 
-  /**
-   * 角色在画布上的投影信息，给「表情叠加层」定位用：
-   * - `unit`：540 设计宽度对应的屏幕像素（随角色缩放 / 缩放滑条变化）
-   * - `anchorX` / `anchorY`：头顶锚点在画布内的像素坐标
-   */
+  const spineInstance = shallowRef<SpineInstance | null>(null);
+  const pixiApp = shallowRef<PIXI.Application | null>(null);
+
   const metrics = ref({ unit: 0, anchorX: 0, anchorY: 0, charHeight: 0 });
 
-  let runtime: SpineCoreRuntime | null = null;
-  let skeleton: SpineSkeleton | null = null;
-  let state: SpineAnimationState | null = null;
-  let data: SpineSkeletonData | null = null;
+  let runtime: SpinePixiRuntime | null = null;
   let backend: SpineBackend | null = null;
-  let bounds = { x: 0, y: 0, width: 1, height: 1 };
-  let frame = 0;
-  let lastTime = 0;
-  let resizeObserver: ResizeObserver | null = null;
-  let panX = 0;
-  let panY = 0;
-  /** 画布 CSS 尺寸缓存，避免每帧读 clientWidth 触发同步布局 */
+  let skeletonData: SpineSkeletonData | null = null;
+  let bounds: SpineBounds = { x: 0, y: 0, width: 1, height: 1 };
+
   let viewWidth = 1;
   let viewHeight = 1;
+  let panX = 0;
+  let panY = 0;
+  let dragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
   let loadToken = 0;
   let lastCharacter: SpineCharacter | null = null;
-  /** 已经因画布锁死重试过的 canvasKey，防止无限换画布 */
-  let lastLockedKey = -1;
-  /** 静态立绘（不播放动作）时靠它判断是否需要重画 */
-  let needsRedraw = true;
+  let resizeObserver: ResizeObserver | null = null;
 
   const variantByName = shallowRef<Map<string, SpineVariant>>(new Map());
 
   function applyVariantLayers() {
-    if (!skeleton) {
-      return;
-    }
+    const inst = spineInstance.value;
+    if (!inst) return;
     const variant = variantByName.value.get(activeVariant.value);
-    if (!variant) {
-      return;
-    }
-    const skin = skeleton.skin ?? data?.defaultSkin ?? null;
+    if (!variant) return;
+    const skin = inst.skeleton.skin ?? skeletonData?.defaultSkin ?? null;
     for (const layer of variant.layers) {
-      const slot = skeleton.slots[layer.slotIndex];
-      if (!slot) {
-        continue;
-      }
+      const slot = inst.skeleton.slots[layer.slotIndex];
+      if (!slot) continue;
       const attachment =
         layer.attachmentName && skin
           ? skin.getAttachment(layer.slotIndex, layer.attachmentName)
@@ -237,72 +200,9 @@ export function useSpineStage(
     }
   }
 
-  function measure() {
-    if (!skeleton || !runtime) {
-      return;
-    }
-    // 量尺寸时把根变换清干净，否则上一次渲染的位移 / 缩放会混进包围盒
-    skeleton.x = 0;
-    skeleton.y = 0;
-    skeleton.scaleX = 1;
-    skeleton.scaleY = 1;
-    skeleton.setToSetupPose();
-    skeleton.updateWorldTransform(runtime.Physics.update);
-    bounds = skeleton.getBoundsRect();
-  }
-
-  /**
-   * 同步画布后备缓冲尺寸与后端视口。
-   *
-   * 只在尺寸 / DPR 真的变化时动 DOM：以前每帧都读 clientWidth 会强制同步布局，
-   * 而 ResizeObserver 已经把「尺寸变了」这件事告诉我们了。
-   */
-  function applySize() {
-    const element = canvas.value;
-    if (!element || !backend) {
-      return;
-    }
-    const cssWidth = element.clientWidth;
-    const cssHeight = element.clientHeight;
-    if (!cssWidth || !cssHeight) {
-      return;
-    }
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(1, Math.round(cssWidth * dpr));
-    const height = Math.max(1, Math.round(cssHeight * dpr));
-    if (element.width !== width || element.height !== height) {
-      element.width = width;
-      element.height = height;
-    }
-    viewWidth = cssWidth;
-    viewHeight = cssHeight;
-    backend.setViewport(cssWidth, cssHeight, dpr);
-    needsRedraw = true;
-  }
-
-  function draw(now: number) {
-    frame = requestAnimationFrame(draw);
-    if (!skeleton || !backend || !runtime) {
-      return;
-    }
-
-    // 选「静态」且没有任何输入时不必重画：高密度骨骼的空转也很浪费电
-    const animating = Boolean(state && activeAction.value);
-    if (!animating && !needsRedraw) {
-      return;
-    }
-    needsRedraw = false;
-
-    const delta = lastTime ? Math.min((now - lastTime) / 1000, 0.05) : 0;
-    lastTime = now;
-
-    skeleton.setToSetupPose();
-    if (animating && state) {
-      state.update(delta);
-      state.apply(skeleton);
-    }
-    applyVariantLayers();
-    skeleton.updateWorldTransform(runtime.Physics.update);
+  function applyTransform() {
+    const inst = spineInstance.value;
+    if (!inst) return;
 
     const fit = Math.min(
       (viewWidth * 0.94) / Math.max(bounds.width, 1),
@@ -310,48 +210,49 @@ export function useSpineStage(
     );
     const scale = fit * zoom.value;
 
-    // 骨骼是 y 轴向上的坐标系，靠 scaleY 取负翻到画布坐标
-    skeleton.scaleX = scale;
-    skeleton.scaleY = -scale;
-    skeleton.x = viewWidth / 2 + panX - (bounds.x + bounds.width / 2) * scale;
-    skeleton.y = viewHeight / 2 + panY + (bounds.y + bounds.height / 2) * scale;
+    inst.scale.set(scale);
 
-    // 头顶锚点：包围盒上沿；540 设计宽度按角色高度等比换算
+    const localCenterX = bounds.x + bounds.width / 2;
+    const localCenterY = bounds.y + bounds.height / 2;
+    inst.x = viewWidth / 2 + panX - localCenterX * scale;
+    inst.y = viewHeight / 2 + panY - localCenterY * scale;
+
     const charHeight = Math.max(bounds.height * scale, 1);
-    metrics.value = {
-      unit: charHeight / 1012,
-      anchorX: viewWidth / 2 + panX,
-      anchorY: viewHeight / 2 + panY - (bounds.height / 2) * scale,
-      charHeight,
-    };
+    const unit = charHeight / 1012;
 
-    backend.render(skeleton, debugRendering.value);
+    const head = inst.skeleton.findBone?.('Head') ?? null;
+    const anchorX = inst.x + (head ? head.worldX * scale : localCenterX * scale);
+    const anchorY = inst.y + (head ? head.worldY * scale : bounds.y * scale);
+
+    metrics.value = { unit, anchorX, anchorY, charHeight };
   }
 
-  function stopLoop() {
-    if (frame) {
-      cancelAnimationFrame(frame);
-      frame = 0;
-    }
-    lastTime = 0;
+  function applySize() {
+    const element = canvas.value;
+    if (!element || !backend) return;
+    const cssWidth = element.clientWidth;
+    const cssHeight = element.clientHeight;
+    if (!cssWidth || !cssHeight) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    viewWidth = cssWidth;
+    viewHeight = cssHeight;
+    backend.setViewport(cssWidth, cssHeight, dpr);
+    applyTransform();
   }
 
   function disposeStage() {
-    stopLoop();
     resizeObserver?.disconnect();
     resizeObserver = null;
+    if (spineInstance.value) {
+      spineInstance.value.destroy({ children: true });
+      spineInstance.value = null;
+    }
     backend?.dispose();
     backend = null;
+    pixiApp.value = null;
     runtime = null;
-    skeleton = null;
-    state = null;
-    data = null;
-    variants.value = [];
-    actions.value = [];
-    variantByName.value = new Map();
-    activeVariant.value = '';
-    activeAction.value = '';
-    info.value = null;
+    skeletonData = null;
   }
 
   async function load(character: SpineCharacter) {
@@ -369,81 +270,77 @@ export function useSpineStage(
         throw new Error('画布尚未就绪');
       }
 
-      // 换角色时先放掉旧上下文，避免 WebGL 贴图和着色器泄漏
       disposeStage();
 
-      const mode = normalizeSpineRendererMode(rendererMode.value);
-      const handle = await createSpineBackend(element, mode);
+      const handle = await createSpineBackend(element);
       if (token !== loadToken) {
         handle.backend.dispose();
         return;
       }
 
-      const activeBackend = handle.backend;
-      const activeRuntime = handle.runtime;
-      backend = activeBackend;
-      runtime = activeRuntime;
-      backendKind.value = activeBackend.kind;
+      backend = handle.backend;
+      runtime = handle.runtime;
+      pixiApp.value = backend.app;
+      backendKind.value = backend.kind;
 
-      const atlas = new activeRuntime.TextureAtlas(await character.atlas.text());
+      const atlas = new runtime.TextureAtlas(await character.atlas.text());
       for (const page of atlas.pages) {
         if (!matchTexture(character.textures, page.name)) {
           throw new Error(`图集页 ${page.name} 缺少对应贴图`);
         }
       }
-      await activeBackend.bindTextures(atlas, (pageName) =>
+      await backend.bindTextures(atlas, (pageName) =>
         matchTexture(character.textures, pageName)
       );
-      if (token !== loadToken) {
-        return;
-      }
+      if (token !== loadToken) return;
 
-      const loader = new activeRuntime.AtlasAttachmentLoader(atlas);
-      let skeletonData: SpineSkeletonData;
+      const loader = new runtime.AtlasAttachmentLoader(atlas);
+      let parsedData: SpineSkeletonData;
       if (character.skeleton.name.toLowerCase().endsWith('.json')) {
         const json = JSON.parse(await character.skeleton.text());
-        skeletonData = new activeRuntime.SkeletonJson(loader).readSkeletonData(json);
+        parsedData = new runtime.SkeletonJson(loader).readSkeletonData(json);
       } else {
         const bytes = new Uint8Array(await character.skeleton.arrayBuffer());
-        skeletonData = new activeRuntime.SkeletonBinary(loader).readSkeletonData(bytes);
+        parsedData = new runtime.SkeletonBinary(loader).readSkeletonData(bytes);
       }
-      if (token !== loadToken) {
-        return;
-      }
+      if (token !== loadToken) return;
 
-      data = skeletonData;
-      skeleton = new activeRuntime.Skeleton(skeletonData);
-      skeleton.setToSetupPose();
+      skeletonData = parsedData;
 
-      const stateData = new activeRuntime.AnimationStateData(skeletonData);
-      stateData.defaultMix = 0.15;
-      const nextState = new activeRuntime.AnimationState(stateData);
-      state = nextState;
+      const inst = new runtime.Spine({ skeletonData: parsedData });
+      spineInstance.value = inst;
+      backend.app.stage.addChild(inst);
 
-      const parsedVariants = extractSpineVariants(skeletonData, activeRuntime);
+      inst.skeleton.setToSetupPose();
+      inst.skeleton.updateWorldTransform(runtime.Physics?.update);
+      bounds = inst.skeleton.getBoundsRect();
+
+      const parsedVariants = extractSpineVariants(parsedData, runtime);
       variants.value = parsedVariants;
       variantByName.value = new Map(parsedVariants.map((item) => [item.name, item]));
       activeVariant.value = parsedVariants[0]?.name ?? '';
 
-      const parsedActions = extractSpineActions(skeletonData);
+      const parsedActions = extractSpineActions(parsedData);
       actions.value = parsedActions;
       const nextAction = parsedActions.find((name) => /idle/i.test(name)) ?? '';
       activeAction.value = nextAction;
-      // 与上一次载入同名动作时 watch 不会触发，这里直接起播
-      nextState.clearTracks();
+
+      inst.state.clearTracks();
       if (nextAction) {
-        nextState.setAnimation(0, nextAction, true);
+        inst.state.setAnimation(0, nextAction, true);
+        inst.autoUpdate = true;
+      } else {
+        inst.autoUpdate = false;
       }
 
-      info.value = {
-        bones: skeletonData.bones.length,
-        slots: skeletonData.slots.length,
-        animations: skeletonData.animations.length,
-        version: skeletonData.version ?? 'unknown',
-      };
+      applyVariantLayers();
 
-      zoom.value = 1;
-      measure();
+      info.value = {
+        bones: parsedData.bones.length,
+        slots: parsedData.slots.length,
+        animations: parsedData.animations.length,
+        version: parsedData.version ?? 'unknown',
+      };
 
       if (typeof ResizeObserver !== 'undefined') {
         resizeObserver?.disconnect();
@@ -452,135 +349,84 @@ export function useSpineStage(
       }
 
       applySize();
-      stopLoop();
-      lastTime = 0;
-      needsRedraw = true;
-      frame = requestAnimationFrame(draw);
       status.value = 'ready';
     } catch (cause) {
-      if (token !== loadToken) {
-        return;
-      }
+      if (token !== loadToken) return;
       disposeStage();
       status.value = 'error';
-      // 上一轮用 WebGL 占了画布，这轮要退回 canvas 2d 就必须换一张画布重来
-      if (
-        cause instanceof SpineCanvasLockedError &&
-        lastCharacter &&
-        lastLockedKey !== canvasKey.value
-      ) {
-        canvasKey.value += 1;
-        lastLockedKey = canvasKey.value;
-        error.value = '';
-        return;
-      }
       error.value = cause instanceof Error ? cause.message : String(cause);
     }
   }
 
-  function setAction(name: string) {
-    activeAction.value = name;
-  }
-
-  watch(activeAction, (name) => {
-    if (!state) {
-      return;
-    }
-    state.clearTracks();
-    if (name) {
-      state.setAnimation(0, name, true);
-    }
-    needsRedraw = true;
-  });
-
-  watch(debugRendering, () => {
-    needsRedraw = true;
-  });
-
   function setVariant(name: string) {
     activeVariant.value = name;
-    needsRedraw = true;
+    applyVariantLayers();
   }
 
-  function setZoom(value: number) {
-    zoom.value = Math.min(Math.max(value, 0.2), 5);
-    needsRedraw = true;
+  function setAction(name: string) {
+    activeAction.value = name;
+    const inst = spineInstance.value;
+    if (!inst) return;
+    inst.state.clearTracks();
+    if (name) {
+      inst.state.setAnimation(0, name, true);
+      inst.autoUpdate = true;
+    } else {
+      inst.autoUpdate = false;
+      inst.skeleton.setToSetupPose();
+      applyVariantLayers();
+    }
+  }
+
+  function setZoom(nextZoom: number) {
+    zoom.value = Math.max(0.2, Math.min(nextZoom, 4));
+    applyTransform();
   }
 
   function resetView() {
     zoom.value = 1;
     panX = 0;
     panY = 0;
-    needsRedraw = true;
+    applyTransform();
   }
 
-  /* ------------------------------ 拖拽平移 ------------------------------ */
-
-  let dragging = false;
-  let dragStartX = 0;
-  let dragStartY = 0;
-  let panOriginX = 0;
-  let panOriginY = 0;
-
   function onPointerDown(event: PointerEvent) {
-    if (event.button !== 0) {
-      return;
-    }
+    if (event.button !== 0 && event.button !== 1) return;
     dragging = true;
-    dragStartX = event.clientX;
-    dragStartY = event.clientY;
-    panOriginX = panX;
-    panOriginY = panY;
-    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+    dragStartX = event.clientX - panX;
+    dragStartY = event.clientY - panY;
+    (event.target as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
   }
 
   function onPointerMove(event: PointerEvent) {
-    if (!dragging) {
-      return;
-    }
-    panX = panOriginX + (event.clientX - dragStartX);
-    panY = panOriginY + (event.clientY - dragStartY);
-    needsRedraw = true;
+    if (!dragging) return;
+    panX = event.clientX - dragStartX;
+    panY = event.clientY - dragStartY;
+    applyTransform();
   }
 
   function onPointerUp(event: PointerEvent) {
+    if (!dragging) return;
     dragging = false;
-    (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+    (event.target as HTMLElement | null)?.releasePointerCapture?.(event.pointerId);
   }
 
   function onWheel(event: WheelEvent) {
-    event.preventDefault();
-    const factor = event.deltaY > 0 ? 0.92 : 1.08;
+    const factor = event.deltaY < 0 ? 1.1 : 0.9;
     setZoom(zoom.value * factor);
   }
 
-  /* ------------------------ 渲染器 / 画布热切换 ------------------------ */
-
-  // DPR 变化（跨屏拖窗口）不会改变 CSS 尺寸，ResizeObserver 收不到，单独补一次
-  function onWindowResize() {
-    applySize();
-  }
-  window.addEventListener('resize', onWindowResize);
-
-  // 同一张画布不能既 webgl 又 2d，换模式时直接换一张 <canvas> 再重新载入
-  watch(rendererMode, () => {
-    if (lastCharacter) {
-      canvasKey.value += 1;
-    }
+  watch(debugRendering, (enabled) => {
+    const inst = spineInstance.value;
+    if (!inst || !runtime) return;
+    inst.debug = enabled ? new runtime.SpineDebugRenderer(inst) : null;
   });
 
-  watch(
-    canvas,
-    (element) => {
-      if (element && lastCharacter && status.value !== 'loading') {
-        void load(lastCharacter);
-      }
-    },
-    { flush: 'post' }
-  );
+  watch(activeVariant, () => {
+    applyVariantLayers();
+  });
 
   onBeforeUnmount(() => {
-    window.removeEventListener('resize', onWindowResize);
     loadToken += 1;
     disposeStage();
   });
@@ -597,7 +443,8 @@ export function useSpineStage(
     canvasKey: readonlyRef(canvasKey),
     zoom: readonlyRef(zoom),
     metrics: readonlyRef(metrics),
-    // 双向绑定：`rizui_switch` 直接 v-model，保持可写
+    spineInstance: readonlyRef(spineInstance),
+    pixiApp: readonlyRef(pixiApp),
     debugRendering,
     load,
     setVariant,

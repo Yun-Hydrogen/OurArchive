@@ -13,13 +13,12 @@ import type { StoragePaths } from '@/modules/Initializer/paths.server';
  *   2. 手动放入文件夹（稍后自行放置）
  *   3. 强制无 Spine 加载（不推荐，立绘预览不可用）
  *
- * 无论选择哪种，服务都会继续启动；前端只通过 `/plugins/spine/*.mjs` 动态加载
- * 这里的文件，构建期不依赖任何 `@esotericsoftware/*` 包。浏览器不能直接执行
- * TypeScript，所以缓存的是官方 npm 包里的 ESM 产物（`.mjs`），而不是源码 `.ts`。
+ * 无论选择哪种，服务都会继续启动；前端通过 `/plugins/spine/*.js` 动态加载
+ * 这里的文件，构建期不依赖任何 `@esotericsoftware/*` 包。
  */
 export const SPINE_RUNTIME_VERSION = '4.2.120';
 
-export const SPINE_RUNTIME_FILES = ['spine-webgl.mjs', 'spine-canvas.mjs', 'LICENSE'] as const;
+export const SPINE_RUNTIME_FILES = ['spine-pixi.js', 'LICENSE'] as const;
 
 const LICENSE_URL = 'https://esotericsoftware.com/spine-runtimes-license';
 
@@ -38,18 +37,21 @@ interface DownloadSpec {
   sources: string[];
 }
 
-function buildSources(pkg: string, file: string): string[] {
-  const relative = file === 'LICENSE' ? 'LICENSE' : `dist/esm/${file}`;
-  return [
-    `https://cdn.jsdelivr.net/npm/@esotericsoftware/${pkg}@${SPINE_RUNTIME_VERSION}/${relative}`,
-    `https://unpkg.com/@esotericsoftware/${pkg}@${SPINE_RUNTIME_VERSION}/${relative}`,
-  ];
-}
-
 const DOWNLOADS: DownloadSpec[] = [
-  { file: 'spine-webgl.mjs', sources: buildSources('spine-webgl', 'spine-webgl.mjs') },
-  { file: 'spine-canvas.mjs', sources: buildSources('spine-canvas', 'spine-canvas.mjs') },
-  { file: 'LICENSE', sources: buildSources('spine-webgl', 'LICENSE') },
+  {
+    file: 'spine-pixi.js',
+    sources: [
+      `https://cdn.jsdelivr.net/npm/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/dist/iife/spine-pixi-v7.js`,
+      `https://unpkg.com/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/dist/iife/spine-pixi-v7.js`,
+    ],
+  },
+  {
+    file: 'LICENSE',
+    sources: [
+      `https://cdn.jsdelivr.net/npm/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/LICENSE`,
+      `https://unpkg.com/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/LICENSE`,
+    ],
+  },
 ];
 
 export interface SpineRuntimeStatus {

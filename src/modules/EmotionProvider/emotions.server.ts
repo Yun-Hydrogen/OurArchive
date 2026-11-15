@@ -1,7 +1,5 @@
 /**
- * 表情解析：`index/emotions.yml` → 合成图层 + 关键帧。
- *
- * 播放逻辑由前端解释，这里只负责把 yml 翻成结构化数据并把资源路径转成 URL。
+ * 表情解析：`index/emotions.yml` → 表情元数据与 PNG / SVG / 音频资源。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,128 +7,128 @@ import { load as parseYaml } from 'js-yaml';
 import type {
   PackageEmotion,
   ResourcePackage,
-  PackageEmotionKeyframe,
-  PackageEmotionLayer,
 } from '@/modules/API/types';
 import {
   AUDIO_EXTENSIONS,
   EMOTION_INDEX_DIR,
   EMOTION_INDEX_FILE,
-  IMAGE_EXTENSIONS,
-  asText,
   buildAssetUrl,
   getContent,
   resolveInside,
+  asText,
 } from '@/modules/PackageProvider/packageManifest.server';
-/* ------------------------------ 表情 ------------------------------ */
 
-function asNumber(value: unknown, fallback: number): number {
-  const parsed = typeof value === 'number' ? value : Number(asText(value));
-  return Number.isFinite(parsed) ? parsed : fallback;
+const SVG_EXTENSION = '.svg';
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+
+/** 19 种表情对应的 PNG 材质映射表（BA 游戏标准，位于 images/ 目录下） */
+const EMOTION_IMAGE_FILES: Record<string, string[]> = {
+  heart: ['emoicon_balloon_n.png', 'emoicon_heart.png'],
+  respond: ['emoicon_action.png'],
+  music: ['emoicon_note.png'],
+  twinkle: ['emoicon_twinkle.png'],
+  upset: ['emoicon_balloon_n.png', 'emoicon_anxiety.png'],
+  sweat: ['emoicon_sweat_1.png', 'emoicon_sweat_2.png'],
+  dot: ['emoicon_balloon_n.png', 'emoicon_idea.png'],
+  exclaim: ['emoicon_exclamationmark.png'],
+  surprise: ['emoicon_exclamation.png', 'emoicon_question.png'],
+  question: ['emoicon_questionmark.png'],
+  shy: ['emoicon_balloon_n.png', 'emoicon_shy.png'],
+  angry: ['emoicon_aggro.png'],
+  chat: ['emoicon_chat.png'],
+  sad: ['emoji_sad.png'],
+  steam: ['emoji_steam.png'],
+  sigh: ['emoji_sigh.png'],
+  bulb: ['emoicon_balloon_n.png', 'emoji_bulb_1.png', 'emoji_bulb_2.png'],
+  tear: ['emoji_tear_1.png', 'emoji_tear_2.png'],
+  zzz: ['emoji_zzz.png'],
+};
+
+const SVG_TAG_RE = /<svg\b[^>]*>/i;
+
+function readAttr(tag: string, name: string): string {
+  const regex = new RegExp(`${name}\\s*=\\s*("([^"]*)"|'([^']*)')`, 'i');
+  const match = regex.exec(tag);
+  return match ? String(match[2] ?? match[3] ?? '') : '';
 }
 
-/** `[x, y]` / `{x, y}` / 单个数字 → 二元组 */
-function asPair(value: unknown, fallback: [number, number]): [number, number] {
+function toNumber(value: string): number {
+  const cleaned = String(value).replace(/[^0-9.+-]/g, '');
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseViewBox(value: string): [number, number, number, number] | null {
+  const parts = String(value).trim().split(/[\s,]+/).map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) {
+    return null;
+  }
+  return [parts[0], parts[1], parts[2], parts[3]];
+}
+
+export function readSvgCanvas(svgText: string): { width: number; height: number } {
+  const tagMatch = SVG_TAG_RE.exec(svgText);
+  if (!tagMatch) {
+    return { width: 0, height: 0 };
+  }
+  const tag = tagMatch[0];
+  const width = toNumber(readAttr(tag, 'width'));
+  const height = toNumber(readAttr(tag, 'height'));
+  if (width > 0 && height > 0) {
+    return { width, height };
+  }
+  const viewBox = parseViewBox(readAttr(tag, 'viewBox'));
+  if (viewBox) {
+    return { width: Math.max(0, viewBox[2]), height: Math.max(0, viewBox[3]) };
+  }
+  return { width: Math.max(0, width), height: Math.max(0, height) };
+}
+
+function readSvgAnchor(svgText: string, width: number, height: number): [number, number] {
+  const meta = /<metadata[^>]*data-anchor\s*=\s*"([^"]*)"/i.exec(svgText);
+  if (meta) {
+    const parts = String(meta[1]).split(/[\s,]+/).map(Number);
+    if (parts.length >= 2 && parts.every(Number.isFinite)) {
+      return [parts[0], parts[1]];
+    }
+  }
+  if (width > 0 && height > 0) {
+    return [width / 2, Math.max(0, height * 0.1)];
+  }
+  return [0, 0];
+}
+
+function asNonNegativeNumber(value: unknown, fallback: number): number {
+  const parsed = typeof value === 'number' ? value : Number(asText(value));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function asBoolean(value: unknown, fallback: boolean): boolean {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  const text = asText(value).trim().toLowerCase();
+  if (!text) {
+    return fallback;
+  }
+  return ['true', 'yes', '1', 'on'].includes(text);
+}
+
+function parsePair(value: unknown, fallback: [number, number]): [number, number] {
   if (Array.isArray(value) && value.length >= 2) {
-    return [asNumber(value[0], fallback[0]), asNumber(value[1], fallback[1])];
+    const x = Number(value[0]);
+    const y = Number(value[1]);
+    return [Number.isFinite(x) ? x : fallback[0], Number.isFinite(y) ? y : fallback[1]];
   }
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    return [
-      asNumber(record.x, fallback[0]),
-      asNumber(record.y, fallback[1]),
-    ];
-  }
-  if (value !== undefined && value !== null && value !== '') {
-    const single = asNumber(value, NaN);
-    if (Number.isFinite(single)) {
-      return [single, single];
-    }
+    const x = Number(record.x);
+    const y = Number(record.y);
+    return [Number.isFinite(x) ? x : fallback[0], Number.isFinite(y) ? y : fallback[1]];
   }
   return [...fallback];
 }
 
-/** 解析一层的关键帧，自动补 0 起点、排序并去掉非法项 */
-function parseEmotionKeyframes(raw: unknown, duration: number): PackageEmotionKeyframe[] {
-  if (!Array.isArray(raw)) {
-    return [{ at: 0 }, { at: duration }];
-  }
-
-  const frames: PackageEmotionKeyframe[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') {
-      continue;
-    }
-    const record = item as Record<string, unknown>;
-    const frame: PackageEmotionKeyframe = { at: asNumber(record.at, NaN) };
-    if (!Number.isFinite(frame.at) || frame.at < 0) {
-      continue;
-    }
-    for (const key of ['opacity', 'zoom', 'x', 'y', 'rotate'] as const) {
-      const value = record[key];
-      if (value === undefined || value === null || value === '') {
-        continue;
-      }
-      const parsed = asNumber(value, NaN);
-      if (Number.isFinite(parsed)) {
-        frame[key] = parsed;
-      }
-    }
-    frames.push(frame);
-  }
-
-  if (!frames.length) {
-    return [{ at: 0 }, { at: duration }];
-  }
-
-  frames.sort((a, b) => a.at - b.at);
-  if (frames[0].at > 0) {
-    frames.unshift({ at: 0 });
-  }
-  return frames;
-}
-
-/** 解析一层图；`parent` 用下标引用同一表情里更早的层 */
-function parseEmotionLayer(
-  root: string,
-  packageId: string,
-  raw: unknown,
-  index: number
-): PackageEmotionLayer | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-  const record = raw as Record<string, unknown>;
-  const relative = asText(record.image || record.file).replace(/^[/\\]+/, '');
-  if (!relative) {
-    return null;
-  }
-
-  const resolved = resolveInside(root, relative);
-  const exists = Boolean(resolved && fs.existsSync(resolved));
-  const duration = Math.max(0.05, asNumber(record.duration, 1));
-  const parent = Math.trunc(asNumber(record.parent, -1));
-
-  return {
-    image: buildAssetUrl(packageId, 'emotions', relative),
-    exists,
-    scale: Math.max(0.0001, asNumber(record.scale, 1)),
-    duration,
-    ease: asText(record.ease) || 'linear',
-    anchor: asPair(record.anchor, [0, 0]),
-    position: asPair(record.position, [0, 0]),
-    // 只允许引用更早的层，避免成环
-    parent: parent >= 0 && parent < index ? parent : -1,
-    keyframes: parseEmotionKeyframes(record.keyframes, duration),
-  };
-}
-
-/**
- * 读取 Emotions 分类的表情清单（`<path>/index/emotions.yml`）。
- *
- * 索引只描述「资源 + 关键帧」，播放逻辑由前端解释，因此换表情只需要改 yml。
- * 图层顺序即叠放顺序；`parent` 引用更早的层，位置按父层宽度换算。
- */
 export function readPackageEmotions(
   packageDir: string,
   pkg: ResourcePackage
@@ -174,16 +172,35 @@ export function readPackageEmotions(
       continue;
     }
 
-    const layers: PackageEmotionLayer[] = [];
-    for (const rawLayer of Array.isArray(record.layers) ? record.layers : []) {
-      const layer = parseEmotionLayer(root, pkg.id, rawLayer, layers.length);
-      if (layer) {
-        layers.push(layer);
+    const normalizedId = id.toLowerCase();
+    const mappedFiles = EMOTION_IMAGE_FILES[normalizedId] ?? [];
+    const imageUrls: string[] = [];
+    let allImagesExist = mappedFiles.length > 0;
+
+    for (const imgName of mappedFiles) {
+      const candidate = resolveInside(root, `images/${imgName}`);
+      if (candidate && fs.existsSync(candidate)) {
+        imageUrls.push(buildAssetUrl(pkg.id, 'emotions', `images/${imgName}`));
+      } else {
+        allImagesExist = false;
       }
     }
-    if (!layers.length) {
-      continue;
+
+    const entryRelative = asText(record.entry).replace(/^[/\\]+/, '');
+    const entryIsSvg = entryRelative.toLowerCase().endsWith(SVG_EXTENSION);
+    const entryFile = entryIsSvg ? resolveInside(root, entryRelative) : null;
+    let svgText = '';
+    if (entryFile && fs.existsSync(entryFile)) {
+      try {
+        svgText = fs.readFileSync(entryFile, 'utf-8');
+      } catch {
+        svgText = '';
+      }
     }
+    const exists = allImagesExist || Boolean(svgText);
+    const canvas = svgText ? readSvgCanvas(svgText) : { width: 240, height: 240 };
+    const metaAnchor = svgText ? readSvgAnchor(svgText, canvas.width, canvas.height) : [canvas.width / 2, canvas.height / 3];
+    const anchor = parsePair(record.anchor, metaAnchor as [number, number]);
 
     const soundRelative = asText(record.sound).replace(/^[/\\]+/, '');
     const soundFile = soundRelative ? resolveInside(root, soundRelative) : null;
@@ -191,30 +208,30 @@ export function readPackageEmotions(
       soundFile && fs.existsSync(soundFile) && fs.statSync(soundFile).isFile()
     );
 
-    const duration = Math.max(
-      asNumber(record.duration, 0),
-      ...layers.map((layer) => layer.duration)
-    );
-
     emotions.push({
       id,
       name: asText(record.name) || id,
       description: asText(record.description),
-      offset: asPair(record.offset, [0, 0]),
-      duration,
+      entry: entryFile && exists ? buildAssetUrl(pkg.id, 'emotions', entryRelative) : '',
+      exists,
+      width: canvas.width,
+      height: canvas.height,
+      anchor,
+      duration: asNonNegativeNumber(record.duration, 0),
+      loop: asBoolean(record.loop, false),
       soundUrl:
         soundRelative && soundExists
           ? buildAssetUrl(pkg.id, 'emotions', soundRelative)
           : '',
       soundExists,
-      layers,
+      imageUrls,
     });
   }
 
   return emotions;
 }
 
-/** 在 Emotions 目录里定位一张图片 / 一段音效，越界或不存在返回 null */
+/** 在 Emotions 目录里定位允许下发的 `.svg` / 图片 / 音频文件；越界或不存在返回 null */
 export function resolveEmotionFile(
   packageDir: string,
   pkg: ResourcePackage,
@@ -236,7 +253,7 @@ export function resolveEmotionFile(
   }
 
   const ext = path.extname(target).toLowerCase();
-  if (!IMAGE_EXTENSIONS.has(ext) && !AUDIO_EXTENSIONS.has(ext)) {
+  if (ext !== SVG_EXTENSION && !AUDIO_EXTENSIONS.has(ext) && !IMAGE_EXTENSIONS.has(ext)) {
     return null;
   }
   return target;

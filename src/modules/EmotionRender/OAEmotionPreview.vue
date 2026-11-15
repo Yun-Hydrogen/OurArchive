@@ -10,9 +10,9 @@ import type { SpineCharacter } from '@/modules/SkeletonRender/spinePackage';
 /**
  * 表情预览区：左边立绘、右边表情按钮。
  *
- * 立绘走与工具页相同的 `useSpineStage`；表情叠加层按
- * `metrics`（角色在画布上的位置与缩放）对齐到头顶，
- * 因此拖动 / 缩放立绘时表情始终跟着走。
+ * 立绘走与工具页相同的 `useSpineStage`；表情宿主按锚点对齐到头顶，
+ * 拖动 / 缩放立绘时表情跟随。表情本体是自包含动画 SVG，这里只负责
+ * 挑选 / 触发，不含任何动画逻辑。
  */
 const props = defineProps<{
   character: SpineCharacter | null;
@@ -40,6 +40,8 @@ const {
   zoom,
   backendKind,
   canvasKey,
+  spineInstance,
+  pixiApp,
   load,
   setZoom,
   resetView,
@@ -51,7 +53,7 @@ const {
 
 const activeEmotionId = ref('');
 const missingImages = computed(() =>
-  props.emotions.filter((emotion) => emotion.layers.some((layer) => !layer.exists))
+  props.emotions.filter((emotion) => !emotion.exists)
 );
 
 const zoomPercent = computed({
@@ -59,7 +61,9 @@ const zoomPercent = computed({
   set: (value: number) => setZoom(value / 100),
 });
 
-const rendererLabel = computed(() => (backendKind.value === 'webgl' ? 'WebGL' : 'Canvas 2D'));
+const rendererLabel = computed(() =>
+  backendKind.value === 'pixi-webgl' || backendKind.value === 'webgl' ? 'Pixi (WebGL)' : 'Canvas 2D'
+);
 
 async function start() {
   if (!props.character) {
@@ -115,6 +119,8 @@ defineExpose({ stop: () => player.value?.stop() });
 
         <OAEmotionPlayer
           ref="player"
+          :spine-instance="spineInstance"
+          :pixi-app="pixiApp"
           :unit="metrics.unit"
           :anchor-x="metrics.anchorX"
           :anchor-y="metrics.anchorY"
@@ -177,14 +183,17 @@ defineExpose({ stop: () => player.value?.stop() });
             class="oa-emo__chip"
             :class="{
               'is-active': activeEmotionId === emotion.id,
-              'is-incomplete': !emotion.layers.every((layer) => layer.exists),
+              'is-incomplete': !emotion.exists,
             }"
-            :title="`${emotion.name}（${emotion.id}）· ${emotion.duration.toFixed(2)}s`"
+            :title="emotion.duration > 0
+              ? `${emotion.name}（${emotion.id}）· ${emotion.duration.toFixed(2)}s`
+              : `${emotion.name}（${emotion.id}）`"
             @click="playEmotion(emotion)"
           >
             <span class="oa-emo__chip-name">{{ emotion.name }}</span>
             <span class="oa-emo__chip-id">{{ emotion.id }}</span>
-            <span v-if="!emotion.soundExists" class="oa-emo__chip-warn" title="音效缺失">无音效</span>
+            <span v-if="!emotion.exists" class="oa-emo__chip-warn" title="入口 SVG 缺失">未找到</span>
+            <span v-else-if="!emotion.soundExists" class="oa-emo__chip-warn" title="音效缺失">无音效</span>
           </button>
         </div>
 
@@ -194,7 +203,7 @@ defineExpose({ stop: () => player.value?.stop() });
       </Transition>
 
       <p v-if="missingImages.length" class="oa-emo__hint">
-        有 {{ missingImages.length }} 个表情缺图，点击会显示空白。
+        有 {{ missingImages.length }} 个表情缺少 .svg 文件。
       </p>
     </aside>
   </div>

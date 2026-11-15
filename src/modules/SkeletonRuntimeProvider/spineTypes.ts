@@ -1,10 +1,16 @@
 /**
- * Spine 运行时的最小结构类型。
+ * Spine 运行时的最小结构类型（基于 spine-pixi-v7 与 spine-core 4.2）。
  *
- * 运行时由 `/plugins/spine/*.mjs` 在浏览器里动态加载，构建期没有官方类型可用，
- * 所以这里只声明本项目实际用到的 API：不复制运行时源码，也不把运行时打进产物。
- * 升级运行时大版本时，先对照这些接口确认 API 仍然存在。
+ * 运行时由 `/plugins/spine/spine-pixi.js` 在浏览器里动态加载，构建期没有官方类型可用，
+ * 这里声明本项目实际用到的 API，构建期不把 Spine 运行时直接打进产物。
  */
+import type { Container } from 'pixi.js';
+
+export interface SpineBone {
+  name: string;
+  worldX: number;
+  worldY: number;
+}
 
 export interface SpineBounds {
   x: number;
@@ -29,8 +35,16 @@ export interface SpineSkin {
   getAttachment(slotIndex: number, name: string): unknown | null;
 }
 
+export interface SpineAttachment {
+  name: string | null;
+}
+
 export interface SpineSlot {
   setAttachment(attachment: unknown | null): void;
+  attachment?: SpineAttachment | null;
+  getAttachment?(): SpineAttachment | null;
+  bone?: SpineBone | null;
+  data?: { name?: string | null } | null;
 }
 
 export interface SpineSkeletonData {
@@ -49,8 +63,10 @@ export interface SpineSkeleton {
   scaleY: number;
   skin: SpineSkin | null;
   slots: SpineSlot[];
+  bones?: SpineBone[];
+  findBone?(name: string): SpineBone | null;
   setToSetupPose(): void;
-  updateWorldTransform(physics: unknown): void;
+  updateWorldTransform(physics?: unknown): void;
   getBoundsRect(): SpineBounds;
 }
 
@@ -70,10 +86,25 @@ export interface SpineTextureAtlas {
   pages: SpineTextureAtlasPage[];
 }
 
-/** WebGL / Canvas 两个 ESM 包都重新导出了同一套 core API */
-export interface SpineCoreRuntime {
-  Physics: { update: unknown };
-  AttachmentTimeline: new (...args: unknown[]) => SpineTimeline;
+export interface SpineInstance extends Container {
+  skeleton: SpineSkeleton;
+  state: SpineAnimationState;
+  autoUpdate: boolean;
+  debug?: unknown;
+  boundsProvider?: unknown;
+  update(delta: number): void;
+  destroy(options?: unknown): void;
+}
+
+export interface SpinePixiRuntime {
+  Spine: {
+    new (options: { skeletonData: SpineSkeletonData; [key: string]: unknown }): SpineInstance;
+    from(options: unknown): SpineInstance;
+  };
+  SpineTexture: {
+    from(texture: unknown): unknown;
+  };
+  SpineDebugRenderer: new (spine: SpineInstance) => unknown;
   TextureAtlas: new (atlasText: string) => SpineTextureAtlas;
   AtlasAttachmentLoader: new (atlas: SpineTextureAtlas) => unknown;
   SkeletonJson: new (loader: unknown) => {
@@ -85,103 +116,6 @@ export interface SpineCoreRuntime {
   Skeleton: new (data: SpineSkeletonData) => SpineSkeleton;
   AnimationStateData: new (data: SpineSkeletonData) => { defaultMix: number };
   AnimationState: new (data: unknown) => SpineAnimationState;
-}
-
-export interface SpineGlContext {
-  readonly gl: WebGLRenderingContext | null;
-  dispose(): void;
-}
-
-export interface SpineShader {
-  bind(): void;
-  setUniform4x4f(uniform: unknown, values: ArrayLike<number>): void;
-  setUniformi(uniform: unknown, value: number): void;
-  dispose(): void;
-}
-
-export interface SpineShaderClass {
-  readonly MVP_MATRIX: unknown;
-  readonly SAMPLER: unknown;
-  newColoredTextured(context: SpineGlContext): SpineShader;
-  newColored(context: SpineGlContext): SpineShader;
-}
-
-export interface SpinePolygonBatcher {
-  begin(shader: SpineShader): void;
-  end(): void;
-  dispose(): void;
-}
-
-export interface SpineWebglSkeletonRenderer {
-  premultipliedAlpha: boolean;
-  draw(batcher: SpinePolygonBatcher, skeleton: SpineSkeleton): void;
-}
-
-export interface SpineShapeRenderer {
-  begin(shader: SpineShader): void;
-  end(): void;
-  dispose(): void;
-}
-
-export interface SpineSkeletonDebugRenderer {
-  drawBones: boolean;
-  drawRegionAttachments: boolean;
-  drawMeshTriangles: boolean;
-  drawBoundingBoxes: boolean;
-  drawMeshHull: boolean;
-  drawPaths: boolean;
-  drawClipping: boolean;
-  drawSkeletonXY: boolean;
-  draw(shapes: SpineShapeRenderer, skeleton: SpineSkeleton): void;
-  dispose(): void;
-}
-
-export interface SpineGlTexture {
-  dispose(): void;
-}
-
-export interface SpineGlTextureClass {
-  DISABLE_UNPACK_PREMULTIPLIED_ALPHA_WEBGL: boolean;
-  new (context: SpineGlContext, image: ImageBitmap, mipmaps?: boolean): SpineGlTexture;
-}
-
-export interface SpineMatrix4 {
-  readonly values: Float32Array;
-  ortho(left: number, right: number, bottom: number, top: number, near: number, far: number): void;
-}
-
-export interface SpineWebglRuntime extends SpineCoreRuntime {
-  ManagedWebGLRenderingContext: new (
-    canvas: HTMLCanvasElement,
-    config: {
-      alpha?: boolean;
-      premultipliedAlpha?: boolean;
-      antialias?: boolean;
-      depth?: boolean;
-      stencil?: boolean;
-    }
-  ) => SpineGlContext;
-  Shader: SpineShaderClass;
-  PolygonBatcher: new (context: SpineGlContext, twoColorTint?: boolean) => SpinePolygonBatcher;
-  SkeletonRenderer: new (
-    context: SpineGlContext,
-    twoColorTint?: boolean
-  ) => SpineWebglSkeletonRenderer;
-  ShapeRenderer: new (context: SpineGlContext) => SpineShapeRenderer;
-  SkeletonDebugRenderer: new (context: SpineGlContext) => SpineSkeletonDebugRenderer;
-  GLTexture: SpineGlTextureClass;
-  Matrix4: new () => SpineMatrix4;
-}
-
-export interface SpineCanvasTexture {}
-
-export interface SpineCanvasSkeletonRenderer {
-  triangleRendering: boolean;
-  debugRendering: boolean;
-  draw(skeleton: SpineSkeleton): void;
-}
-
-export interface SpineCanvasRuntime extends SpineCoreRuntime {
-  CanvasTexture: new (image: ImageBitmap) => SpineCanvasTexture;
-  SkeletonRenderer: new (context: CanvasRenderingContext2D) => SpineCanvasSkeletonRenderer;
+  Physics: { update: unknown };
+  AttachmentTimeline: new (...args: unknown[]) => SpineTimeline;
 }

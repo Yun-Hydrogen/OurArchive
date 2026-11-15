@@ -27,8 +27,6 @@ export type {
   PackageBackgroundCategory,
   PackageCharacter,
   PackageEmotion,
-  PackageEmotionKeyframe,
-  PackageEmotionLayer,
   PackageMusic,
   PackageSkeleton,
   PackageSkeletonItem,
