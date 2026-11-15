@@ -28,6 +28,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Our Archive - 立绘骨骼预览' },
   },
   {
+    path: ROUTE_PATHS.emotionPreview,
+    name: ROUTE_NAMES.emotionPreview,
+    component: () => import('@/views/EmotionPreviewView.vue'),
+    meta: { title: 'Our Archive - 表情动效预览' },
+  },
+  {
     path: ROUTE_PATHS.resources,
     name: ROUTE_NAMES.resources,
     component: () => import('@/views/ResourcesView.vue'),

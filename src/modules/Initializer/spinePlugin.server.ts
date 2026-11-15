@@ -42,14 +42,17 @@ const DOWNLOADS: DownloadSpec[] = [
     file: 'spine-pixi.js',
     sources: [
       `https://cdn.jsdelivr.net/npm/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/dist/iife/spine-pixi-v7.js`,
+      `https://fastly.jsdelivr.net/npm/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/dist/iife/spine-pixi-v7.js`,
       `https://unpkg.com/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/dist/iife/spine-pixi-v7.js`,
     ],
   },
   {
     file: 'LICENSE',
     sources: [
-      `https://cdn.jsdelivr.net/npm/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/LICENSE`,
-      `https://unpkg.com/@esotericsoftware/spine-pixi-v7@${SPINE_RUNTIME_VERSION}/LICENSE`,
+      `https://cdn.jsdelivr.net/npm/@esotericsoftware/spine-core@${SPINE_RUNTIME_VERSION}/LICENSE`,
+      `https://fastly.jsdelivr.net/npm/@esotericsoftware/spine-core@${SPINE_RUNTIME_VERSION}/LICENSE`,
+      `https://unpkg.com/@esotericsoftware/spine-core@${SPINE_RUNTIME_VERSION}/LICENSE`,
+      `https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/${SPINE_RUNTIME_VERSION.split('.').slice(0, 2).join('.')}/LICENSE`,
     ],
   },
 ];
@@ -57,7 +60,7 @@ const DOWNLOADS: DownloadSpec[] = [
 export interface SpineRuntimeStatus {
   /** plugins/spine 的绝对路径 */
   dir: string;
-  /** 三个必需文件是否齐全 */
+  /** 必需文件是否齐全（spine-pixi.js 与 LICENSE） */
   installed: boolean;
   /** 缺失的文件名 */
   missing: string[];
@@ -118,6 +121,10 @@ export async function ensureSpineRuntime(paths: StoragePaths): Promise<SpineRunt
   try {
     fs.mkdirSync(status.dir, { recursive: true });
     for (const spec of DOWNLOADS) {
+      if (!status.missing.includes(spec.file)) {
+        console.log(`     ${pc.green('✓')} ${spec.file}（已存在）`);
+        continue;
+      }
       await downloadToDirectory(spec, status.dir);
       console.log(`     ${pc.green('✓')} ${spec.file}`);
     }
@@ -298,7 +305,8 @@ async function downloadToDirectory(spec: DownloadSpec, targetDir: string) {
       }
       const bytes = new Uint8Array(await response.arrayBuffer());
       // 防止 CDN 返回 200 的错误页：运行时是数百 KB，许可证也应有正文
-      const minimumBytes = spec.file.endsWith('.mjs') ? 1024 : 100;
+      const minimumBytes =
+        spec.file.endsWith('.js') || spec.file.endsWith('.mjs') ? 1024 : 100;
       if (bytes.byteLength < minimumBytes) {
         throw new Error(`响应内容过小（${bytes.byteLength} B）`);
       }

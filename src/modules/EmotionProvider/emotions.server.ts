@@ -19,6 +19,7 @@ import {
 } from '@/modules/PackageProvider/packageManifest.server';
 
 const SVG_EXTENSION = '.svg';
+const JSON_EXTENSION = '.json';
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 
 /** 19 种表情对应的 PNG 材质映射表（BA 游戏标准，位于 images/ 目录下） */
@@ -186,6 +187,39 @@ export function readPackageEmotions(
       }
     }
 
+    const motionRelativeCandidate =
+      asText(record.motion).replace(/^[/\\]+/, '') || `motions/${id}.json`;
+    const motionFile = motionRelativeCandidate
+      ? resolveInside(root, motionRelativeCandidate)
+      : null;
+    let motionUrl = '';
+    let motionDuration = 0;
+    if (motionFile && fs.existsSync(motionFile) && fs.statSync(motionFile).isFile()) {
+      motionUrl = buildAssetUrl(pkg.id, 'emotions', motionRelativeCandidate);
+      try {
+        const motionJson = JSON.parse(fs.readFileSync(motionFile, 'utf-8'));
+        if (typeof motionJson.duration === 'number') {
+          motionDuration = motionJson.duration;
+        }
+        if (Array.isArray(motionJson.layers)) {
+          for (const layer of motionJson.layers) {
+            if (layer && typeof layer.texture === 'string') {
+              const texRel = layer.texture.replace(/^[/\\]+/, '');
+              const texCandidate = resolveInside(root, texRel);
+              if (texCandidate && fs.existsSync(texCandidate)) {
+                const texUrl = buildAssetUrl(pkg.id, 'emotions', texRel);
+                if (!imageUrls.includes(texUrl)) {
+                  imageUrls.push(texUrl);
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     const entryRelative = asText(record.entry).replace(/^[/\\]+/, '');
     const entryIsSvg = entryRelative.toLowerCase().endsWith(SVG_EXTENSION);
     const entryFile = entryIsSvg ? resolveInside(root, entryRelative) : null;
@@ -197,7 +231,7 @@ export function readPackageEmotions(
         svgText = '';
       }
     }
-    const exists = allImagesExist || Boolean(svgText);
+    const exists = allImagesExist || Boolean(svgText) || Boolean(motionUrl);
     const canvas = svgText ? readSvgCanvas(svgText) : { width: 240, height: 240 };
     const metaAnchor = svgText ? readSvgAnchor(svgText, canvas.width, canvas.height) : [canvas.width / 2, canvas.height / 3];
     const anchor = parsePair(record.anchor, metaAnchor as [number, number]);
@@ -217,7 +251,7 @@ export function readPackageEmotions(
       width: canvas.width,
       height: canvas.height,
       anchor,
-      duration: asNonNegativeNumber(record.duration, 0),
+      duration: asNonNegativeNumber(record.duration, motionDuration),
       loop: asBoolean(record.loop, false),
       soundUrl:
         soundRelative && soundExists
@@ -225,6 +259,7 @@ export function readPackageEmotions(
           : '',
       soundExists,
       imageUrls,
+      motionUrl: motionUrl || undefined,
     });
   }
 
@@ -253,7 +288,12 @@ export function resolveEmotionFile(
   }
 
   const ext = path.extname(target).toLowerCase();
-  if (ext !== SVG_EXTENSION && !AUDIO_EXTENSIONS.has(ext) && !IMAGE_EXTENSIONS.has(ext)) {
+  if (
+    ext !== SVG_EXTENSION &&
+    ext !== JSON_EXTENSION &&
+    !AUDIO_EXTENSIONS.has(ext) &&
+    !IMAGE_EXTENSIONS.has(ext)
+  ) {
     return null;
   }
   return target;

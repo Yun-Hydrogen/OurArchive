@@ -5,6 +5,9 @@ import type { PackageEmotion } from '@/modules/API/types';
 import type { SpineInstance } from '@/modules/SkeletonRuntimeProvider/spineTypes';
 import { playEmotionSfx, stopEmotionSfx } from '@/modules/AudioPlayer/useEmotionSfx';
 import { playEmotionOnTarget } from '@/modules/EmotionRender/emotionPlayer';
+import { playMotion, type MotionInstance } from '@/modules/EmotionRender/motionCompiler';
+import { DEFAULT_MOTIONS } from '@/modules/EmotionRender/defaultMotions';
+import type { EmotionMotionConfig } from '@/modules/EmotionRender/motionTypes';
 
 const props = defineProps<{
   spineInstance?: SpineInstance | null;
@@ -17,7 +20,8 @@ const props = defineProps<{
 const playingName = ref('');
 const lastError = ref('');
 
-let activeTarget: PIXI.Container | null = null;
+let activeMountHost: PIXI.Container | null = null;
+let activeMotion: MotionInstance | null = null;
 let playToken = 0;
 
 function stop() {
@@ -25,17 +29,27 @@ function stop() {
   playingName.value = '';
   lastError.value = '';
   stopEmotionSfx();
-  if (activeTarget) {
+
+  if (activeMotion) {
     try {
-      activeTarget.destroy({ children: true });
+      activeMotion.stop();
     } catch {
       // ignore
     }
-    activeTarget = null;
+    activeMotion = null;
+  }
+
+  if (activeMountHost) {
+    try {
+      activeMountHost.destroy({ children: true });
+    } catch {
+      // ignore
+    }
+    activeMountHost = null;
   }
 }
 
-async function play(emotion: PackageEmotion) {
+async function play(emotion: PackageEmotion, customMotionConfig?: EmotionMotionConfig) {
   if (!emotion) return;
 
   stop();
@@ -48,37 +62,89 @@ async function play(emotion: PackageEmotion) {
   }
 
   try {
-    let targetContainer: PIXI.Container | null = props.spineInstance ?? null;
-    let isTempTarget = false;
+    let mountParent: PIXI.Container;
+    let localAnchorX = props.anchorX || 0;
+    let localAnchorY = props.anchorY || 0;
+    let scaleFactor = props.unit || 1;
 
-    if (!targetContainer && props.pixiApp) {
-      // 如果没有挂在 Spine 上，挂在舞台临时容器中
-      const temp = new PIXI.Container();
-      temp.position.set(props.anchorX || 0, props.anchorY || 0);
-      props.pixiApp.stage.addChild(temp);
-      targetContainer = temp;
-      activeTarget = temp;
-      isTempTarget = true;
-    }
-
-    if (!targetContainer) {
+    if (props.spineInstance) {
+      mountParent = props.spineInstance;
+      const globalPt = new PIXI.Point(props.anchorX || 0, props.anchorY || 0);
+      const localPt = props.spineInstance.toLocal(globalPt);
+      localAnchorX = localPt.x;
+      localAnchorY = localPt.y;
+      const spineScale = props.spineInstance.scale.x || 1;
+      scaleFactor = (props.unit || 1) / spineScale;
+    } else if (props.pixiApp) {
+      mountParent = props.pixiApp.stage;
+    } else {
       throw new Error('未检测到可挂载的立绘舞台');
     }
 
-    // 预载 PNG 纹理
-    const textures: PIXI.Texture[] = [];
+    const host = new PIXI.Container();
+    host.position.set(localAnchorX, localAnchorY);
+    host.zIndex = 30;
+    mountParent.addChild(host);
+    activeMountHost = host;
+
+    // 获取动效配置：优先传入的自定义配置 -> 其次从 motionUrl 拉取 -> 再次读取内置默认配置
+    let motionConfig: EmotionMotionConfig | null = customMotionConfig ?? null;
+    if (!motionConfig && emotion.motionUrl) {
+      try {
+        const resp = await fetch(emotion.motionUrl);
+        if (resp.ok) {
+          motionConfig = (await resp.json()) as EmotionMotionConfig;
+        }
+      } catch {
+        // 请求失败回退内置预设
+      }
+    }
+    if (!motionConfig) {
+      motionConfig = DEFAULT_MOTIONS[emotion.id.toLowerCase()] ?? null;
+    }
+
+    // 预载贴图
+    const textureMap = new Map<string, PIXI.Texture>();
+    const texturesList: PIXI.Texture[] = [];
     for (const url of emotion.imageUrls) {
       const tex = await PIXI.Texture.fromURL(url);
-      textures.push(tex);
+      texturesList.push(tex);
+      const filename = url.replace(/^[/\\]+/, '').split('/').pop() ?? '';
+      textureMap.set(url, tex);
+      textureMap.set(filename, tex);
+      textureMap.set(`images/${filename}`, tex);
     }
 
     if (token !== playToken) return;
 
-    await playEmotionOnTarget(targetContainer, emotion.id, textures);
+    if (motionConfig) {
+      // 走 JSON 动效编译器
+      const motion = playMotion({
+        target: host,
+        config: motionConfig,
+        textures: (texPath: string) => {
+          const clean = texPath.replace(/^[/\\]+/, '');
+          const filename = clean.split('/').pop() ?? '';
+          return (
+            textureMap.get(clean) ??
+            textureMap.get(filename) ??
+            textureMap.get(`images/${filename}`) ??
+            texturesList[0]
+          );
+        },
+        scale: scaleFactor,
+        loop: emotion.loop,
+      });
+      activeMotion = motion;
+      await motion.promise;
+    } else {
+      // 回退原版硬编码逻辑
+      await playEmotionOnTarget(host, emotion.id, texturesList);
+    }
 
-    if (isTempTarget && activeTarget) {
-      activeTarget.destroy({ children: true });
-      activeTarget = null;
+    if (token === playToken && activeMountHost) {
+      activeMountHost.destroy({ children: true });
+      activeMountHost = null;
     }
   } catch (err) {
     if (token === playToken) {
@@ -87,6 +153,7 @@ async function play(emotion: PackageEmotion) {
   } finally {
     if (token === playToken) {
       playingName.value = '';
+      activeMotion = null;
     }
   }
 }
@@ -99,27 +166,10 @@ defineExpose({
   play,
   stop,
   playingName,
+  lastError,
 });
 </script>
 
 <template>
-  <div v-if="lastError" class="oa-emo-error-pill">
-    {{ lastError }}
-  </div>
+  <div class="oa-emotion-player" aria-hidden="true" style="display: none;" />
 </template>
-
-<style scoped>
-.oa-emo-error-pill {
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(239, 68, 68, 0.9);
-  color: #fff;
-  font-size: 12px;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  pointer-events: none;
-  z-index: 50;
-}
-</style>

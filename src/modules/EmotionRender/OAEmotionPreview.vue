@@ -66,21 +66,13 @@ const rendererLabel = computed(() =>
 );
 
 async function start() {
-  if (!props.character) {
-    return;
-  }
   if (!isLoaded.value) {
     await fetchConfig();
   }
-  await load(props.character);
+  await load(props.character ?? null);
 }
 
 function playEmotion(emotion: PackageEmotion) {
-  // 没有底座立绘时先让用户选一个，避免「点了没反应」
-  if (!props.character) {
-    emit('pick');
-    return;
-  }
   activeEmotionId.value = emotion.id;
   player.value?.play(emotion);
 }
@@ -127,12 +119,7 @@ defineExpose({ stop: () => player.value?.stop() });
         />
 
         <Transition name="oa-fade">
-          <div v-if="!character" key="none" class="oa-emo__overlay">
-            <p class="oa-emo__overlay-text">还没有选择预览角色。</p>
-            <rizui_button text="选择角色" @click="emit('pick')" />
-          </div>
-
-          <div v-else-if="status === 'loading'" key="loading" class="oa-emo__overlay">
+          <div v-if="status === 'loading'" key="loading" class="oa-emo__overlay">
             <p class="oa-emo__overlay-text">正在解析骨骼与图集…</p>
             <rizui_progress :indeterminate="true" :height="6" rounded />
           </div>
@@ -145,8 +132,8 @@ defineExpose({ stop: () => player.value?.stop() });
       </div>
 
       <div class="oa-emo__stage-bar">
-        <span class="oa-emo__stage-label" :title="characterLabel">
-          {{ characterLabel || '未选择立绘' }}
+        <span class="oa-emo__stage-label" :title="character ? characterLabel : '虚拟人台底座'">
+          {{ character ? characterLabel : '虚拟人台底座' }}
         </span>
         <span class="oa-emo__stage-meta">{{ rendererLabel }}</span>
         <label class="oa-emo__zoom">
@@ -155,7 +142,8 @@ defineExpose({ stop: () => player.value?.stop() });
           <span class="oa-emo__zoom-value">{{ zoomPercent }}%</span>
         </label>
         <button type="button" class="oa-emo__mini" @click="resetView">重置视角</button>
-        <button type="button" class="oa-emo__mini" @click="emit('pick')">更换角色</button>
+        <button type="button" class="oa-emo__mini" @click="emit('pick')">{{ character ? '更换角色' : '选择角色立绘' }}</button>
+        <button v-if="character" type="button" class="oa-emo__mini" @click="load(null)">切回人台</button>
       </div>
     </div>
 

@@ -1,8 +1,8 @@
 # Emotions 表情资源开发者指南
 
-本文档面向资源包作者，说明 **Our Archive** 中「表情（Emotions）」的目录结构、`emotions.yml` 配置规范，以及**自包含动画 SVG** 的写法。
+本文档面向资源包作者，说明 **Our Archive** 中「表情（Emotions）」的目录结构、`emotions.yml` 配置规范，以及**基于 JSON 动效时间轴与 Pixi.js 场景图**的编写方法。
 
-表情的全部表现——图形、动画、节奏——都写在一个 **SVG 文件**里，宿主只负责把它按锚点摆到角色头顶、播放声明的音效。因此**新增或调整表情不需要改代码**。
+表情的全部表现——多图层材质、缓动物理曲线、缩放旋转节奏——均可通过外载的 **JSON 动效文件**（`motions/*.json`）进行定义，宿主解析后直接挂入 Pixi 舞台并驱动 GSAP 播放。**新增或调整表情不需要修改任何前端代码**。
 
 ---
 
@@ -14,50 +14,104 @@
 - package_content:
     - Emotions:
       supported: true
-      path: emotions        # 目录名可自定义，这里以 emotions/ 为例
+      path: emotions        # 目录名可自定义，例如 emotions/ 或 emtions/
 ```
 
-目录约定：
+推荐目录约定：
 
-```
+```text
 <资源包>/emotions/
 ├── index/
-│   └── emotions.yml        # 必需：表情索引（本文主角）
-├── svg/                    # 推荐：每个表情一个 .svg
-│   ├── heart.svg
-│   └── dot.svg
-└── sounds/                 # 推荐：每个表情一段音效
+│   └── emotions.yml        # 必需：表情索引（声明全部表情项）
+├── motions/                # 推荐：JSON 动效时间轴定义
+│   ├── heart.json
+│   ├── angry.json
+│   └── custom.json
+├── images/                 # 表情精灵材质（PNG / WebP）
+│   ├── emoicon_heart.png
+│   └── emoicon_balloon_n.png
+└── sounds/                 # 音效音频（.wav / .ogg / .mp3）
     └── sfx_emotion_heart.wav
 ```
 
-- 只认 `emotions.yml` 里声明过的 `entry`；目录里多出来的 `.svg` 不会被列出。
-- 子目录层级不限，路径写相对 `emotions/` 的相对路径即可。
+- 只认 `emotions.yml` 里声明过的条目；
 - 索引缺失或解析失败时，该分类显示为空，不影响资源包其它分类。
 
 ---
 
-## 2. 顶层结构
+## 2. 顶层结构（`emotions.yml`）
 
 ```yaml
 emotions:
-  - id: heart                 # 必填，全局唯一
-    name: 爱心                # 展示名，缺省用 id
-    description: ""           # 可选，界面说明
-    entry: svg/heart.svg      # 必填，相对 emotions/ 的 .svg 路径
-    anchor: [135.5, 203]      # 可选，锚点（px）；不写则读 SVG 内 metadata
-    duration: 1.35            # 可选，总时长（秒）；不写则不自动收起
-    loop: false               # 可选，是否无限循环
-    sound: sounds/heart.wav   # 可选，音效（相对 emotions/）
+  - id: heart                   # 必填，全局唯一标识
+    name: 爱心                  # 展示名，缺省回退 id
+    motion: motions/heart.json  # 推荐：外载 JSON 动效文件（相对 emotions/）
+    sound: sounds/sfx_heart.wav # 可选：音效文件
+    duration: 1.35              # 可选：总时长（秒），缺省读 JSON 中的 duration
+    loop: false                 # 可选：是否循环播放
 ```
 
 | 字段 | 必填 | 说明 |
 | :--- | :--- | :--- |
-| `id` | ✅ | 表情唯一标识，建议小写 + 下划线 |
+| `id` | ✅ | 表情唯一标识，建议小写英文（如 `heart`, `angry`） |
 | `name` | | 界面显示名（中文），缺省回退 `id` |
-| `description` | | 说明文字 |
-| `entry` | ✅ | 指向一个 `.svg`；必须是自包含动画 SVG（见第 3 节） |
-| `anchor` | | `[x, y]`，单位是 **SVG 画布内的 px**：这个点会对齐到角色头顶 |
-| `duration` | | 总时长（秒）。写 `0` 或不写则由宿主按 1.5s 收尾 |
+| `motion` | ✅（推荐） | 指向 `motions/` 下的 `.json` 动效文件 |
+| `entry` | | 兼容旧版 `.svg` 文件路径 |
+| `sound` | | 音效路径（相对 emotions/），缺失时静默播放 |
+| `duration`| | 总时长（秒），缺省读取 JSON 内声明 |
+| `loop` | | `true` 时循环播放，直到切走表情或关闭 |
+
+---
+
+## 3. 动效 JSON 怎么写（`motions/*.json`）
+
+动效 JSON 是纯数据格式，由 Pixi.js 场景图与 GSAP 物理曲线驱动：
+
+```json
+{
+  "version": "1.0",
+  "id": "heart",
+  "duration": 1.35,
+  "startOffset": { "x": 0, "y": 0 },
+  "layers": [
+    {
+      "name": "balloon",
+      "texture": "images/emoicon_balloon_n.png",
+      "anchor": { "x": 0.5, "y": 1.0 },
+      "initial": { "scale": 0.2, "alpha": 0 },
+      "keyframes": [
+        { "to": { "scale": 1.15, "alpha": 1 }, "duration": 0.25, "ease": "back.out(2)" },
+        { "to": { "scale": 1.0 }, "duration": 0.15 },
+        { "to": { "scale": 0.8, "alpha": 0 }, "duration": 0.2, "delay": 0.6 }
+      ]
+    },
+    {
+      "name": "heart_icon",
+      "texture": "images/emoicon_heart.png",
+      "anchor": { "x": 0.5, "y": 0.5 },
+      "position": { "x": 0, "y": -45 },
+      "initial": { "scale": 0, "alpha": 0 },
+      "keyframes": [
+        { "to": { "scale": 1.25, "alpha": 1 }, "duration": 0.28, "ease": "elastic.out(1, 0.45)", "delay": 0.08 },
+        { "to": { "scale": 1.0 }, "duration": 0.15 },
+        { "to": { "scale": 1.15 }, "duration": 0.2, "delay": 0.2, "ease": "power2.out" },
+        { "to": { "scale": 1.0 }, "duration": 0.15 },
+        { "to": { "alpha": 0 }, "duration": 0.18, "delay": 0.3 }
+      ]
+    }
+  ]
+}
+```
+
+### 3.1 字段说明
+
+- `layers`：图层数组，按声明顺序层叠。
+- `texture`：材质相对路径（如 `images/emoicon_heart.png`）。
+- `count` / `angleStep`：径向或多粒子数量与角度步长（如生气井字 3 个旋转分布 `count: 3, angleStep: 120`）。
+- `instances`：当一个图层包含多个不同初始位置/延迟的粒子（如星星/睡眠 Z），直接在 `instances` 里逐一指定。
+- `initial`：初始属性（`scale`, `scaleX`, `scaleY`, `x`, `y`, `angle`, `alpha`, `visible`）。
+- `keyframes`：关键帧序列，每个关键帧包含 `to`（目标状态）、`duration`（秒）、`ease`（缓动函数）、`delay`（延迟）。
+- 缓动支持所有标准 GSAP 缓动名：`"back.out(2)"`、`"elastic.out(1, 0.5)"`、`"power4.out"`、`"none"` 等。
 | `loop` | | `true` 时循环播放，直到换表情 / 离开页面 |
 | `sound` | | 音效路径；缺失或文件不存在时静默播放（不报错） |
 

@@ -25,9 +25,9 @@
 | 五、资源管理页与资源包详情 | 23 – 28 |
 | 六、主界面卡片动画 | 29 – 34 |
 | 七、RizUI 集成 | 35 – 41 |
-| 八、立绘骨骼预览（Spine） | 42 – 51 |
+| 八、立绘骨骼预览（Spine） | 42 – 51, 61 |
 | 九、页面动画 / 构建 / 布局 | 52 – 55 |
-| 十、表情（Emotions）与 Pixi Spine 渲染 | 56 – 60 |
+| 十、表情（Emotions）与 Pixi Spine 渲染 | 56 – 60, 62 |
 
 ---
 
@@ -623,6 +623,29 @@
   如果将 `new PIXI.Texture(baseTexture)` 传给 `SpineTexture.from`，访问 `image.resource.source` 时 `image.resource` 为 `undefined` 从而触发该异常。
 - **解决方案**：向 `runtime.SpineTexture.from` 显式传入 `baseTexture`（这也是 spine-pixi 官方 loader 的用法），并兜底校验 `baseTexture.resource.source` 确保其引用 `createImageBitmap` 结果。
 - **效果**：图集页面纹理正常装配进 Spine 渲染器，立绘加载平稳流畅。
+
+---
+
+## 61 · Spine 运行时下载源中 `spine-pixi-v7` npm 包不包含 LICENSE
+
+- **位置**：`src/modules/Initializer/spinePlugin.server.ts`
+- **表现**：启动时自动下载 Spine 运行时，`spine-pixi.js` 下载成功，但 `LICENSE` 下载报 404（全部下载源失败：cdn.jsdelivr.net：fetch failed；unpkg.com：HTTP 404），导致自动下载失败降级为手动放入模式。
+- **原因**：Esoteric Software 发布的 npm 包中，`@esotericsoftware/spine-pixi-v7` 根目录下未包含 `LICENSE` 文件；官方将 Spine 许可文件打包在核心包 `@esotericsoftware/spine-core` 中，或者托管于官方 GitHub 仓库根目录。
+- **解决方案**：将 LICENSE 的下载源指向 `@esotericsoftware/spine-core@${SPINE_RUNTIME_VERSION}/LICENSE`，并补充 fastly.jsdelivr.net、unpkg.com 及 raw.githubusercontent.com 备用镜像源；同时若 `spine-pixi.js` 本地已存在且有效，自动下载时直接跳过，避免重复拉取。
+- **效果**：Spine 运行时与 LICENSE 均能一键极速下载就绪，无需用户手动介入。
+- **备注**：见条目 45。
+
+---
+
+## 62 · 表情系统外载 JSON 动效与虚拟人台（Dummy Mannequin）独立预览
+
+- **位置**：`src/modules/EmotionRender/motionCompiler.ts`、`src/modules/EmotionRender/OAEmotionPlayer.vue`、`src/views/EmotionPreviewView.vue`、`src/modules/SkeletonRender/useSpineStage.ts`
+- **表现**：原表情系统只有死代码写在前端仓库中，资源包无法自定义外载；且预览强依赖选择具体的角色立绘，未选角色时界面报错或无法点击，工具箱缺乏独立测试入口。
+- **解决方案**：
+  1. 制定 JSON 动效时间轴规范（`EmotionMotionConfig`），通过 `motionCompiler` 解析图层、多粒子散布与 GSAP 物理弹性曲线，支持资源包在 `motions/*.json` 中纯数据外载表情；
+  2. 舞台引入轻量「虚拟人台底座（Dummy Mannequin）」矢量绘制机制，未选立绘时默认展示人台与十字定位星，任何表情立即可试听试看；
+  3. 工具箱增加独立「表情动效预览（EmotionPreviewView）」工具，提供实时 JSON 动效编辑与一键调试。
+- **效果**：实现资源包 100% 纯外载自定义表情，工具箱与资源包详情页均可随时丝滑预览。
 
 ---
 

@@ -61,10 +61,10 @@
 
 ### `ensureSpineRuntime(paths)`（`spinePlugin.server.ts`）
 
-1. 作用：检查 `<root>/plugins/spine/` 下三个必需文件（`spine-webgl.mjs`、`spine-canvas.mjs`、`LICENSE`，版本 `4.2.120`）。缺失时展示许可协议并引导用户选择。
+1. 作用：检查 `<root>/plugins/spine/` 下必需文件（`spine-pixi.js`、`LICENSE`，版本 `4.2.120`）。缺失时展示许可协议并引导用户选择。
 2. 输入输出：`(paths: StoragePaths): Promise<SpineRuntimeStatus>`。
 3. 交互模式与自动化：
-   - 模式选项：`auto`（自动从 jsDelivr / unpkg 下载 ESM 产物至本地并落盘）、`manual`（输出目标目录及 CDN 地址，指导用户手动放置）、`none`（强制跳过，立绘预览报不可用）。
+   - 模式选项：`auto`（自动从 jsDelivr / unpkg / GitHub 等镜像源下载 IIFE 运行时产物与许可协议至本地并落盘）、`manual`（输出目标目录及 CDN 地址，指导用户手动放置）、`none`（强制跳过，立绘预览报不可用）。
    - 非阻塞保证：选择 `manual`、`none`、无 TTY / 等待选择超时 30 秒默认回退 `manual`，以及下载失败后降级 `manual`，**均正常启动后端**，绝不退出进程。
    - 环境变量优先：可由环境变量 `OUR_ARCHIVE_SPINE_MODE=auto|manual|none` 直接指定模式；兼容历史变量 `OUR_ARCHIVE_SPINE_DOWNLOAD=1` 映射为 `auto`。
    - 管道 stdin 交互兼容：开发环境下 `concurrently` 管道转发导致 `isTTY` 为 false，通过 `OUR_ARCHIVE_INTERACTIVE=1` 允许进入控制台询问（见 [NeedNotice](../NeedNotice.md) 条目 07）。

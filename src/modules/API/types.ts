@@ -149,6 +149,8 @@ export interface PackageEmotion {
   soundExists: boolean;
   /** 表情 PNG 材质 URL 列表（供 Pixi.js 动画合成） */
   imageUrls: string[];
+  /** 动效 JSON 描述文件 URL（若外载） */
+  motionUrl?: string;
 }
 
 /** 一张背景图（背景目录下的一级文件） */

@@ -159,6 +159,7 @@ export function useSpineStage(
   const canvasKey = ref(0);
   const zoom = ref(1);
   const debugRendering = ref(false);
+  const isDummy = ref(false);
 
   const spineInstance = shallowRef<SpineInstance | null>(null);
   const pixiApp = shallowRef<PIXI.Application | null>(null);
@@ -169,6 +170,7 @@ export function useSpineStage(
   let backend: SpineBackend | null = null;
   let skeletonData: SpineSkeletonData | null = null;
   let bounds: SpineBounds = { x: 0, y: 0, width: 1, height: 1 };
+  let dummyContainer: PIXI.Container | null = null;
 
   let viewWidth = 1;
   let viewHeight = 1;
@@ -200,9 +202,61 @@ export function useSpineStage(
     }
   }
 
+  function createDummyMannequin(): PIXI.Container {
+    const container = new PIXI.Container();
+    const g = new PIXI.Graphics();
+
+    // 虚拟人台头部 (Circle)
+    g.lineStyle(2, 0x0284c7, 0.5);
+    g.beginFill(0x38bdf8, 0.18);
+    g.drawCircle(0, -60, 42);
+    g.endFill();
+
+    // 蔚蓝档案标志性光环 (Halo)
+    g.lineStyle(2, 0x0090fe, 0.6);
+    g.drawEllipse(0, -125, 46, 12);
+
+    // 颈部
+    g.beginFill(0x38bdf8, 0.14);
+    g.drawRect(-12, -18, 24, 20);
+    g.endFill();
+
+    // 躯干与肩部剪影
+    g.lineStyle(2, 0x0284c7, 0.4);
+    g.beginFill(0x38bdf8, 0.12);
+    g.moveTo(-70, 40);
+    g.quadraticCurveTo(-30, 2, 0, 2);
+    g.quadraticCurveTo(30, 2, 70, 40);
+    g.lineTo(55, 180);
+    g.lineTo(-55, 180);
+    g.closePath();
+    g.endFill();
+
+    // 头顶定位十字星锚点
+    g.lineStyle(1.5, 0x0284c7, 0.8);
+    g.drawCircle(0, -100, 8);
+    g.moveTo(-14, -100);
+    g.lineTo(14, -100);
+    g.moveTo(0, -114);
+    g.lineTo(0, -86);
+
+    container.addChild(g);
+    return container;
+  }
+
   function applyTransform() {
     const inst = spineInstance.value;
-    if (!inst) return;
+    if (!inst) {
+      if (dummyContainer) {
+        dummyContainer.position.set(viewWidth / 2 + panX, viewHeight / 2 + panY + 100 * zoom.value);
+        dummyContainer.scale.set(zoom.value);
+        const unit = zoom.value * 0.8;
+        const anchorX = dummyContainer.x;
+        const anchorY = dummyContainer.y - 100 * zoom.value;
+        metrics.value = { unit, anchorX, anchorY, charHeight: 750 * zoom.value };
+      }
+      return;
+    }
 
     const fit = Math.min(
       (viewWidth * 0.94) / Math.max(bounds.width, 1),
@@ -244,6 +298,14 @@ export function useSpineStage(
   function disposeStage() {
     resizeObserver?.disconnect();
     resizeObserver = null;
+    if (dummyContainer) {
+      try {
+        dummyContainer.destroy({ children: true });
+      } catch {
+        // ignore
+      }
+      dummyContainer = null;
+    }
     if (spineInstance.value) {
       spineInstance.value.destroy({ children: true });
       spineInstance.value = null;
@@ -255,7 +317,66 @@ export function useSpineStage(
     skeletonData = null;
   }
 
-  async function load(character: SpineCharacter) {
+  async function loadDummy() {
+    const token = ++loadToken;
+    status.value = 'loading';
+    error.value = '';
+    zoom.value = 1;
+    panX = 0;
+    panY = 0;
+    lastCharacter = null;
+    isDummy.value = true;
+
+    try {
+      const element = canvas.value;
+      if (!element) {
+        throw new Error('画布尚未就绪');
+      }
+
+      disposeStage();
+
+      const handle = await createSpineBackend(element);
+      if (token !== loadToken) {
+        handle.backend.dispose();
+        return;
+      }
+
+      backend = handle.backend;
+      runtime = handle.runtime;
+      pixiApp.value = backend.app;
+      backendKind.value = backend.kind;
+
+      dummyContainer = createDummyMannequin();
+      backend.app.stage.addChild(dummyContainer);
+
+      variants.value = [];
+      variantByName.value = new Map();
+      activeVariant.value = '';
+      actions.value = [];
+      activeAction.value = '';
+      info.value = { bones: 0, slots: 0, animations: 0, version: '人台' };
+
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver?.disconnect();
+        resizeObserver = new ResizeObserver(() => applySize());
+        resizeObserver.observe(element);
+      }
+
+      applySize();
+      status.value = 'ready';
+    } catch (cause) {
+      if (token !== loadToken) return;
+      disposeStage();
+      status.value = 'error';
+      error.value = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  async function load(character: SpineCharacter | null) {
+    if (!character) {
+      return loadDummy();
+    }
+    isDummy.value = false;
     const token = ++loadToken;
     status.value = 'loading';
     error.value = '';
@@ -445,8 +566,10 @@ export function useSpineStage(
     metrics: readonlyRef(metrics),
     spineInstance: readonlyRef(spineInstance),
     pixiApp: readonlyRef(pixiApp),
+    isDummy: readonlyRef(isDummy),
     debugRendering,
     load,
+    loadDummy,
     setVariant,
     setAction,
     setZoom,
