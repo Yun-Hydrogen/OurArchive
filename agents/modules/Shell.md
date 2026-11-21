@@ -11,7 +11,7 @@
 | `OABannerDock.vue` | banner 停靠容器：舞台中央 ↔ 左下角；停靠态点击打开「贡献与感谢」 |
 | `OABannerSvg.vue` | 内联的动画版横幅 SVG（约 34 KB），只能靠 `:key` 重挂来重播 |
 | `OABubbles.vue` | 气泡背景：10 个蓝点柔光圆，`active` 控制整体淡入 |
-| `OASettingsButton.vue` | 右上角设置按钮；弹窗开关 `isOpen` 就留在它内部 |
+| `OASettingsButton.vue` | 右上角设置按钮（`float`）或贴右缘竖向把手（`edge`）；弹窗开关 `isOpen` 就留在它内部 |
 | `OASettingsModal.vue` | 设置弹窗：主界面 BGM 音量、预览音量、立绘渲染器 |
 | `OAAboutModal.vue` | 「贡献与感谢」弹窗，由 banner 停靠态的点击打开 |
 | `OAMouseSpark.vue` | 鼠标特效的 canvas 宿主，把 props 透传给 `useMouseSpark` |
@@ -29,7 +29,8 @@
 
 1. 结构：`.oa-shell`（flex 纵向）内含 `.oa-shell__bg`（`position: fixed; inset: 0; z-index: 0`，`::after` 承载浅蓝渐变，`.is-home` 时 `opacity: 1`）→ `<OABubbles>` → `<OABannerDock>` → `.oa-shell__settings`（`z-index: 40`，`top: clamp(14px, 2.4vh, 26px)` / `right: clamp(20px, 3vw, 42px)`）→ `.oa-shell__view`（`z-index: 10`，放 `<router-view>`）；`<OAAboutModal>` 与 `<OAMouseSpark>` 挂在外壳之外。
 2. 路由 → 阶段：`watch(() => route.name, …, { immediate: true })`，进 `home` 调 `enterHome()`、回 `splash` 调 `enterSplash()`，**其它路由不改 `stage`**（banner 继续停在左下角），这就是「新页面只要不处理就自动延续外壳」的约定。
-3. 注意事项：底色交叉淡入的 `620ms` 是写在 `.oa-shell__bg::after` 上的**硬编码**，与 `SHELL_TIMING.bannerMorph` 数值一致但不同源，改停靠时长时记得两处一起改。
+3. 沉浸外壳：`IMMERSIVE_ROUTES`（`resources` / `packageDetail` / `packageCharacter`）命中时，`OABannerDock` 的 `visible` 传 `false`（收起 banner），设置按钮容器加 `.is-edge` 并给 `OASettingsButton` 传 `variant="edge"`（贴右缘竖向把手）。资源库整段共用一个外壳形态，避免进入子页时 banner 与设置按钮跳位。
+4. 注意事项：底色交叉淡入的 `620ms` 是写在 `.oa-shell__bg::after` 上的**硬编码**，与 `SHELL_TIMING.bannerMorph` 数值一致但不同源，改停靠时长时记得两处一起改。
 
 ### `useAppShell()`（模块唯一入口）
 
@@ -48,6 +49,7 @@
 1. 作用：banner 在「舞台中央」与「左下角小尺寸品牌标记」之间做连续变形；停靠后变成可点击按钮（`role="button"`、`tabindex`、`aria-label`，Enter/Space 也能触发），点击 `emit('click')` → `App.vue` 打开关于弹窗。
 2. 输入输出：props `docked: boolean`、`visible: boolean`（过 gate 后才显示）、`playToken: number`（递增 → 内部 `<OABannerSvg :key="playToken">` 重挂）；事件 `click`。
 3. 注意事项：两个状态的 `transform` 函数结构**完全一致**（`translate(-50%,-50%) translate(x,y) scale(s)`），只换参数，否则插值退化成矩阵分解、中途会斜飘变形（见 NeedNotice 条目 05）；`updateGeometry()` 混用 `window.innerWidth/Height` 与 `documentElement.clientWidth/Height`（`left/top: 50%` 的百分比不含滚动条，`vw/vh` 含），只监听 `resize` 与 `watch(docked, { flush: 'post' })`，**没有 `ResizeObserver`**；几何常量要与 CSS 对齐：舞台 `min(46vw, 620px)`、停靠宽 `clamp(76px, 6.2vw, 104px)`、左边距 `clamp(20px, 3vw, 42px)`、下边距 `clamp(14px, 2.8vh, 30px)`；hover / active 只缩放 `1.05` / `0.97`，全程只动 `transform`（合成层）。
+4. 注意事项：`visible=false` 时不只是 `opacity: 0`，还必须让 `.is-docked` 的 `pointer-events: auto` 失效（`.oa-banner-dock:not(.is-visible)` 那条规则），否则透明按钮仍会挡住页面点击；同时 `tabindex` 与 `role` 都随 `visible` 一起收回，避免键盘焦点落到看不见的 banner 上。
 
 ### `OABubbles`（`active`）
 
@@ -55,11 +57,11 @@
 2. 输入输出：props `active?: boolean`（默认 `true`）；无事件、无插槽。
 3. 注意事项：气泡由 `BUBBLES` 常量数组 × `.oa-bubbles__bub--1` ~ `--10` 修饰类生成，每个各写一条 `width/height`（180~200px）、`top/left`、`--dur`（34~42s）、负 `--delay` 与 `opacity`（0.10~0.15），漂浮关键帧是 `oa-bubbles__bub-float`；容器固定 `filter: blur(12px)`，切 `active` 时不要动几何；`prefers-reduced-motion: reduce` 下关掉动画。
 
-### `OASettingsButton` / `OASettingsModal`
+### `OASettingsButton`（`variant`） / `OASettingsModal`
 
-1. 作用：右上角 44×44 的齿轮按钮，内部 `isOpen` 控制 `OASettingsModal`；弹窗里是「背景音效」（主界面 BGM 音量、预览音频/音效音量，均 0–100）与「立绘渲染」（`SPINE_RENDERER_OPTIONS` 三档 + 一条 Canvas 2D 掉帧提示）。
-2. 输入输出：`OASettingsButton` 无 props；`OASettingsModal` 接受 `visible`，`emit('update:visible')` / `emit('close')`，每次打开时 `fetchConfig()` 重新拉配置。
-3. 注意事项：两个页面共用同一份外壳按钮，不要在页面里再放一个；渲染器切换立即写回配置，但**下次载入立绘才生效**（提示文案已写明），不要为它去重建舞台。
+1. 作用：设置入口按钮，内部 `isOpen` 控制 `OASettingsModal`；弹窗里是「背景音效」（主界面 BGM 音量、预览音频/音效音量，均 0–100）与「立绘渲染」（`SPINE_RENDERER_OPTIONS` 三档 + 一条 Canvas 2D 掉帧提示）。
+2. 输入输出：`OASettingsButton` 接受 `variant?: 'float' | 'edge'`（默认 `float`，44×44 圆角方块；`edge` 是 30×62、只留左侧圆角、贴在视口右缘的竖向把手，hover 向左探出 6px）；`OASettingsModal` 接受 `visible`，`emit('update:visible')` / `emit('close')`，每次打开时 `fetchConfig()` 重新拉配置。
+3. 注意事项：两个页面共用同一份外壳按钮，不要在页面里再放一个；`edge` 变体的定位由 `App.vue` 的 `.oa-shell__settings.is-edge`（`top: 50%; right: 0; translateY(-50%)`）负责，按钮自己只改尺寸与圆角；渲染器切换立即写回配置，但**下次载入立绘才生效**（提示文案已写明），不要为它去重建舞台。
 
 ### `OAAboutModal`（`visible` + `update:visible` / `close`）
 
@@ -82,6 +84,7 @@
 ## 注意事项
 
 - 外壳元素一律 `position: fixed` + 明确层级：底色 0、气泡 0、banner 30、内容区 10、设置 40、鼠标特效 99999；调层级只能动页面自己那一层。
+- 新页面默认沿用「banner 停靠左下 + 设置悬浮右上」；只有需要整屏让位的沉浸页才把路由名加进 `App.vue` 的 `IMMERSIVE_ROUTES`（当前是资源管理 + 资源包详情 + 角色详情），并在页面根节点把 `--oa-page-head-reserve` 设为 `0px`，否则页头右侧会留出一块给悬浮按钮的空当。
 - `playBannerAnimation()`（自增 `bannerPlayToken`）是「重播 banner」的唯一开关，页面不要直接操作 `OABannerSvg`。
 - 动画版横幅只能内联成 Vue 组件并靠 `:key` 重挂（见 NeedNotice 条目 02、03）；停靠到位后显示的是静态 SVG，交叉淡入由 `bannerCrossfade` / `bannerCrossfadeDelay` 控制。
 - 鼠标特效没有「按设备降级」的开关，要关只能改 `OAMouseSpark` 的 props 默认值或注释掉实例。

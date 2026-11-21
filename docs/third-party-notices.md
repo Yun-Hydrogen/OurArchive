@@ -9,5 +9,11 @@
 
 - UI组件库使用Riz-UI，遵循AGPLv3，详见[Riz-UI](license/Riz-UI)
 
+- DragonBones 运行时（`pixi-dragonbones-runtime@7.0.0`）以 MIT 许可分发，
+  详见 [pixi-dragonbones-runtime](license/pixi-dragonbones-runtime)。
+
+- DragonBones 运行时本体（DragonBonesJS）以 MIT 许可分发，
+  详见 [DragonBones](license/DragonBones)。
+
 ## 关于《蔚蓝档案》游戏资源
 项目不会包含任何游戏内的文件，请自行处理。

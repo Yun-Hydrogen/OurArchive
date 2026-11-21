@@ -12,18 +12,19 @@
 
 ## 职责边界
 
-- 做：全局配置（`main_bgm_volume`、`preview_volume`、`spine_renderer`）的默认值、格式规范、落盘与迁移，以及前端响应式状态管理和 300ms 防抖更新。
+- 做：全局配置（`main_bgm_volume`、`preview_volume`、`spine_renderer`、`keep_session`）的默认值、格式规范、落盘与迁移，以及前端响应式状态管理和 300ms 防抖更新。
 - 不做：底层存储目录的创建（由 `Initializer/storage.server.ts` 负责）、具体音量如何施加到音频元素（由 `AudioPlayer` 与各播放器负责）、渲染器具体执行（由立绘预览模块负责）。
 
 ## 关键实现
 
 ### `loadGlobalConfig()` / `saveGlobalConfig()`（`configStore.server.ts`）
 
-1. 作用：服务端读写 `<root>/config/global_config.yml`；读取时使用默认配置打底（`main_bgm_volume: 50`、`preview_volume: 60`、`spine_renderer: 'stable'`）并做浅合并。
+1. 作用：服务端读写 `<root>/config/global_config.yml`；读取时使用默认配置打底（`main_bgm_volume: 50`、`preview_volume: 60`、`spine_renderer: 'stable'`、`keep_session: true`）并做浅合并。
 2. 输入输出：`loadGlobalConfig(paths?): GlobalConfig`；`saveGlobalConfig(config, paths?): GlobalConfig`。
 3. 校验规则：
    - 音量项统一收敛为 0–100 的整数，非数字或溢出自动恢复为默认配置。
    - `spine_renderer` 通过 `isSpineRendererMode()` 校验，非法值归一化为 `'stable'`。
+   - `keep_session` 必须是布尔值，非法值归一化为 `true`。
 4. 注意事项：文件缺失或 YAML 语法错误时打印警告并返回默认配置，**绝不抛错**；写入时通过 `dump`（`indent: 2`、`lineWidth: -1`、`noRefs: true`）序列化。
 
 ### `migrateLegacyConfigDir(paths)`（`configStore.server.ts`）
@@ -40,7 +41,9 @@
 
 1. 作用：确保配置文件物理存在；首次启动且无旧配置可迁移时，写入默认配置内容（`DEFAULT_CONFIG_CONTENT`）。
 2. 输入输出：`(paths?: StoragePaths): void`。
-3. 注意事项：该函数仅关注配置文件的写入与默认值落盘，基础目录本身的创建留在 `Initializer/storage.server.ts`，职责单向解耦。
+3. 已有配置的补齐：文件存在时对比 `loadGlobalConfig()` 的键集合，**只补缺失项**（如新增的 `keep_session`）并写回；
+   解析失败则原样保留，避免覆盖用户手写内容。
+4. 注意事项：该函数仅关注配置文件的写入与默认值落盘，基础目录本身的创建留在 `Initializer/storage.server.ts`，职责单向解耦。
 
 ### 渲染器模式定义与共享真源（`rendererMode.ts`）
 
@@ -55,7 +58,7 @@
 ### `useGlobalConfig()`（`useGlobalConfig.ts`）
 
 1. 作用：前端全局配置单例 Composable，多组件调用共享同一份响应式 `config` 引用。
-2. 输入输出：暴露只读 `config`、`isLoaded`，以及 `fetchConfig()`、`setMainBgmVolume()`、`setPreviewVolume()`、`setSpineRenderer()`。
+2. 输入输出：暴露只读 `config`、`isLoaded`，以及 `fetchConfig()`、`setMainBgmVolume()`、`setPreviewVolume()`、`setSpineRenderer()`、`setKeepSessionEnabled()`。
 3. 响应式与防抖同步：
    - `fetchConfig()` 调用 GET `/api/config` 初始化状态，拉取失败保留 `CONFIG_DEFAULTS` 并警告，不抛出异常。
    - `config` 是经 `readonlyRef()` 封装的只读暴露，修改必须通过专属 setter，内部自动通过 `clampVolume` 规范数值。
@@ -63,13 +66,15 @@
 
 ### 弹窗与设置面板集成消费（`OASettingsModal.vue`）
 
-1. 消费方式：`Shell` 模块中的设置弹窗引入 `useGlobalConfig`，展示音量滑块与渲染模式单选。
+1. 消费方式：`Shell` 模块中的设置弹窗引入 `useGlobalConfig`，展示音量滑块、渲染模式单选，以及「界面行为 → 会话保持」开关（`rizui_switch`）。
 2. 生效时机：音量设置即时同步；渲染模式修改即时保存至后端，但立绘渲染器实例仅在下次载入立绘时初始化生效，不强制刷新当前页面。
+3. 会话保持：开关变更立即调 `setKeepSession()` 写 `localStorage` 镜像（路由守卫依赖它），再走防抖 `PUT /api/config` 落盘 `global_config.yml`。
 
 ## 注意事项
 
 - 服务端写入配置文件前，必须先调用 `fs.mkdirSync(paths.configDir, { recursive: true })` 确保目录存在。
-- 字段命名全链路统一为 snake_case（`main_bgm_volume`、`preview_volume`、`spine_renderer`），严禁在 DTO 处私自转为 camelCase。
+- 字段命名全链路统一为 snake_case（`main_bgm_volume`、`preview_volume`、`spine_renderer`、`keep_session`），严禁在 DTO 处私自转为 camelCase。
+- `keep_session` 变更时必须同步调用 `setKeepSession()` 写 `localStorage` 镜像：路由守卫在配置请求返回前就要用它判断能否恢复页面。
 - 旧配置迁移在 `initializeStorage()` 中触发，先迁移再通过 `ensureConfigFile()` 兜底生成默认配置。
 
 ## 相关文档

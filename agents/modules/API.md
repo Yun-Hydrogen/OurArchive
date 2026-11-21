@@ -7,17 +7,17 @@
 | 文件 | 作用 |
 | --- | --- |
 | `request.ts` | 客户端统一请求封装（`apiGet` / `apiPut`）、统一包络校验与 `ApiError` 异常体系 |
-| `types.ts` | 跨端共享 DTO 类型契约（`ResourcePackage` / `PackageCharacter` / `PackageSkeleton` / `PackageMusic` 等） |
+| `types.ts` | 跨端共享 DTO 类型契约（`ResourcePackage` / `PackageCharacter` / `PackageSkeleton` / `PackageEmotion` / `PackageMusic` 等） |
 | `configApi.ts` | 客户端全局配置 API（`fetchGlobalConfig` / `saveGlobalConfig`） |
-| `packagesApi.ts` | 客户端资源包 API（获取列表、详情、角色、骨骼、曲目、音效、背景图、表情） |
+| `packagesApi.ts` | 客户端资源包 API（获取列表、详情、角色、骨骼、曲目、音效、背景图） |
 | `configRoutes.server.ts` | 服务端全局配置端点（`GET /api/config`、`PUT /api/config`，服务端专用） |
 | `preloadRoutes.server.ts` | 服务端预加载清单及资源流端点（`GET /api/preload/assets`、`GET /api/preload/asset/:id`，服务端专用） |
-| `packagesRoutes.server.ts` | 服务端资源包与下发静态资源全部路由（共 15 个端点，服务端专用） |
+| `packagesRoutes.server.ts` | 服务端资源包与下发静态资源全部路由（共 13 个端点，服务端专用） |
 
 ## 职责边界
 
 - 做：前后端数据通信底座：统一的客户端 JSON 请求拦截和异常包装、跨端 DTO 类型契约，以及服务端的配置、预加载和资源包核心路由与文件下发。
-- 不做：资源底层文件的解析与目录物理扫描（分别由 `PackageProvider`、`CharacterProvider`、`AudioProvider`、`BackgroundProvider`、`EmotionProvider` 承担）。
+- 不做：资源底层文件的解析与目录物理扫描（分别由 `PackageProvider`、`CharacterProvider`、`AudioProvider`、`BackgroundProvider` 承担）。
 
 ## 关键实现
 
@@ -25,16 +25,16 @@
 
 | 方法 | 路径 | 响应内容 / 说明 |
 | --- | --- | --- |
-| `GET` | `/api/config` | 获取全局配置（`main_bgm_volume`、`preview_volume`、`spine_renderer`） |
+| `GET` | `/api/config` | 获取全局配置（`main_bgm_volume`、`preview_volume`、`spine_renderer`、`keep_session`） |
 | `PUT` | `/api/config` | 提交配置变更补丁，音量钳制在 0–100，渲染模式受守卫校验 |
 | `GET` | `/api/preload/assets` | 获取所有预加载资源的校验清单与元数据状态 |
 | `GET` | `/api/preload/asset/:id` | 获取指定预加载资源的文件内容本体（音频流 / 图片等） |
 | `GET` | `/api/packages` | 扫描 `res/` 根目录列出全部资源包及总数 |
 | `GET` | `/api/packages/:id` | 获取单个资源包的完整清单详情 |
 | `GET` | `/api/packages/:id/characters` | 获取该包角色索引列表（含头像 URL 及立绘存在性判定） |
-| `GET` | `/api/packages/:id/skeletons` | 获取该包全部立绘目录元数据（文件清单、体积、三件套完整度） |
+| `GET` | `/api/packages/:id/skeletons` | 获取该包全部立绘目录元数据（文件清单、体积、骨骼类型与完整度） |
 | `GET` | `/api/packages/:id/skeleton/:skeletonId` | 获取指定立绘目录内的文件清单与体积 |
-| `GET` | `/api/packages/:id/skeleton/:skeletonId/:file(*)` | 下发立绘文件本体（`.skel` / `.atlas` / `.png` 等） |
+| `GET` | `/api/packages/:id/skeleton/:skeletonId/:file(*)` | 下发立绘文件本体（`.skel` / `.atlas` / `.png` / `_ske.json` / `_tex.json` 等） |
 | `GET` | `/api/packages/:id/avatar/:file(*)` | 下发角色头像图片本体 |
 | `GET` | `/api/packages/:id/music` | 获取背景音乐曲目列表（读取 `index/music_info.json`） |
 | `GET` | `/api/packages/:id/music/:file(*)` | 下发背景音乐音频本体（带 Range 支持） |
@@ -42,8 +42,8 @@
 | `GET` | `/api/packages/:id/sounds/:file(*)` | 下发音效音频本体（带 Range 支持） |
 | `GET` | `/api/packages/:id/backgrounds` | 获取背景图列表与分类（读取 `index/category.yml`） |
 | `GET` | `/api/packages/:id/backgrounds/:file(*)` | 下发背景图图片本体 |
-| `GET` | `/api/packages/:id/emotions` | 获取表情清单列表（读取 `index/emotions.yml`） |
-| `GET` | `/api/packages/:id/emotions/:file(*)` | 下发表情引用的图片或音效文件本体 |
+| `GET` | `/api/packages/:id/emotions` | 获取表情清单与脚本元数据（读取 `index/emotions.yml`） |
+| `GET` | `/api/packages/:id/emotions/:file(*)` | 下发表情图片 / 音效 / JS 脚本 |
 
 ### `apiGet<T>(url)` / `apiPut<T>(url, body)`（`request.ts`）
 
@@ -69,7 +69,7 @@
 3. 安全闸门与下发策略：
    - 路径越界阻断：必须经由 `resolveInside()` 校验安全路径，禁止路径穿越。
    - 文件存在性检查：目标必须物理存在且为普通文件（`statSync(target).isFile()`）。
-   - 类型白名单过滤：必须在 `MIME_BY_EXTENSION` 扩展名白名单内（含 `.png/.jpg/.jpeg/.webp/.bmp/.gif/.avif`、`.skel`、`.atlas`、`.json` 以及 `.ogg/.opus/.mp3/.wav/.flac/.aac/.m4a` 等），非白名单一律返回 404（见 [NeedNotice](../NeedNotice.md) 条目 21）。
+   - 类型白名单过滤：必须在 `MIME_BY_EXTENSION` 扩展名白名单内（含 `.png/.jpg/.jpeg/.webp/.bmp/.gif/.avif`、`.skel`、`.atlas`、`.json`、`.js/.mjs` 以及 `.ogg/.opus/.mp3/.wav/.flac/.aac/.m4a` 等），非白名单一律返回 404（见 [NeedNotice](../NeedNotice.md) 条目 21）。
    - 响应头注入：统一注入 `Cache-Control: no-cache`。
    - 字节流下发：统一调用 Express 的 `res.sendFile(target)`，原生支持 HTTP 206 Range，这是前端音频播放可拖动 seek 的必要条件。
 

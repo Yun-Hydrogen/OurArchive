@@ -11,7 +11,7 @@
 ## 职责边界
 
 - 解析什么：解析 `hasCharacter` 分类的角色索引文件，组装头像可访问 URL（`avatars/` 目录），检查角色绑定的各立绘目录（`skeletons/` 目录）物理存在性。
-- 不做什么：不加载、解析或渲染立绘骨骼文件（由 `SkeletonRender` / `SkeletonRuntimeProvider` 负责），不管理角色选择弹窗状态（由 `ResourcePicker` 负责），不绘制前端页面。
+- 不做什么：不加载、解析或渲染立绘骨骼文件（由 `SkeletonRender` / `SkeletonRuntimeProvider` 负责），不管理角色选择弹窗状态，不绘制前端页面。
 
 ## 数据形状
 
@@ -76,5 +76,4 @@
 ## 相关文档
 
 - [PackageProvider](./PackageProvider.md)
-- [ResourcePicker](./ResourcePicker.md)
 - [NeedNotice](../NeedNotice.md)

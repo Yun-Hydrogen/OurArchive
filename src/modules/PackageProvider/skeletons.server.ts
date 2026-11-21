@@ -5,8 +5,62 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { PackageSkeleton, PackageSkeletonItem, ResourcePackage } from '@/modules/API/types';
+import type {
+  PackageSkeleton,
+  PackageSkeletonItem,
+  PackageSkeletonKind,
+  ResourcePackage,
+} from '@/modules/API/types';
 import { buildAssetUrl, getContent, resolveInside } from './packageManifest.server';
+
+const TEXTURE_EXTENSIONS = new Set(['.png', '.webp', '.jpg', '.jpeg']);
+
+function isDragonBonesSkeleton(name: string): boolean {
+  return /_ske\.(json|dbbin)$/i.test(name);
+}
+
+function isDragonBonesTextureJson(name: string): boolean {
+  return /_tex\.json$/i.test(name);
+}
+
+/** 根据目录里的文件名判断骨骼类型与可预览性 */
+function detectSkeletonKind(files: PackageSkeletonItem[]): {
+  kind: PackageSkeletonKind;
+  complete: boolean;
+} {
+  const names = files.map((file) => file.name);
+  const exts = new Set(files.map((file) => file.ext));
+  const hasTexture = [...TEXTURE_EXTENSIONS].some((ext) => exts.has(ext));
+
+  const hasDragonBonesSkeleton = names.some(isDragonBonesSkeleton);
+  const hasDragonBonesTextureJson = names.some(isDragonBonesTextureJson);
+  const hasDragonBonesJson = names.some((name) => /_ske\.json$/i.test(name));
+
+  // DragonBones 的 `_ske` / `_tex` 命名优先级高于 Spine 的通用 `.json`
+  if (hasDragonBonesSkeleton || hasDragonBonesTextureJson) {
+    return {
+      kind: 'dragonbones',
+      // 第一版只支持 JSON 骨架；`.dbbin` 识别为 DragonBones 但暂不可预览
+      complete: hasDragonBonesJson && hasDragonBonesTextureJson && hasTexture,
+    };
+  }
+
+  const hasAtlas = exts.has('.atlas');
+  const hasSpineSkeleton =
+    exts.has('.skel') ||
+    names.some(
+      (name) =>
+        name.toLowerCase().endsWith('.json') &&
+        !isDragonBonesSkeleton(name) &&
+        !isDragonBonesTextureJson(name)
+    );
+
+  if (hasAtlas || hasSpineSkeleton) {
+    return { kind: 'spine', complete: hasAtlas && hasSpineSkeleton && hasTexture };
+  }
+
+  return { kind: 'unknown', complete: false };
+}
 /** 读取某个立绘目录下的文件；目录不存在或不是骨骼分类时返回 null */
 export function readSkeletonFiles(
   packageDir: string,
@@ -102,16 +156,14 @@ export function readPackageSkeletons(
 
     const dir = path.join(root, entry.name);
     const files = readSkeletonDir(pkg.id, entry.name, dir) ?? [];
-    const exts = new Set(files.map((file) => file.ext));
+    const detected = detectSkeletonKind(files);
 
     results.push({
       id: entry.name,
       files,
       totalSize: files.reduce((sum, file) => sum + file.size, 0),
-      complete:
-        (exts.has('.skel') || exts.has('.json')) &&
-        exts.has('.atlas') &&
-        (exts.has('.png') || exts.has('.webp') || exts.has('.jpg') || exts.has('.jpeg')),
+      kind: detected.kind,
+      complete: detected.complete,
     });
   }
 

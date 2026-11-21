@@ -14,15 +14,8 @@ import OAPackageSounds from './OAPackageSounds.vue';
 import OAPackageBackgrounds from './OAPackageBackgrounds.vue';
 import OAPackageEmotions from './OAPackageEmotions.vue';
 import { SHELL_TIMING } from '@/modules/Shell/shellTiming';
-import OACharacterPickerDialog from '@/modules/ResourcePicker/OACharacterPickerDialog.vue';
-import {
-  disposeCharacterPicker,
-  openCharacterPicker,
-  type CharacterPickItem,
-} from '@/modules/ResourcePicker/useCharacterPicker';
 import { useEnterAnimation } from '@/modules/ViewsManager/useEnterAnimation';
 import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
-import { loadSpineCharacterFromPackage, type SpineCharacter } from '@/modules/SkeletonRender/spinePackage';
 import {
   usePackageContent,
   type PackageCharacter,
@@ -372,6 +365,9 @@ const activeKeyword = computed({
     if (activeSection.value === SECTION_BACKGROUNDS) {
       return backgroundKeyword.value;
     }
+    if (activeSection.value === SECTION_EMOTIONS) {
+      return emotionKeyword.value;
+    }
     return keyword.value;
   },
   set: (value: string) => {
@@ -383,6 +379,8 @@ const activeKeyword = computed({
       soundKeyword.value = value;
     } else if (activeSection.value === SECTION_BACKGROUNDS) {
       backgroundKeyword.value = value;
+    } else if (activeSection.value === SECTION_EMOTIONS) {
+      emotionKeyword.value = value;
     } else {
       keyword.value = value;
     }
@@ -408,6 +406,9 @@ const searchPlaceholder = computed(() => {
   }
   if (activeSection.value === SECTION_BACKGROUNDS) {
     return '搜索背景文件名';
+  }
+  if (activeSection.value === SECTION_EMOTIONS) {
+    return '搜索表情 id / 名称';
   }
   return '';
 });
@@ -465,6 +466,7 @@ watch(
       void loadBackgrounds();
     } else if (section === SECTION_EMOTIONS) {
       void loadEmotions();
+      void loadSkeletons();
     }
   },
   { immediate: true }
@@ -511,110 +513,14 @@ const soundCategoryGroups = computed(() => {
 /** 背景搜索词（页头搜索框按分类代理） */
 const backgroundKeyword = ref('');
 
+/** 表情搜索词 */
+const emotionKeyword = ref('');
+
 /**
  * 当前选中的背景分类 id（侧边栏子条目驱动）；`null` 表示「全部」。
  * 空串是合法值，代表 `category.yml` 之外的「未分类」。
  */
 const activeBackgroundCategory = ref<string | null>(null);
-
-/* ------------------------------ 表情 ------------------------------ */
-
-/** 表情预览用的立绘；为空时提示先选角色 */
-const emotionCharacter = ref<SpineCharacter | null>(null);
-const emotionCharacterLabel = ref('');
-const emotionCharacterLoading = ref(false);
-const emotionCharacterError = ref('');
-
-/** 已被角色引用的立绘 id，用来从「独立立绘」里排除掉 */
-const boundSkeletonIds = computed(
-  () =>
-    new Set(
-      characters.value
-        .flatMap((character) => character.spines)
-        .filter((spine) => spine.exists)
-        .map((spine) => spine.id)
-    )
-);
-
-/**
- * 候选列表 = 每个角色绑定的立绘 + 没被任何角色引用的独立立绘目录。
- * 独立立绘需要完整三件套，否则载入必然失败。
- */
-async function buildCharacterChoices(): Promise<CharacterPickItem[]> {
-  if (!skeletons.value.length) {
-    await loadSkeletons();
-  }
-
-  const items: CharacterPickItem[] = [];
-
-  for (const character of characters.value) {
-    for (const spine of character.spines) {
-      if (!spine.exists) {
-        continue;
-      }
-      items.push({
-        key: `character:${character.name_id}:${spine.id}`,
-        label: character.name,
-        description: [character.school, character.club].filter(Boolean).join(' · ') || '角色立绘',
-        group: '角色立绘',
-        skeletonId: spine.id,
-        avatarUrl: character.avatarUrl,
-      });
-    }
-  }
-
-  const bound = boundSkeletonIds.value;
-  for (const skeleton of skeletons.value) {
-    if (!skeleton.complete || bound.has(skeleton.id)) {
-      continue;
-    }
-    items.push({
-      key: `skeleton:${skeleton.id}`,
-      label: skeleton.id,
-      description: '未被角色引用的独立立绘目录',
-      group: '独立立绘',
-      skeletonId: skeleton.id,
-      avatarUrl: '',
-    });
-  }
-
-  return items;
-}
-
-async function loadEmotionCharacter(picked: CharacterPickItem) {
-  emotionCharacterLoading.value = true;
-  emotionCharacterError.value = '';
-
-  try {
-    emotionCharacter.value = await loadSpineCharacterFromPackage(packageId.value, picked.skeletonId);
-    emotionCharacterLabel.value =
-      picked.group === '独立立绘'
-        ? picked.skeletonId
-        : `${picked.label} · ${picked.skeletonId}`;
-  } catch (error) {
-    emotionCharacter.value = null;
-    emotionCharacterLabel.value = '';
-    emotionCharacterError.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    emotionCharacterLoading.value = false;
-  }
-}
-
-/** 打开角色选择框；决定用哪条立绘作为表情预览底座 */
-async function pickEmotionCharacter() {
-  const items = await buildCharacterChoices();
-  const picked = await openCharacterPicker(items, {
-    title: '选择表情预览角色',
-    description: '从资源包里已绑定立绘的角色，或独立的立绘目录中选择一个作为表情预览的底座。',
-    emptyText: '这个资源包里没有可用的立绘（先确认「骨骼」分类里至少有一个完整目录）。',
-  });
-
-  if (!picked) {
-    return;
-  }
-
-  await loadEmotionCharacter(picked);
-}
 
 onMounted(() => {
   void load();
@@ -629,7 +535,6 @@ onBeforeUnmount(() => {
     clearTimeout(highlightTimer);
     highlightTimer = null;
   }
-  disposeCharacterPicker();
   resizeObserver?.disconnect();
   resizeObserver = null;
 });
@@ -768,17 +673,16 @@ function openCharacter(character: PackageCharacter) {
           :active-category="activeBackgroundCategory"
         />
 
-        <!-- 表情：先选一个立绘做底座，再点右侧表情叠加播放 -->
+        <!-- 表情：在独立舞台上选择角色 / 骨骼并叠加播放 -->
         <OAPackageEmotions
           v-else-if="activeSection === SECTION_EMOTIONS && activeContent?.supported"
+          :package-id="packageId"
           :emotions="emotions"
+          :skeletons="skeletons"
+          :characters="characters"
           :loading="emotionsLoading"
           :error="emotionsError"
-          :character="emotionCharacter"
-          :character-label="emotionCharacterLabel"
-          :character-loading="emotionCharacterLoading"
-          :character-error="emotionCharacterError"
-          @pick="pickEmotionCharacter"
+          :keyword="emotionKeyword"
         />
 
         <!-- 未声明该分类：统一提示 -->
@@ -800,9 +704,6 @@ function openCharacter(character: PackageCharacter) {
       </div>
     </section>
     </Transition>
-
-    <!-- 角色选择对话框：常驻挂载，由 openCharacterPicker() 唤起 -->
-    <OACharacterPickerDialog />
   </main>
 </template>
 

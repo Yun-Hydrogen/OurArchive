@@ -2,6 +2,14 @@
 import { ref } from 'vue';
 import OASettingsModal from '@/modules/Shell/OASettingsModal.vue';
 
+withDefaults(
+  defineProps<{
+    /** `float`：右上角悬浮方块；`edge`：贴视口右缘的竖向把手（资源库沉浸页） */
+    variant?: 'float' | 'edge';
+  }>(),
+  { variant: 'float' }
+);
+
 const isOpen = ref(false);
 </script>
 
@@ -9,6 +17,7 @@ const isOpen = ref(false);
   <button
     type="button"
     class="oa-settings-trigger"
+    :class="{ 'is-edge': variant === 'edge' }"
     aria-label="设置"
     title="设置"
     @click="isOpen = true"
@@ -54,6 +63,7 @@ const isOpen = ref(false);
     color 0.25s ease,
     border-color 0.25s ease,
     box-shadow 0.25s ease,
+    width 0.25s ease,
     transform 0.25s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -80,5 +90,33 @@ const isOpen = ref(false);
 .oa-settings-trigger:focus-visible {
   outline: 2px solid var(--oa-blue);
   outline-offset: 2px;
+}
+
+/*
+ * 侧边吸附变体：贴在视口右缘的竖向把手，只保留左侧圆角与左侧阴影，
+ * 看起来像从屏幕边缘「抽」出来的一小截；hover 时向左探出一点。
+ */
+.oa-settings-trigger.is-edge {
+  width: 30px;
+  height: 62px;
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: -6px 0 20px rgba(36, 92, 138, 0.16);
+}
+
+.oa-settings-trigger.is-edge .oa-settings-trigger__icon {
+  width: 18px;
+  height: 18px;
+}
+
+.oa-settings-trigger.is-edge:hover {
+  width: 36px;
+  transform: translateX(-2px);
+  box-shadow: -8px 0 24px rgba(0, 144, 254, 0.24);
+}
+
+.oa-settings-trigger.is-edge:active {
+  transform: translateX(0) scale(0.97);
 }
 </style>

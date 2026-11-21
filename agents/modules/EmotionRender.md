@@ -1,4 +1,4 @@
-# EmotionRender — 角色表情渲染与预览舞台（Pixi.js + GSAP + JSON 动效体系）
+# EmotionRender — 表情脚本宿主与舞台预览
 
 > 源码：`src/modules/EmotionRender/`
 
@@ -6,31 +6,44 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `motionTypes.ts` | 动效 JSON DSL 类型定义（`EmotionMotionConfig`、图层、关键帧、缓动） |
-| `motionCompiler.ts` | 动效编译器：将外载动效 JSON 编译为 GSAP Timeline，挂载 Pixi 容器并管理销毁 |
-| `defaultMotions.ts` | 19 种 BA 官方标准表情的 JSON 动效预设与回退 |
-| `emotionOptions.ts` | 19 种表情物理运动参数（BA-Story 原版参数，对齐官方补间曲线与设计基准） |
-| `emotionPlayer.ts` | GSAP + Pixi.js 原版动画驱动器（作为通用兜底运行器） |
-| `OAEmotionPlayer.vue` | 表情播放宿主：支持外载 `motionUrl` 与内置 JSON 动效，自动转换坐标挂载 |
-| `OAEmotionPreview.vue` | 表情预览容器：整合 Spine 立绘 / 虚拟人台舞台、表情选择面板与缩放视口控制 |
-| `src/views/EmotionPreviewView.vue` | 工具箱独立【表情动效预览】工具页面，支持人台/立绘底座、循环、静音与在线 JSON 动效实时调试 |
+| `emotionScript.ts` | 动态 `import()` 资源包脚本、导出解析、Context 类型 |
+| `useEmotionPlayer.ts` | 预载贴图、挂载覆盖层、播放 / 停止、清理 |
+| `OAEmotionStage.vue` | 独立表情舞台：按 `packageId` / `skeletonId` 装配骨骼，暴露 `playEmotion()` / `stopEmotion()` |
 
-## 职责边界
+表情预览**不再**嵌在骨骼预览页里。资源包详情 → 表情分类采用「舞台 + 右侧列表」两栏布局：
+左边是 `OAEmotionStage`，右边是表情列表（独立滚动），通过 `ResourcePicker` 选择角色 / 骨骼作为底图，
+选中的骨骼 id 变化时舞台重新加载并清空正在播放的表情。
 
-- 做什么：接收表情元数据（支持外载 JSON 动效文件与 PNG 纹理）、将表情直接作为 Pixi `Container` 挂载到角色 Spine 实例或舞台人台锚点上、通过 `motionCompiler` 驱动 Sprite 的缩放/弹性/旋转/透明度物理补间、播完自销毁，触发表情专属音效（`SFX_Emoticon_Motion_{Name}.wav`）。
-- 不做什么：不使用 SVG SMIL 动画、不脱离渲染树进行 DOM 悬浮计算、不直接读写 YAML（由 `EmotionProvider` 负责）、不直接持有音频底层（由 `AudioPlayer/useEmotionSfx` 负责）。
+## 关键实现
 
-## 核心机制
+### 挂载坐标
 
-### 1. 外载 JSON 动效 DSL（`motionTypes.ts` / `motionCompiler.ts`）
-- **外载解耦**：资源包可直接放置 `motions/*.json`，在 `emotions.yml` 中声明 `motion: motions/foo.json`，纯数据驱动，无需修改前端代码即可新增或定制表情。
-- **多图层与多粒子**：支持气泡底衬、主图、旋转散开的粒子系统（`count`, `angleStep`, `instances`）。
-- **物理缓动**：关键帧直接支持 GSAP 的弹性曲线（`back.out`, `elastic.out` 等），达到官方原版游戏质感。
+- 舞台提供 `getOverlayRoot()`：始终位于角色之上的 Pixi 容器。
+- `getHeadGlobalAnchor()`：头顶锚点的舞台全局坐标。
+- `getDesignScale()`：1 设计像素对应的舞台全局像素。
+- `getCharacterFrame()` / `getHeadAnchor()`：角色本地包围盒与头顶锚点，用于 `framePoint`。
+- `framePoint(nx, ny)` 把角色包围盒的 0–1 比例坐标换算成容器内设计坐标，
+  与 BA-Story 的 `startPositionOffset` 语义一致（BA 使用固定 540×1012 设计框，
+  而不是直接拿 `Head` 骨骼世界坐标）。
+- `useEmotionPlayer` 创建 `anchorHost`，位置设为头顶全局坐标，缩放设为设计比例；
+  脚本内部坐标使用 **540 × 1012 设计像素**。
 
-### 2. 虚拟人台底座与坐标换算
-- **人台模式（Dummy）**：无需绑定任何资源包立绘，自动呈现带头部定位星与光环的轻量矢量人台轮廓，任何表情均可立即点击试听试看。
-- **立绘模式（Spine）**：绑定立绘时，通过 `inst.toLocal(globalAnchor)` 将头部全局锚点换算为 Spine 本地坐标系，表情随角色移动与缩放 100% 贴合同步。
+### 播放流程
 
-### 3. 音效同步
-- 表情触发时由 `playEmotionSfx` 播放对应的 `SFX_Emoticon_Motion_{Name}.wav`。
-- 新的表情音效触发时自动停止旧音效，保持听感清晰。
+1. 预载 `images` 为 `PIXI.Texture`，按文件名与 URL 建立索引。
+2. 创建 `anchorHost` / `container`，挂到覆盖层。
+3. 构造 `EmotionScriptContext`（`container`、`textures`、`audio`、`PIXI`、`gsap`、`ticker`、`signal`、`framePoint`）。
+4. `import(/* @vite-ignore */ scriptUrl)`，按 `export` / `default` 取工厂函数并执行。
+5. 没有 `script` 的表情直接拒绝播放（`error = '该表情没有脚本，无法播放'`）——宿主不再有内置兜底动画。
+6. 停止时：abort、取消 RAF、执行清理函数、移除并销毁容器、恢复 BGM。
+
+### 脚本信任
+
+当前版本**未实现**脚本信任/沙箱，资源包脚本会直接执行；相关机制后续再补。
+
+## 已知坑
+
+- 不能把 Pixi 对象交给 Vue `readonly` 深代理；`stage` 用 `markRaw` 传递。
+- 覆盖层必须在角色加载后重新提到 `app.stage` 末尾，否则表情会被角色盖住。
+- 脚本返回的时间轴必须在 `onCleanup` 里 `kill()`，否则切换表情会残留。
+- 表情列表与舞台是两个独立滚动区：舞台固定、列表单独滚动，避免滑到列表底部时错过表情播放。

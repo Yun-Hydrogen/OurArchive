@@ -10,3 +10,4 @@ resources/plugins/
 Thumbs.db
 .commandcode
 *.tsbuildinfo
+.vscode/

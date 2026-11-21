@@ -124,6 +124,8 @@ function openSkeleton(skeletonId: string) {
   padding: clamp(14px, 2.2vh, 24px) clamp(24px, 4.4vw, 84px) clamp(36px, 4.6vh, 52px);
   padding-top: clamp(56px, 8vh, 84px);
   color: var(--oa-dark-blue);
+  /* 资源库沉浸页：设置按钮在右缘竖向把手上，页头不必为右上角让位 */
+  --oa-page-head-reserve: 0px;
 }
 
 .oa-charview__head {
@@ -181,6 +183,13 @@ function openSkeleton(skeletonId: string) {
     transform: translateY(38px) scale(0.985);
   }
 }
+@media (max-width: 1100px) {
+  /* 窄窗口下内容会贴到右缘，给沉浸式设置把手留出 34px 让位 */
+  .oa-charview {
+    padding-right: 34px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .oa-charview.is-entering .oa-charview__card,
   .oa-charview.is-leaving .oa-charview__card,

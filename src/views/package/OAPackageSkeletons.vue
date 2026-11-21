@@ -56,7 +56,7 @@ function toggle(id: string) {
 
 /** 文件类型标签：骨骼 / 图集 / 贴图 / 其它 */
 function fileKind(ext: string): string {
-  if (ext === '.skel' || ext === '.json') {
+  if (ext === '.skel' || ext === '.json' || ext === '.dbbin') {
     return '骨骼';
   }
   if (ext === '.atlas') {
@@ -66,6 +66,12 @@ function fileKind(ext: string): string {
     return '贴图';
   }
   return '其它';
+}
+
+function kindLabel(kind: PackageSkeleton['kind']): string {
+  if (kind === 'spine') return 'Spine';
+  if (kind === 'dragonbones') return 'DragonBones';
+  return '未知格式';
 }
 </script>
 
@@ -113,9 +119,10 @@ function fileKind(ext: string): string {
           <span class="oa-pkg__skel__names">
             <span class="oa-pkg__skel__id">{{ item.id }}</span>
             <span class="oa-pkg__skel__meta">
-              {{ item.files.length }} 个文件 · {{ formatBytes(item.totalSize) }}
+              <span class="oa-pkg__skel__kind">{{ kindLabel(item.kind) }}</span>
+              · {{ item.files.length }} 个文件 · {{ formatBytes(item.totalSize) }}
               <template v-if="!item.complete">
-                · <span class="oa-pkg__skel__warn">缺少必需文件</span>
+                · <span class="oa-pkg__skel__warn">缺少必需文件或暂不支持</span>
               </template>
             </span>
           </span>
@@ -124,7 +131,7 @@ function fileKind(ext: string): string {
             type="button"
             class="oa-pkg__skel__preview"
             :disabled="!item.complete"
-            :title="item.complete ? '在骨骼预览里打开' : '缺少 .skel / .atlas / 贴图，无法预览'"
+            :title="item.complete ? '在骨骼预览里打开' : '文件不完整或格式暂不支持，无法预览'"
             @click.stop="emit('preview', item.id)"
           >
             <svg viewBox="0 0 16 16" aria-hidden="true">

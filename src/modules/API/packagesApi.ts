@@ -114,7 +114,7 @@ export function fetchPackageBackgrounds(packageId: string): Promise<BackgroundsR
   );
 }
 
-/** 表情清单（读 `index/emotions.yml`，每条指向一个自包含动画 SVG） */
+/** 表情清单（读 `index/emotions.yml`） */
 export function fetchPackageEmotions(packageId: string): Promise<EmotionsResponse> {
   return apiGet<EmotionsResponse>(
     `/api/packages/${encodeURIComponent(packageId)}/emotions`

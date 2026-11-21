@@ -88,8 +88,9 @@ onBeforeUnmount(() => {
       '--fade': `${SHELL_TIMING.bannerCrossfade}ms`,
       '--fade-delay': `${SHELL_TIMING.bannerCrossfadeDelay}ms`,
     }"
-    :role="docked ? 'button' : undefined"
-    :tabindex="docked ? 0 : -1"
+    :role="docked && visible ? 'button' : undefined"
+    :tabindex="docked && visible ? 0 : -1"
+    :aria-hidden="!visible"
     :aria-label="docked ? '关于 Our Archive (开发与贡献信息)' : undefined"
     :title="docked ? '点击查看开发与贡献信息' : undefined"
     @click="handleClick"
@@ -154,6 +155,15 @@ onBeforeUnmount(() => {
   outline: 2px solid var(--oa-blue);
   outline-offset: 4px;
   border-radius: 6px;
+}
+
+/*
+ * 隐藏态（资源库沉浸页会主动收起 banner）必须连点击一起关掉：
+ * `.is-docked` 会把 pointer-events 打开，透明后仍会挡住下面的页面。
+ * 本规则与 `.is-docked` 特异性相同、位置在后，所以能覆盖它。
+ */
+.oa-banner-dock:not(.is-visible) {
+  pointer-events: none;
 }
 
 .oa-banner-dock__inner {

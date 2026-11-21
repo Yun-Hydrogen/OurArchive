@@ -1,4 +1,4 @@
-# SkeletonRuntimeProvider — Spine Pixi 运行时动态加载与契约类型
+# SkeletonRuntimeProvider — 骨骼运行时加载与契约类型
 
 > 源码：`src/modules/SkeletonRuntimeProvider/`
 
@@ -6,13 +6,17 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `runtime.ts` | 浏览器端动态加载器（从 `/plugins/spine/spine-pixi.js` 懒加载运行时模块） |
+| `runtime.ts` | Spine 浏览器端动态加载器（从 `/plugins/spine/spine-pixi.js` 懒加载） |
 | `spineTypes.ts` | Spine Pixi 运行时的最小结构类型声明（不复制官方源码、不打进依赖） |
 
 ## 职责边界
 
 - 做什么：以单例 Promise 动态拉取服务端静态托管的 Spine Pixi 运行时文件（`spine-pixi.js`），注入全局 `window.PIXI` 供其内部 require-shim 使用，绑定 `window.spine`，并定义调用方所需的最小接口契约。
 - 不做什么：不把 Spine 官方运行时硬打进前端 npm 依赖、不负责运行时的服务端下载与磁盘写入（服务端由 `Initializer/spinePlugin.server.ts` 处理）、不参与具体的画布绘制。
+
+> DragonBones 不经过本模块：它使用 npm 依赖 `pixi-dragonbones-runtime@7.0.0`（MIT），
+> 由 `SkeletonRender/dragonBonesRenderer.ts` 在首次加载 DragonBones 骨骼时动态 `import()`。
+
 
 ## 关键实现
 

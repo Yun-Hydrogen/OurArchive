@@ -4,9 +4,10 @@ import {
   normalizeSpineRendererMode,
   type SpineRendererMode,
 } from '@/modules/ConfigProvider/rendererMode';
+import { setKeepSession } from '@/modules/ViewsManager/access';
 import { readonlyRef } from '@/utils/reactivity';
 
-export type ConfigKey = 'main_bgm_volume' | 'preview_volume' | 'spine_renderer';
+export type ConfigKey = 'main_bgm_volume' | 'preview_volume' | 'spine_renderer' | 'keep_session';
 
 export interface GlobalConfig {
   /** 主界面背景音乐音量，0-100 */
@@ -20,12 +21,15 @@ export interface GlobalConfig {
    *   - conservative：仅 canvas 2d
    */
   spine_renderer: SpineRendererMode;
+  /** 会话保持：刷新后停留在原页面，不强制回到引导页 */
+  keep_session: boolean;
 }
 
 export const CONFIG_DEFAULTS: GlobalConfig = {
   main_bgm_volume: 50,
   preview_volume: 60,
   spine_renderer: 'stable',
+  keep_session: true,
 };
 
 const config = ref<GlobalConfig>({ ...CONFIG_DEFAULTS });
@@ -56,7 +60,12 @@ export function useGlobalConfig() {
         main_bgm_volume: clampVolume(data.config.main_bgm_volume, CONFIG_DEFAULTS.main_bgm_volume),
         preview_volume: clampVolume(data.config.preview_volume, CONFIG_DEFAULTS.preview_volume),
         spine_renderer: normalizeSpineRendererMode(data.config.spine_renderer),
+        keep_session:
+          typeof data.config.keep_session === 'boolean'
+            ? data.config.keep_session
+            : CONFIG_DEFAULTS.keep_session,
       };
+      setKeepSession(config.value.keep_session);
       isLoaded.value = true;
     } catch (error) {
       console.warn('[Our Archive] 获取全局配置失败，使用默认配置', error);
@@ -94,6 +103,13 @@ export function useGlobalConfig() {
     persist();
   }
 
+  function setKeepSessionEnabled(enabled: boolean) {
+    config.value.keep_session = Boolean(enabled);
+    // 立即同步本地镜像：路由守卫在配置请求返回前就要用它
+    setKeepSession(config.value.keep_session);
+    persist();
+  }
+
   return {
     config: readonlyRef(config),
     isLoaded: readonlyRef(isLoaded),
@@ -101,5 +117,6 @@ export function useGlobalConfig() {
     setMainBgmVolume,
     setPreviewVolume,
     setSpineRenderer,
+    setKeepSessionEnabled,
   };
 }

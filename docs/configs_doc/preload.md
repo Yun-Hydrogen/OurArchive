@@ -44,15 +44,15 @@ assets:
 
 ### 第一步：在 `preload_assets.yml` 中声明资源
 
-打开项目根目录的 `preload_assets.yml`，在 `assets` 下追加新条目。例如新增一个对话框音效与角色表情：
+打开项目根目录的 `preload_assets.yml`，在 `assets` 下追加新条目。例如新增一个对话框音效与界面图标：
 
 ```yaml
   - id: se_dialog_next
     file: preload/sounds/se/next.wav
     file_type: sound
 
-  - id: emoicon_sparkle
-    file: preload/images/emotions/sparkle.png
+  - id: ui_star
+    file: preload/images/uis/star.png
     file_type: image
 ```
 

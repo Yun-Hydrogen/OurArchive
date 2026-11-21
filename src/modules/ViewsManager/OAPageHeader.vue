@@ -100,8 +100,11 @@ const emit = defineEmits<{
   /*
    * 常驻设置按钮是 `position: fixed` 挂在右上角（44px + 右侧内边距），
    * 页头右侧必须让开它，否则窄窗口下返回键会被它挡住、点不到。
+   *
+   * 资源库这类「沉浸外壳」页面会把设置按钮改成贴右缘的竖向把手，
+   * 页头不再需要让位，由页面通过 --oa-page-head-reserve 覆盖为 0。
    */
-  padding-right: clamp(64px, 6vw, 80px);
+  padding-right: var(--oa-page-head-reserve, clamp(64px, 6vw, 80px));
 }
 
 .oa-page-head__main {

@@ -6,7 +6,7 @@
  */
 import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
 
-export type ToolArtVariant = 'skeleton' | 'emotion';
+export type ToolArtVariant = 'skeleton';
 
 export interface ToolEntry {
   /** 工具唯一标识，同时作为插画语义 */
@@ -28,12 +28,5 @@ export const TOOL_ENTRIES: ToolEntry[] = [
     subtitle: '载入 .skel / .atlas / 贴图，预览并切换立绘差分',
     art: 'skeleton',
     route: ROUTE_NAMES.skeletonPreview,
-  },
-  {
-    id: 'emotion-preview',
-    title: '表情动效预览',
-    subtitle: '基于 Pixi 与 JSON 动效时间轴，预览并测试角色表情与音效',
-    art: 'emotion',
-    route: ROUTE_NAMES.emotionPreview,
   },
 ];

@@ -42,6 +42,11 @@ export function createConfigRouter(): Router {
       patch.spine_renderer = body.spine_renderer;
     }
 
+    // 会话保持：布尔开关
+    if ('keep_session' in body) {
+      patch.keep_session = body.keep_session === true;
+    }
+
     const updated = saveGlobalConfig(patch);
     res.json({
       success: true,

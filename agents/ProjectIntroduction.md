@@ -9,6 +9,7 @@ Our Archive 旨在为玩家提供一个创作和体验视觉小说风格剧情�
 | 前端 | Vue 3 + Vite 6 + TypeScript + vue-router 4 |
 | UI | RizUI（`riz-ui`，按需引入） |
 | Spine | 官方 Spine Runtimes 4.2（按需下载到用户资源目录 `plugins/spine/`，仅立绘预览路由动态加载，默认 WebGL） |
+| DragonBones | `pixi-dragonbones-runtime@7.0.0`（MIT，随应用打包，首次加载 DragonBones 骨骼时动态 import） |
 | 后端 | Node.js + Express 4 + TypeScript |
 | 构建 | tsup（服务端）、@yao-pkg/pkg（可选单文件 exe） |
 | 包管理 | 单一 npm 包（无 workspaces） |
@@ -37,7 +38,7 @@ OurArchive/
 │   ├── utils/              # format.ts / reactivity.ts（纯函数）
 │   ├── views/              # 7 个页面 + 页面私有件
 │   │   └── package/        # 资源包页私有件（同页私有件 > 5 个才开子目录）
-│   └── modules/            # 16 个功能模块（见下）
+│   └── modules/            # 13 个功能模块（见下）
 ├── dist/                   # 构建产物：client/（Vite）+ server/（tsup）
 └── scripts/                # 打包脚本与启动脚本（package.js / bat / sh）
 ```
@@ -46,21 +47,22 @@ OurArchive/
 
 | 层 | 模块 | 职责 |
 | --- | --- | --- |
-| 渲染 / 播放 | `EmotionRender` | 表情关键帧解释与预览面板 |
-| | `SkeletonRender` | 立绘渲染：后端适配、舞台交互、预览组件 |
+| 渲染 / 播放 | `SkeletonRender` | 立绘渲染：后端适配、舞台交互、预览组件 |
 | | `BackgroundRender` | 背景宫格与大图灯箱 |
 | | `AudioPlayer` | 背景音乐单例与播放控制 |
 | 数据解析 | `PackageProvider` | `package.yml` 清单、内容分类、目录约定、立绘目录扫描 |
 | | `CharacterProvider` | `characters.json` → 角色 + 头像 + 立绘存在性 |
 | | `AudioProvider` | `music_info.json` / `sound_info.json` + 音频时长解析 |
 | | `BackgroundProvider` | `index/category.yml` + 背景图扫描 |
-| | `EmotionProvider` | `emotions.yml` → 合成图层与关键帧 |
-| 交互 | `ResourcePicker` | 通用资源选择对话框（Promise API） |
 | 基础设施 | `Initializer` | 启动初始化：路径、目录、preload 校验、Spine 插件下载、端口、托管 |
 | | `SkeletonRuntimeProvider` | 动态加载本地 Spine runtime 并交给渲染器 |
+| | `SkeletonRender` | 双骨骼 Pixi 舞台：Spine / DragonBones、预览与表情覆盖层 |
+| | `EmotionProvider` | 表情 `emotions.yml` 解析 |
+| | `EmotionRender` | 表情脚本加载、播放与独立表情舞台 `OAEmotionStage` |
 | | `API` | 前后端契约：DTO 类型、请求封装、Express router |
 | 装配 | `Shell` | 常驻外壳：气泡 / banner / 鼠标特效 / 设置关于 / 外壳时序 |
 | | `ViewsManager` | 路由表、入口闸门、页面入场动画、统一页头 `OAPageHeader.vue` |
+| | `ResourcePicker` | 通用资源选择器：角色 / 骨骼候选项 → Promise 结果 |
 | | `ConfigProvider` | 全局配置：默认值 / 校验 / yml 读写 / 渲染器模式取值 |
 
 每个模块的细节见 `agents/modules/<模块>.md`，页面见 `agents/views/<页面>.md`（总入口：[agents/README.md](./README.md)）。
@@ -181,13 +183,11 @@ node scripts/package.js all --no-zip       # 只出目录，不压缩归档
 - **跨平台**：Windows / Linux / Android (Termux)。
 - **局域网访问**：监听 `0.0.0.0`。
 - **离线运行**：除首次按需下载 Spine 运行时外，不请求任何外部资源。
-- **许可证**：代码 AGPL-3.0-only；`resources/` 资产为 CC BY-NC-ND 4.0，与 BA 官方无关联，不附带 BA 版权资源。Spine 运行时不随程序分发，首次启动按协议下载；许可见 [docs/third-party-notices.md](../docs/third-party-notices.md)。
+- **许可证**：代码 AGPL-3.0-only；`resources/` 资产为 CC BY-NC-ND 4.0，与 BA 官方无关联，不附带 BA 版权资源。Spine 运行时不随程序分发，首次启动按协议下载；DragonBones 运行时以 MIT 许可随应用分发。许可见 [docs/third-party-notices.md](../docs/third-party-notices.md)。
 
 ## 专题文档
 
 | 主题 | 文档 |
 | --- | --- |
 | 预加载资源清单怎么写 | [docs/configs_doc/preload.md](../docs/configs_doc/preload.md) |
-| 表情资源怎么配 | [docs/configs_doc/emotions.md](../docs/configs_doc/emotions.md) |
-| 表情系统的第三方实现记录 | [emotionstodo.md](./emotionstodo.md) |
 | 踩过的坑（改代码前先扫） | [NeedNotice.md](./NeedNotice.md) |

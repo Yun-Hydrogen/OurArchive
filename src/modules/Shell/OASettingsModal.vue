@@ -8,6 +8,7 @@ import {
   rizui_button,
   rizui_dropdown,
   rizui_infobox,
+  rizui_switch,
 } from 'riz-ui';
 import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
 import { SPINE_RENDERER_OPTIONS, type SpineRendererMode } from '@/modules/ConfigProvider/rendererMode';
@@ -21,8 +22,14 @@ const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
-const { config, setMainBgmVolume, setPreviewVolume, setSpineRenderer, fetchConfig } =
-  useGlobalConfig();
+const {
+  config,
+  setMainBgmVolume,
+  setPreviewVolume,
+  setSpineRenderer,
+  setKeepSessionEnabled,
+  fetchConfig,
+} = useGlobalConfig();
 
 const RENDERER_OPTIONS = SPINE_RENDERER_OPTIONS.map((option) => ({
   value: option.value,
@@ -101,6 +108,18 @@ watch(
           type="info"
           text="阿罗娜、普拉娜这类高密度形变立绘在 Canvas 2D 下会明显掉帧，建议保持「稳定」或「激进」。"
         />
+      </rizui_card>
+
+      <rizui_card title="界面行为" desc="刷新页面时的进入方式">
+        <rizui_cfgrow
+          label="会话保持"
+          hint="开启后刷新会停留在当前页面；关闭则每次都回到入场引导"
+        >
+          <rizui_switch
+            :model-value="config.keep_session"
+            @update:model-value="setKeepSessionEnabled"
+          />
+        </rizui_cfgrow>
       </rizui_card>
     </div>
 

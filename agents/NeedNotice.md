@@ -1,4 +1,4 @@
-# Our Archive — 踩坑总集（NeedNotice）
+﻿# Our Archive — 踩坑总集（NeedNotice）
 
 本文档记录本项目踩过的**难解 / 复杂 / 难以发掘**的坑。**改动相关代码前先扫一遍对应分组**——
 很多坑是「看起来能删、删了就坏」的那类。条目**按主题分组，不区分前端 / 服务端**：一个功能
@@ -22,12 +22,13 @@
 | 二、路径 / 存储 / 配置 | 08 – 12 |
 | 三、资源包索引与计数 | 13 – 17 |
 | 四、API 与静态托管 | 18 – 22 |
-| 五、资源管理页与资源包详情 | 23 – 28 |
+| 五、资源管理页与资源包详情 | 23 – 26, 28 |
 | 六、主界面卡片动画 | 29 – 34 |
 | 七、RizUI 集成 | 35 – 41 |
-| 八、立绘骨骼预览（Spine） | 42 – 51, 61 |
-| 九、页面动画 / 构建 / 布局 | 52 – 55 |
-| 十、表情（Emotions）与 Pixi Spine 渲染 | 56 – 60, 62 |
+| 八、立绘骨骼预览（Spine） | 42 – 51 |
+| 九、页面动画 / 构建 / 布局 | 52 – 56 |
+| 十、Spine 运行时与底层渲染 | 60 – 61 |
+| 十一、双骨骼舞台与表情 JS 插件 | 62 – 67 |
 
 ---
 
@@ -78,14 +79,19 @@
 - **效果**：插值是一条连续的位移 + 缩放，没有变形。
 - **备注**：`dx / dy / scale` 由 `updateGeometry()` 按视口实时算，监听 `resize` + `ResizeObserver`；只动 `transform`，全程合成层。
 
-## 06 · 路由闸门用内存态 + `replace`
+## 06 · 路由闸门用内存态 + `replace`，刷新恢复走显式开关
 
-- **位置**：`modules/ViewsManager/access.ts`、`modules/ViewsManager/router.ts`
+- **位置**：`modules/ViewsManager/access.ts`、`modules/ViewsManager/router.ts`、`modules/ConfigProvider/useGlobalConfig.ts`
 - **表现**：直接访问 / 刷新 `/home`、`/resources` 等深层地址会绕过首屏引导；用 `push` 还会在历史栈里留下死链。
-- **解决方案**：`isUnlocked` 是**纯内存**变量（不写 sessionStorage），`beforeEach` 拦截非 `splash` 路由并 `{ name: 'splash', replace: true }`。
-- **原理**：持久化会让刷新后直接进内页，破坏「必须经过 gate」的入口契约；`replace` 才不会让返回键回到一条马上又被重定向的地址。
-- **效果**：入口只有「端口号 + gate」一条路径，返回键行为可预期（`/home` 返回 → `/`）。
-- **备注**：`/tools`、`/tools/skeleton`、`/resources` 及其子页面同样受约束。
+- **解决方案**：
+  1. 闸门状态 `isUnlocked` 仍是内存变量；`beforeEach` 拦截非 `splash` 路由并 `{ name: 'splash', replace: true }`。
+  2. 「会话保持」开启时（配置 `keep_session`，默认开），`afterEach` 把上一页写进 `sessionStorage`；
+     未解锁但 `canRestoreSession()` 成立时放行并 `enterSession()`，刷新即停留原页面。
+  3. 关闭会话保持会把 `oa:last-route` / `oa:unlocked` 一起清掉，行为回到「刷新必回引导页」。
+- **原理**：会话恢复必须是**显式开关**，否则持久化会破坏「必须经过 gate」的入口契约；而守卫在配置请求返回前就要判断，
+  所以开关另存了一份 `localStorage` 镜像（`oa:keep-session`）。
+- **效果**：默认刷新停在当前页面；关掉开关后入口只有「端口号 + gate」一条路径。
+- **备注**：恢复时外壳同步 `enterSession()`（stage=home、gatePassed=true），否则 banner 与背景会停在 splash 形态。
 
 ## 07 · 启动选择在 dev / 非交互环境会挂住或读不到输入
 
@@ -137,9 +143,9 @@
 
 ## 12 · 手写 JSON / YAML 带 BOM 会让解析失败
 
-- **位置**：`res/*/package.yml`、`res/*/characters/characters.json`、`res/*/index/music_info.json`、`res/*/index/category.yml`、表情的 `<path>/index/emotions.yml`（默认包里是 `emtions/index/emotions.yml`——目录名 `emtions` 是资源包作者写死的，`package.yml` 用 `path: emtions` 指过去）
+- **位置**：`res/*/package.yml`、`res/*/characters/characters.json`、`res/*/index/music_info.json`、`res/*/index/category.yml`
 - **表现**：资源包在列表里显示 `valid: false`，或者角色 / 音乐 / 背景分类数量为 0，但文件肉眼看着完全正常。
-- **解决方案**：保存为 **UTF-8 无 BOM**；读取侧统一 `.replace(/^\uFEFF/, '')` 兜底（`PackageProvider/packageManifest.server.ts`、`CharacterProvider/characters.server.ts`、`AudioProvider/music.server.ts` / `sounds.server.ts`、`BackgroundProvider/backgrounds.server.ts`、`EmotionProvider/emotions.server.ts`）。
+- **解决方案**：保存为 **UTF-8 无 BOM**；读取侧统一 `.replace(/^\uFEFF/, '')` 兜底（`PackageProvider/packageManifest.server.ts`、`CharacterProvider/characters.server.ts`、`AudioProvider/music.server.ts` / `sounds.server.ts`、`BackgroundProvider/backgrounds.server.ts`）。
 - **原理**：`JSON.parse` 遇到 BOM（`EF BB BF`）会直接抛 `Unexpected token`；YAML 解析器同样会出问题。Windows 上的 PowerShell 5.1 `Set-Content -Encoding utf8` 默认会写 BOM，是主要来源。
 - **效果**：清单能正常解析，计数正确。
 - **备注**：写这类文件优先用编辑器或带 `utf-8` 显式编码的脚本；Node 侧 `JSON.parse` 与 `parseYaml` 前都必须先剥 BOM。
@@ -279,22 +285,13 @@
 - **效果**：每个分类组件自带一份「元素 + 状态」，互斥挂载保证同一时刻只会有一条高亮；切分类 / 卸载时 `onBeforeUnmount(stop)` 顺带把主界面 BGM 恢复回来。
 - **备注**：`stop()` 里 `removeAttribute('src')` 是必要的；只 `pause()` 的话换 `src` 前的旧缓冲会残留。
 
-## 27 · `<img>` 不能当图层容器
-
-- **位置**：`modules/EmotionRender/OAEmotionPlayer.vue`
-- **表现**：表情的第二层（子层）永远不显示，`getBoundingClientRect().width === 0`，`transform` 也是 `none`。
-- **解决方案**：每层用 `div` 当容器，图片作为它的子节点（`width: 100%`），子层 append 到父层的 `div` 里。
-- **原理**：`<img>` 是替换元素（replaced element），它的子节点不参与渲染，`appendChild` 不会报错但永远是 0 尺寸。
-- **效果**：`Heart = 气球 + 爱心`、`Bulb = 气球 + 灯泡 + 光圈` 这类多层合成正常叠放。
-- **备注**：`canvas` / `video` / `iframe` 同理，都不要往里塞子节点。
-
 ## 28 · canvas 的 `height: 100%` 在「靠 flex 撑开」的父级里不生效
 
-- **位置**：`modules/EmotionRender/OAEmotionPreview.vue`
-- **表现**：舞台容器已经 600+ px 高，但 canvas 只有 `min-height` 那么高（280px），角色看起来被裁了一截；表情锚点也算在错误的位置。
-- **解决方案**：给 `.oa-emo__stage` 一个**确定高度**（`height: clamp(300px, 52vh, 620px)`），不靠 `flex: 1` 撑；canvas 的 `height: 100%` 才能解析出正确值。
+- **位置**：`views/` 下含 canvas 的 flex 舞台容器
+- **表现**：舞台容器已经 600+ px 高，但 canvas 只有 `min-height` 那么高（280px），角色看起来被裁了一截。
+- **解决方案**：给舞台容器一个**确定高度**（`height: clamp(...)` 或固定像素），不靠 `flex: 1` 撑；canvas 的 `height: 100%` 才能解析出正确值。
 - **原理**：百分比高度要相对「高度可解析」的包含块计算；`flex: 1` + `flex-basis: 0` 的父级在部分布局下被当成高度不确定，canvas 退回默认 150px / 自身 `min-height`。
-- **效果**：canvas 与舞台等高，`useSpineStage` 量到的 `viewHeight` 与 DOM 一致，表情锚点正确。
+- **效果**：canvas 与舞台等高，`useSpineStage` 量到的 `viewHeight` 与 DOM 一致。
 - **备注**：`ResizeObserver` 只在尺寸真的变化时才会纠正，父级高度算错时它不会「猜」出正确值。
 
 # 六、主界面卡片动画
@@ -397,7 +394,7 @@
 
 ## 39 · `rizui_dropdown` 的弹层是非 teleport 的绝对定位
 
-- **位置**：`modules/SkeletonRender/OASpineViewer.vue`、`modules/EmotionRender/OAEmotionPreview.vue`
+- **位置**：`modules/SkeletonRender/OASpineViewer.vue`
 - **表现**：放在 `overflow-y: auto` 的侧栏里，下拉选项被裁掉一半。
 - **解决方案**：侧栏内改用横排 chips（动作项只有 2~3 个）；实在要下拉就保证父级不滚动、不 `overflow: hidden`。
 - **原理**：弹层是普通绝对定位子节点，会被最近的 `overflow` 祖先裁切，且不跟随滚动。
@@ -539,11 +536,11 @@
 
 ## 54 · 纵向 flex 里的 `flex: 3 1 0` 会把子块压成 0 高
 
-- **位置**：`modules/EmotionRender/OAEmotionPreview.vue` 的 `@media (max-width: 900px)`
-- **表现**：窗口宽度 ≤900px 时表情区的舞台整块消失（实测只剩 2px 高），「选择角色」按钮被右侧面板盖住点不到。
-- **解决方案**：媒体查询里把 `.oa-emo` 改成 `flex-direction: column` 的同时，`.oa-emo__stage-box` 必须从 `flex: 3 1 0` 改回 `flex: 0 0 auto`。
-- **原理**：`flex: 3 1 0` 的 `flex-basis: 0` 作用在**主轴**上。横向排列时主轴是宽度（由容器宽度分配，正常）；改成纵向后主轴变成高度，而容器高度由内容撑开（父级 `flex: 0 0 auto`），可分配空间为 0，加上 `flex-shrink: 1` 就把舞台压到了 0；面板是 `flex: 0 0 auto` 不缩，于是只剩它。
-- **效果**：窄窗口下舞台按自身的 `clamp(300px, 52vh, 620px)` 撑高，面板落到它下面（栏目式排布）。
+- **位置**：`views/` 下横向双栏布局的 `@media (max-width: 900px)` 分支
+- **表现**：窗口宽度 ≤900px 时，切到纵向后左侧舞台整块消失（实测只剩 2px 高）。
+- **解决方案**：媒体查询里把容器改成 `flex-direction: column` 的同时，子项必须从 `flex: 3 1 0` 改回 `flex: 0 0 auto`。
+- **原理**：`flex: 3 1 0` 的 `flex-basis: 0` 作用在**主轴**上。横向排列时主轴是宽度（由容器宽度分配，正常）；改成纵向后主轴变成高度，而容器高度由内容撑开（父级 `flex: 0 0 auto`），可分配空间为 0，加上 `flex-shrink: 1` 就把舞台压到了 0。
+- **效果**：窄窗口下舞台按自身确定高度撑开，面板落到它下面（栏目式排布）。
 - **备注**：改响应式方向时，凡是用 `flex: <n> 1 0` 的子项都要重新确认一次主轴语义。
 
 ## 55 · 发行包的服务端产物必须是 `.cjs` + 依赖内联
@@ -559,55 +556,18 @@
 - **效果**：三个平台的发行包都能在**干净目录**（无 node_modules、无仓库）里启动，`/`、`/api/*`、`/plugins/*` 全部正常。
 - **备注**：**这个坑在仓库里 100% 测不出来**——仓库根的 `"type": "module"` 让裸 `.js` 合法，上层的 `node_modules` 又让外部依赖能解析，所以本地 `node dist_release/.../server/index.js` 会「蒙对」。冒烟必须把发行目录**复制到仓库外**再跑。`npm run build:server` 产出的 `dist/server/index.js` 不受影响（它在仓库内，靠根 `package.json` 就是合法的 ESM）。
 
----
+## 56 · 用 `opacity` 隐藏停靠 banner 后，它仍然挡点击
 
-## 56 · `<img>` 引用的 SVG 不播放 SMIL，表情会停在第一帧
-
-- **位置**：`src/modules/EmotionRender/OAEmotionPlayer.vue`、`svgSandbox.ts`
-- **表现**：表情 SVG 里写了完整的 `<animateTransform>`，但在预览页里**永远是第一帧**；看起来「渲染坏了」。
-- **验证方式**：同一张 `heart.svg`
-  - 用 `<img src>` 引用：在 150 / 650 / 1150 ms 各截一帧，三张 PNG 的 MD5 完全一致；
-  - 取回文本内联进 DOM：三帧哈希各不相同，且末帧体积骤降（气泡已淡出）。
-- **解决方案**：宿主 `fetch` SVG 文本 → `DOMParser` 解析 → **净化** → `importNode` 内联插入。`<img>` 只用于静态图标，不能用于自带动画的表情。
-- **原理**：Chromium 在 SVG-as-image 模式下不驱动 SMIL 时间轴（CSS 动画与 GIF 可以，SMIL 不行）。内联后 SVG 成为文档树的一部分，SMIL 正常计时。
-- **副作用**：内联绕过了响应头里的 CSP，所以**必须在前端自行净化**（白名单元素、剔除 `on*`、只允许 `data:` / `#` 链接、剔除改 `href` 的 `animate`）。见 `svgSandbox.ts`。
+- **位置**：`modules/Shell/OABannerDock.vue`、`src/App.vue` 的沉浸外壳
+- **表现**：资源库页面把 banner 的 `visible` 传 `false` 后，左下角明明空无一物，点那块区域却会弹出「贡献与感谢」；键盘 Tab 也会停在看不见的 banner 上。
+- **解决方案**：补一条 `.oa-banner-dock:not(.is-visible) { pointer-events: none; }`，并让 `role` / `tabindex` / `aria-hidden` 全部跟随 `visible`（`docked && visible` 才可交互）。
+- **原理**：停靠态必须可点，所以 `.is-docked` 把 `pointer-events` 设成了 `auto`；`opacity: 0` 的元素依然参与命中测试。两条规则特异性相同，靠「`:not(.is-visible)` 写在 `.is-docked` 之后」覆盖。
+- **效果**：隐藏时整块不挡点击、不进无障碍树；回到普通页面（`visible` 恢复）自动变回可点按钮。
+- **备注**：凡是「用 opacity 收起可交互元素」都要顺手检查 `pointer-events` 与 `tabindex`；相关外壳结构见 [Shell.md](./modules/Shell.md)。
 
 ---
 
-## 57 · 表情锚点不能用「包围盒中心 / 包围盒顶沿」
-
-- **位置**：`src/modules/SkeletonRender/useSpineStage.ts`（`metrics`）
-- **表现**：表情整体漂到角色右上方，或者浮在天使环以上，看起来「没绑定到骨骼」。
-- **原因**：
-  1. **X 用包围盒中心**：立绘的武器 / 翅膀让包围盒明显偏向一侧，中心不等于头部中线（实测 ch0334_spr 偏 ~100px）；
-  2. **Y 用整张包围盒顶沿**：天使环、天线、枪口都会高于头顶。
-- **解决方案**：
-  - X / Y 优先用**头骨**；BA 立绘常常只有 `root`，那就用「**差分脸 slot**（`00_default`、`01_normal`…）挂的那根骨骼」——换脸差分一定挂在头部骨骼上，`slot.bone` 直接给出世界坐标；
-  - 候选多根时取 `worldY` 最大（最高）的那根，而不是「第一个匹配」；
-  - 都没有才退回「骨骼局部原点定 X + 身体包围盒顶沿定 Y」。
-- **效果**：ch0334_spr 上锚点从 `(247, 17)` 修正到 `(285, 92)`，正好落在头顶上方约 11px。
-
----
-
-## 58 · SMIL 没有 `transform-origin`，缩放必须自己补 translate
-
-- **位置**：`res/DefaultPackage/emtions/svg/*.svg`（资源包侧写法）
-- **表现**：本该「原地放大 / 从底部弹出」的符号从画布左上角飞出来。
-- **原因**：`<animateTransform type="scale">` 永远绕当前坐标系原点 `(0,0)` 缩放；写 `transform-origin` 属性 SVGO 也不认（它只是 CSS 属性，在 SMIL 上无效）。
-- **解决方案**：三层嵌套 `translate(cx,cy) → [animateTransform] → translate(-w/2,-h/2)`，把支点挪到元素自身中心 / 底部。写法见 `docs/configs_doc/emotions.md` 3.4 节。
-- **备注**：旋转同理；`type="rotate"` 还支持 `values="deg cx cy"` 形式，但用嵌套 translate 更好读。
-
----
-
-## 59 · 表情系统全面迁移 Pixi.js 场景图与 GSAP Timeline（弃用 SVG SMIL）
-
-- **位置**：`src/modules/EmotionRender/OAEmotionPlayer.vue`、`src/modules/EmotionRender/emotionPlayer.ts`、`src/modules/SkeletonRender/useSpineStage.ts`
-- **表现**：原先手写 SVG SMIL 导致动画生硬、缺失弹性与物理阻尼；DOM 悬浮计算导致不同身形的角色表情漂移或延迟脱节；`<img>` 不跑 SMIL 被迫繁琐内联净化。
-- **解决方案**：全面转向 Pixi.js 场景图 + GSAP Timeline。表情容器直接作为 `spineInstance.addChild(container)` 挂载到角色 Spine 节点；使用 BA 官方 24 张原生 PNG 纹理，参数移植自 BA-Story 的 19 组物理配置表，由 GSAP 驱动补间并由 `timelinePromise` 自动销毁。
-- **原理**：Spine 实例本身就是 Pixi `Container`，子节点天然继承角色的缩放与位移变换矩阵；GSAP 对 Pixi Sprite 的 properties（x/y/scale/angle/alpha/pivot）提供世界级的高性能物理补间。
-- **效果**：彻底解决动画生硬与漂移问题，实现与官方 100% 对齐的丝滑弹跳、音画同步与零内存泄漏。
-
----
+# 十、Spine 运行时与底层渲染
 
 ## 60 · `spine-pixi` 的 `SpineTexture.from` 必须传 `BaseTexture` 而不是 `Texture`
 
@@ -637,18 +597,86 @@
 
 ---
 
-## 62 · 表情系统外载 JSON 动效与虚拟人台（Dummy Mannequin）独立预览
+## 62 · Vue `readonly` 不能包 Pixi 对象
 
-- **位置**：`src/modules/EmotionRender/motionCompiler.ts`、`src/modules/EmotionRender/OAEmotionPlayer.vue`、`src/views/EmotionPreviewView.vue`、`src/modules/SkeletonRender/useSpineStage.ts`
-- **表现**：原表情系统只有死代码写在前端仓库中，资源包无法自定义外载；且预览强依赖选择具体的角色立绘，未选角色时界面报错或无法点击，工具箱缺乏独立测试入口。
-- **解决方案**：
-  1. 制定 JSON 动效时间轴规范（`EmotionMotionConfig`），通过 `motionCompiler` 解析图层、多粒子散布与 GSAP 物理弹性曲线，支持资源包在 `motions/*.json` 中纯数据外载表情；
-  2. 舞台引入轻量「虚拟人台底座（Dummy Mannequin）」矢量绘制机制，未选立绘时默认展示人台与十字定位星，任何表情立即可试听试看；
-  3. 工具箱增加独立「表情动效预览（EmotionPreviewView）」工具，提供实时 JSON 动效编辑与一键调试。
-- **效果**：实现资源包 100% 纯外载自定义表情，工具箱与资源包详情页均可随时丝滑预览。
+- **位置**：`modules/SkeletonRender/useSkeletonStage.ts`、`modules/EmotionRender/useEmotionPlayer.ts`、`modules/SkeletonRender/OASpineViewer.vue`
+- **表现**：把 `mountRoot` / `PIXI.Container` 放进 `readonly(ref)` 后，`addChild`、`sortableChildren`、`scale.set` 全部静默失效；控制台出现 `Set operation on key ... failed: target is readonly`。
+- **解决方案**：Pixi 对象用普通变量、`shallowRef` 或 `markRaw` 持有；传给组件的 `stage` 用 `markRaw({...})`，只读标量状态才用 `readonlyRef`。
+- **原理**：Vue `readonly` 会深代理 `.value`，Pixi 内部对容器属性做原地写入，代理层直接拦截。
+- **效果**：骨骼与表情都能正常挂载、缩放、排序。
+- **备注**：`shallowReadonly` 只代理第一层，也不能用于会被 Pixi 原地修改的对象；最稳妥是根本不要包。
+
+## 63 · 表情必须挂在角色之上的覆盖层
+
+- **位置**：`modules/SkeletonRender/useSkeletonStage.ts`（`overlayRoot`）、`modules/EmotionRender/useEmotionPlayer.ts`
+- **表现**：把表情容器直接 `addChild` 到 Spine 实例后，表情被角色网格盖住，只露出边缘。
+- **解决方案**：舞台单独创建 `overlayRoot` 并挂到 `app.stage`；每次加载新角色后重新 `addChild(overlayRoot)` 把它提到末尾。表情用 `getHeadGlobalAnchor()` + `getDesignScale()` 定位。
+- **原理**：Spine / DragonBones 内部会往自己的容器里加大量 mesh，直接插入的子节点顺序不可控；独立覆盖层才能稳定在角色之上。
+- **效果**：表情始终显示在角色头顶，不被头发 / 身体遮挡。
+- **备注**：覆盖层 `eventMode = 'none'`，不能拦截画布拖拽。
+
+## 64 · DragonBones 不要用共享 ticker
+
+- **位置**：`modules/SkeletonRender/dragonBonesRenderer.ts`
+- **表现**：DragonBones 动作速度翻倍、切角色后旧骨架继续跳，或暂停舞台后仍在动。
+- **解决方案**：`new PixiFactory(null, false)` 关闭共享 ticker，由 `useSkeletonStage` 的 RAF 调 `PixiFactory.advanceTime(dt)`。
+- **原理**：`pixi-dragonbones-runtime` 默认挂到 Pixi 共享 ticker；舞台本身也有 ticker，会重复驱动。
+- **效果**：动作速度与舞台一致，静态模式不空转。
+- **备注**：必须用 `pixi-dragonbones-runtime@7.x`，不要装 8.x。
+
+## 65 · 资源包脚本信任暂未实现
+
+- **位置**：`modules/EmotionRender/emotionScript.ts`、`modules/EmotionRender/useEmotionPlayer.ts`
+- **现状**：表情脚本直接动态 `import()` 并执行；没有确认框、脚本 hash 信任、全局脚本开关或沙箱。
+- **后续**：需要时再补「包 id + 脚本 hash」信任、首次运行确认与全局开关。
+- **备注**：当前文档和 UI 不应声称已实现这些机制。
+
+## 66 · 表情脚本动态 import 需要 `@vite-ignore`
+
+- **位置**：`modules/EmotionRender/emotionScript.ts`
+- **表现**：生产构建时 Vite 试图静态分析 `/api/packages/.../emotions.js`，构建失败或运行时 404。
+- **解决方案**：`import(/* @vite-ignore */ url)`，URL 来自本机 API，运行时才确定。
+- **原理**：Vite 默认会重写/预打包动态 import；`@vite-ignore` 保留原始请求。
+- **效果**：开发与发行包都能按资源包路径加载脚本。
+- **备注**：脚本响应必须带 `text/javascript` 与 `nosniff`，URL 只允许同源 API 生成。
 
 ---
 
+## 67 · 表情贴图的位置与尺寸要按「设计像素 + 父元素比例」算
+
+- **位置**：`modules/EmotionRender/useEmotionPlayer.ts`、`resources/*/emotions/scripts/*.js`
+- **表现**：气泡要么小一半、要么糊在脸上；爱心戳出气泡上沿（看起来「偏上」）；换角色后整体错位。
+- **解决方案**：
+  1. 贴图尺寸按设计框换算：`scale = 比例 * 540 / texture.width`（如 `0.42 * 540`），不要写死 `0.42`。
+  2. 位置用**父元素显示宽/高**做单位：`heart.position.set(balloon.x - w * 0.52, balloon.y - h * 0.5)`。
+  3. 气泡这类「贴角色摆放」的元素，用容器原点（头顶锚点）的相对偏移，而不是角色包围盒的 0–1 比例。
+- **原理**：容器是「头顶锚点 + 540×1012 设计像素」。把贴图原始像素当设计像素用（`scale.set(0.42)`）会让气泡只有 107 设计像素宽，比应有的 227 小一半；而用 `balloon.width * 0.16` 这类小比例当纵向位置，会落进贴图顶部圆弧外的透明区，视觉上就是「偏上」。
+- **效果**：气泡稳定贴在头部左上方，爱心居中于气泡主体。
+- **备注**：BA-Story 的 `0.27 / 0.16` 只适配它自己的气球贴图；我们的 `emoicon_balloon_n.png` 主体中心在 `0.48 / 0.5` 附近，直接照抄会偏上偏左。
+
+---
+
+## 68 · 表情脚本 URL 必须带版本号，否则改了脚本不生效
+
+- **位置**：`modules/EmotionProvider/emotions.server.ts`、`modules/EmotionRender/useEmotionPlayer.ts`
+- **表现**：改完 `resources/*/emotions/scripts/*.js` 刷新页面，表情表现一点没变；控制台报的仍是旧代码的错误（例如 `ctx.relativeScale is not a function`）。
+- **解决方案**：服务端下发 `scriptUrl` 时拼上 `?v=<文件 mtime>`；脚本一改 URL 就变，浏览器才会重新拉取。
+- **原理**：前端用动态 `import()` 加载脚本，浏览器的模块表按**完整 URL** 缓存，HTTP 的 `Cache-Control: no-cache` 也拦不住模块级缓存。URL 不变就永远命中旧模块。
+- **效果**：保存脚本后刷新页面即生效，不需要硬刷新或清缓存。
+- **备注**：改脚本后仍需刷新页面；资源包热更新（不刷新）不会重新执行已加载的模块。
+
+---
+
+## 69 · 表情只支持脚本，别再补「兜底动画」
+
+- **位置**：`modules/EmotionRender/useEmotionPlayer.ts`、`modules/EmotionProvider/emotions.server.ts`
+- **表现**：没有 `script` 的表情以前还能靠内置动画「淡入上飘」，看起来能播但位置/节奏都不对，且掩盖了「贴图没写全」的问题。
+- **解决方案**：删掉 `playFallback()` 与服务端 `motion` JSON 兜底；`play()` 在 `!hasScript` 时直接报「该表情没有脚本，无法播放」，列表里也禁用预览按钮并显示「无脚本」徽标。
+- **原理**：表情的表现完全属于资源包内容，宿主内置一套动画等于维护两套真源；一个表情想动就得有脚本，责任边界清晰。
+- **效果**：表情列表的正确性一目了然——「无脚本」就是没做完。
+- **备注**：`duration` 仍保留，用于脚本没返回 Promise 时决定自动清理时机，不要一起删掉。
+
+---
 ## 维护约定
 
 - **新增坑**：按六段格式追加到最贴合的分组；没有合适分组就新开一组，并更新顶部索引表。

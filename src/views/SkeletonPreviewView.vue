@@ -7,16 +7,14 @@ import OASpineViewer from '@/modules/SkeletonRender/OASpineViewer.vue';
 import OAPageHeader from '@/modules/ViewsManager/OAPageHeader.vue';
 import { ROUTE_NAMES } from '@/modules/ViewsManager/routes';
 import { SHELL_TIMING } from '@/modules/Shell/shellTiming';
-import {
-  loadSpineCharacterFromPackage,
-  type SpineCharacter,
-} from '@/modules/SkeletonRender/spinePackage';
+import { loadSkeletonFromPackage } from '@/modules/SkeletonRender/skeletonPackage';
+import type { SkeletonSource } from '@/modules/SkeletonRender/skeletonTypes';
 
 const route = useRoute();
 const router = useRouter();
 
 /** 当前预览的立绘包；为空表示停在文件选择阶段 */
-const character = ref<SpineCharacter | null>(null);
+const character = ref<SkeletonSource | null>(null);
 
 /** 从资源包直接进入时，记录来源以便「返回」回到角色详情 / 资源包 */
 const sourcePackageId = ref('');
@@ -65,7 +63,7 @@ function backToSource() {
   });
 }
 
-function handleSpinePicked(next: SpineCharacter) {
+function handleSpinePicked(next: SkeletonSource) {
   character.value = next;
 }
 
@@ -91,7 +89,7 @@ async function autoLoad() {
   autoLoadError.value = '';
 
   try {
-    character.value = await loadSpineCharacterFromPackage(packageId, skeletonId);
+    character.value = await loadSkeletonFromPackage(packageId, skeletonId);
   } catch (error) {
     autoLoadError.value = error instanceof Error ? error.message : String(error);
     sourcePackageId.value = '';
@@ -121,7 +119,7 @@ onBeforeUnmount(() => {
     <OAPageHeader
       class="oa-skel-preview__head"
       title="立绘骨骼预览"
-      subtitle="载入立绘包（骨骼 + 图集 + 贴图），预览立绘并切换差分"
+      subtitle="载入 Spine / DragonBones 骨骼包，预览立绘、差分与动作"
       :back-label="sourcePackageId ? (sourceCharacterId ? '角色详情' : '资源包') : '工具'"
       back-position="start"
       @back="backToSource"

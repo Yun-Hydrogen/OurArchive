@@ -1,4 +1,4 @@
-# ResourcePicker — 角色与立绘选择器
+# ResourcePicker — 通用资源选择器
 
 > 源码：`src/modules/ResourcePicker/`
 
@@ -6,78 +6,85 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `useCharacterPicker.ts` | 角色选择 Provider 模式：单例状态流与 Promise 化调用接口 |
-| `OACharacterPickerDialog.vue` | 角色选择对话框渲染组件（分组展示、关键字过滤、头像/缺省徽标回退） |
+| `useResourcePicker.ts` | 候选项 / 选项类型定义 + 全局单例 + `openResourcePicker()` Promise 接口 |
+| `OAResourcePicker.vue` | 通用选择器组件（受控），全部交互使用 RizUI 控件 |
+| `OAResourcePickerHost.vue` | 单例宿主：把 `openResourcePicker()` 的状态接到组件上，`App.vue` 常驻挂载一次 |
 
-## 职责边界
+## 两种用法
 
-- 做什么：向全站任意调用方提供标准化的 Promise 选角界面，渲染角色分组、搜索过滤、单选高亮与双击直接确认，并安全返回选中的角色/骨骼或 `null`。
-- 不做什么：不从服务端拉取原始角色与立绘数据（由外部装配为 `CharacterPickItem[]` 传入）、不直接触碰立绘与骨骼渲染。
+### 1. 受控组件（页面内自己管理开关）
+
+```vue
+<OAResourcePicker
+  v-model:show="pickerOpen"
+  :items="items"
+  title="选择资源"
+  multiple
+  @confirm="(picked) => (selection = picked)"
+/>
+```
+
+### 2. Promise 接口（跨层级唤起，推荐）
+
+```ts
+const picked = await openResourcePicker(items, {
+  title: '选择表情底图',
+  description: '角色会使用其已绑定的立绘。',
+  emptyText: '这个资源包里没有可用的角色或骨骼。',
+  confirmText: '在舞台上预览',
+  initialKeys: [currentKey],
+});
+
+if (picked) {
+  // picked.value 即候选项里自定义的业务数据
+}
+```
+
+- 单选返回 `ResourcePickerItem<T> | null`，多选（`multiple: true`）返回 `ResourcePickerItem<T>[] | null`，两种形态由重载区分。
+- 同一时刻只允许一个选择流程：新的调用会让上一个 Promise 直接返回 `null`。
+- 页面卸载兜底可调用 `disposeResourcePicker()`，避免 Promise 永久挂起。
+
+## 候选项契约
+
+`ResourcePickerItem<T>`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `key` | 唯一键，用于选中判定与 `v-for` key |
+| `label` | 主标题 |
+| `description` | 副标题 |
+| `group` | 分组名；空串归到「未分组」 |
+| `meta` | 右侧等宽标识（骨骼 id、文件大小等） |
+| `thumbnail` | 缩略图 URL |
+| `placeholder` | 无缩略图时的占位文字，缺省取 `label` 首字 |
+| `shape` | 缩略图形状，`circle`（角色头像）/ `square`（文件类） |
+| `disabled` | 禁用（仍展示，不可选） |
+| `value` | **调用方业务数据**，选择器原样返回 |
+
+选择器不关心资源来源；把「角色」映射成骨骼 id 之类的解析由调用方完成，结果放进 `value`。
+
+## RizUI 控件
+
+| 位置 | 控件 |
+| --- | --- |
+| 对话框外壳 / 底部操作区 | `rizui_dialog`（`#footer` 插槽）+ `rizui_button` |
+| 搜索 | `rizui_text`（`v-model`） |
+| 分组筛选（分组 > 1 时出现） | `rizui_dropdown` |
+| 单 / 多选指示 | `rizui_checkbox`（单选时表现为单选勾选） |
+| 加载中 | `rizui_progress`（`indeterminate`） |
+| 空态 | `rizui_infobox` |
 
 ## 关键实现
 
-### `useCharacterPicker.ts`
-
-1. 作用：模块级单例 Provider，通过 Promise 驱动角色选择流程，使得任何深层组件无需各自维护一套弹窗组件及 `v-model` 状态。
-2. 数据契约与导出接口：
-   - `CharacterPickItem`：候选立绘项（`key`、`label`、`description`、`group`、`skeletonId`、`avatarUrl`）。
-   - `CharacterPickerOptions`：弹窗定制选项（`title`、`description`、`emptyText`）。
-   - `openCharacterPicker(items, options)`：打开选择框，返回 `Promise<CharacterPickItem | null>`。
-   - `useCharacterPickerState()`：提供给对话框组件的只读 `state`（基于 `shallowRef`）。
-   - `confirmCharacterPick(key?)` / `cancelCharacterPick()`：内部确认与取消操作。
-   - `setCharacterPickerOpen(open: boolean)`：供 `rizui_dialog` 的 `v-model:show` 响应关闭事件。
-   - `setCharacterPickerSelection(key: string)`：变更当前高亮选中键。
-   - `disposeCharacterPicker()`：清理悬挂的 Promise 与状态。
-3. 注意事项：
-   - **Promise 互斥与兜底**：`openCharacterPicker()` 执行时会先将上一次尚未完成的 Promise 以 `null` 提前结束并清理，避免多个流程竞争或弹窗叠加。
-   - **卸载时清理**：使用方组件或页面卸载时（如 `PackageView` 卸载），必须显式调用 `disposeCharacterPicker()`，以防 Promise 句柄持续悬挂产生内存泄漏。
-   - 默认文案配置：默认标题「选择预览角色」，默认副标题「从资源包里已绑定立绘的角色，或独立的立绘文件中选择一个。」，空提示「这个资源包里没有可用的立绘。」。
-   - 初始默认高亮选中传入条目列表中的第一项（`items[0]?.key ?? ''`）。
-
-### `OACharacterPickerDialog.vue`
-
-1. 作用：全局常驻挂载的角色选择弹窗，消费 `useCharacterPickerState()` 的单例状态，负责 DOM 渲染与用户交互。
-2. 输入输出：无外部 Props 与 Emits，全量通过 `useCharacterPicker.ts` 暴露的方法与单例响应式状态交互。
-3. 交互细节与注意事项：
-   - 弹窗采用 `rizui_dialog`，宽度约束为 `min(760px, 92vw)`。
-   - 过滤与分组：搜索框对 `label`、`description`、`skeletonId`、`group` 四个字段同时进行大小写不敏感匹配；弹窗打开时自动重置搜索词 `keyword`。
-   - 交互操作：单选高亮条目；按回车或双击选项条目（`@dblclick`）直接触发 `confirm(item.key)` 确认并关闭；提供「使用这个立绘」主按钮与「取消」按钮。
-   - 头像降级：`avatarUrl` 缺省时自动显示角色名首字作为头像（`item.label.slice(0, 1)`）。
-   - 列表滚动与自适应：列表最大高度设定为 `min(52vh, 440px)`，自带纵向滚动条与右侧留白垫片。
-   - 骨骼 ID 标识：每个选项右侧展示 `code.oa-pick__id`，背景浅蓝，最大宽度 40% 溢出省略。
-
-### 装配与调用示例
-
-```ts
-const items: CharacterPickItem[] = [
-  ...boundCharacters.map((c) => ({
-    key: `char:${c.name_id}`,
-    label: c.name,
-    description: `${c.school || '其他'} · ${c.club || '未分类'}`,
-    group: '角色',
-    skeletonId: c.skeleton,
-    avatarUrl: c.avatarUrl,
-  })),
-  ...standaloneSkeletons.map((s) => ({
-    key: `skel:${s.id}`,
-    label: s.id,
-    description: `立绘文件 · ${s.id}`,
-    group: '独立立绘',
-    skeletonId: s.id,
-    avatarUrl: '',
-  })),
-];
-const picked = await openCharacterPicker(items);
-```
-
-## 注意事项
-
-- 调用者装配候选列表时，约定分为两组——「角色」（来自已绑定立绘的角色）与「独立立绘」（骨骼完整但未被任何角色引用的条目）。
-- 状态基于模块作用域单例，因此对话框组件在应用视图树中必须且只需常驻挂载一次（如在 `PackageView` 中挂载）。
-- 单例模式下避免在对话框内存储持久化的过滤或滚动状态，每次弹窗打开时均由重置逻辑重新校准。
+- `state` 用 `shallowRef`：候选项可能有数千条（如 631 个骨骼 + 447 个角色），不能做深响应。
+- 打开时 `reset()`：清搜索词、清分组筛选，按 `initialKeys` 还原选中；单选没有预设值时默认落在第一个可选项上。
+- 搜索对 `label` / `description` / `meta` / `group` 做大小写不敏感匹配；列表按分组名首次出现顺序分段。
+- 单选行双击直接确认；多选双击不确认，避免误操作。
+- 行是 `role="option"` 的可聚焦元素，`Enter` / `Space` 切换选中。
+- `#item` 作用域插槽可替换行内文字排版（`{ item, selected }`），缩略图与 `meta` 仍由组件渲染。
 
 ## 相关文档
 
-- [PackageView](../views/PackageView.md)
 - [EmotionRender](./EmotionRender.md)
-- [NeedNotice](../NeedNotice.md)
+- [SkeletonRender](./SkeletonRender.md)
+- [PackageView](../views/PackageView.md)

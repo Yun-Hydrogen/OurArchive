@@ -1,7 +1,7 @@
 /**
  * 资源包清单（`package.yml`）解析、目录约定与内容分类元数据。
  *
- * 这里是资源包模块的「底座」：角色 / 音频 / 表情 / 背景 / 立绘各 Provider
+ * 这里是资源包模块的「底座」：角色 / 音频 / 背景 / 表情 / 立绘各 Provider
  * 都从这里取常量、路径校验（`resolveInside`）与 `getContent()`，
  * 依赖方向固定为「内容 Provider → 清单」，不反向引用。
  */
@@ -206,7 +206,7 @@ function countEntries(dir: string, key: string): { exists: boolean; count: numbe
     }
   }
 
-  // 表情按 index/emotions.yml 的条目数计，不把 images/ sounds/ index/ 当条目
+  // 表情按 index/emotions.yml 的条目数计
   if (key === 'Emotions') {
     const emotionsIndex = path.join(dir, EMOTION_INDEX_DIR, EMOTION_INDEX_FILE);
     try {
@@ -255,14 +255,14 @@ function buildPackageContent(packageRoot: string, key: string, config: Record<st
  *
  * ```yaml
  * # 扁平写法（当前默认包使用的写法）
- * - Emotions:
+ * - Sounds:
  *   supported: false
- *   path: emotions
+ *   path: sounds
  *
  * # 嵌套写法
- * - Emotions:
+ * - Sounds:
  *     supported: false
- *     path: emotions
+ *     path: sounds
  * ```
  */
 function parsePackageContents(packageDir: string, raw: unknown): PackageContent[] {
@@ -298,7 +298,7 @@ function parsePackageContents(packageDir: string, raw: unknown): PackageContent[
       continue;
     }
 
-    // 形如 `- Emotions: emotions` 时把值当作路径
+    // 形如 `- Sounds: sounds` 时把值当作路径
     const typeValue = record[typeKey];
     const config = typeof typeValue === 'string' ? { ...record, path: record.path ?? typeValue } : record;
     contents.push(buildPackageContent(root, typeKey, config));

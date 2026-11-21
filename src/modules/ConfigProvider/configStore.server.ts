@@ -12,7 +12,7 @@ import { DEFAULT_SPINE_RENDERER, isSpineRendererMode } from './rendererMode';
 
 export type GlobalConfig = Record<string, unknown>;
 const DEFAULT_CONFIG_CONTENT =
-  '# Our Archive 全局配置 (global_config.yml)\nmain_bgm_volume: 50\npreview_volume: 60\nspine_renderer: stable\n';
+  '# Our Archive 全局配置 (global_config.yml)\nmain_bgm_volume: 50\npreview_volume: 60\nspine_renderer: stable\nkeep_session: true\n';
 
 /**
  * 兼容旧版本布局：
@@ -70,6 +70,7 @@ export function loadGlobalConfig(paths: StoragePaths = getStoragePaths()): Globa
     main_bgm_volume: 50,
     preview_volume: 60,
     spine_renderer: DEFAULT_SPINE_RENDERER,
+    keep_session: true,
   };
 
   if (!fs.existsSync(paths.configFile)) {
@@ -94,6 +95,10 @@ export function loadGlobalConfig(paths: StoragePaths = getStoragePaths()): Globa
       }
       if (!isSpineRendererMode(merged.spine_renderer)) {
         merged.spine_renderer = DEFAULT_SPINE_RENDERER;
+      }
+      // 会话保持：非布尔值回退默认
+      if (typeof merged.keep_session !== 'boolean') {
+        merged.keep_session = defaults.keep_session;
       }
       return merged;
     }
@@ -131,9 +136,28 @@ export function saveGlobalConfig(
  * 只有「写一份默认配置」这一件事，目录创建在 `Initializer/storage.server.ts`。
  */
 export function ensureConfigFile(paths: StoragePaths = getStoragePaths()): void {
-  if (fs.existsSync(paths.configFile)) {
+  fs.mkdirSync(paths.configDir, { recursive: true });
+
+  if (!fs.existsSync(paths.configFile)) {
+    fs.writeFileSync(paths.configFile, DEFAULT_CONFIG_CONTENT, 'utf-8');
     return;
   }
-  fs.mkdirSync(paths.configDir, { recursive: true });
-  fs.writeFileSync(paths.configFile, DEFAULT_CONFIG_CONTENT, 'utf-8');
+
+  // 已有配置：补齐新版本新增的默认项，保证文件里能看到全部字段
+  let parsed: GlobalConfig = {};
+  try {
+    const raw = parseYaml(fs.readFileSync(paths.configFile, 'utf-8'));
+    if (raw && typeof raw === 'object') {
+      parsed = raw as GlobalConfig;
+    }
+  } catch {
+    // 解析失败时保持原样，交给 loadGlobalConfig 的兜底逻辑处理
+    return;
+  }
+
+  const defaults = loadGlobalConfig(paths);
+  const missing = Object.keys(defaults).filter((key) => !(key in parsed));
+  if (missing.length > 0) {
+    saveGlobalConfig(parsed, paths);
+  }
 }

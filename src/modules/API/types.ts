@@ -66,6 +66,12 @@ export interface PackageCharacter {
   hasSkeleton: boolean;
 }
 
+/** 骨骼类型：Spine 或 DragonBones */
+export type SkeletonKind = 'spine' | 'dragonbones';
+
+/** 资源包扫描结果里的骨骼类型（含无法识别） */
+export type PackageSkeletonKind = SkeletonKind | 'unknown';
+
 /** 立绘目录里的单个文件 */
 export interface PackageSkeletonItem {
   name: string;
@@ -82,6 +88,8 @@ export interface PackageSkeleton {
   files: PackageSkeletonItem[];
   /** 全部文件体积之和 */
   totalSize: number;
+  /** 识别出的骨骼类型 */
+  kind: PackageSkeletonKind;
   /** 骨骼 + 图集 + 贴图齐全，可直接预览 */
   complete: boolean;
 }
@@ -117,40 +125,29 @@ export interface PackageSoundCategory {
   duration: number;
 }
 
-/** 一个表情（`index/emotions.yml` 的一条）
- *
- * 每个表情是**自包含的动画 SVG**：单个 `.svg` 文件自带 `<animate>` / `<set>` / `<animateTransform>`，
- * 或内部 `<style>` + `@keyframes`；不得引用外部图片、字体、样式，**禁止**任何 `<script>`。
- * 宿主只负责把它按锚点摆到舞台上播放，并按需播放声明的音效。
- */
+/** 一个表情（`index/emotions.yml` 的一条） */
 export interface PackageEmotion {
-  /** 表情 id，如 `heart`；同时也是音效名 */
   id: string;
-  /** 展示名，如「爱心」 */
   name: string;
   description: string;
-  /** `.svg` 的访问 URL；文件缺失时为空串 */
-  entry: string;
-  /** SVG 文件是否存在且后缀合法 */
+  /** 有序贴图 URL（从底到顶） */
+  images: string[];
+  /** 贴图是否全部存在 */
   exists: boolean;
-  /** 从 SVG 中读出的画布宽度（单位 px）；读不出时为 0 */
-  width: number;
-  /** 从 SVG 中读出的画布高度（单位 px）；读不出时为 0 */
-  height: number;
-  /** 锚点：SVG 内对齐角色头顶的位置（单位 px，左上角原点） */
-  anchor: [number, number];
-  /** 声明的总时长（秒）；未声明时为 0，宿主按动画自身时长播放 */
-  duration: number;
-  /** 是否无限循环；缺省 false */
-  loop: boolean;
-  /** 音效可访问 URL；无音效时为空串 */
+  /** 音效 URL；无音效时为空串 */
   soundUrl: string;
   /** 音效文件是否真的存在 */
   soundExists: boolean;
-  /** 表情 PNG 材质 URL 列表（供 Pixi.js 动画合成） */
-  imageUrls: string[];
-  /** 动效 JSON 描述文件 URL（若外载） */
-  motionUrl?: string;
+  /** 总时长（秒）；0 表示未声明 */
+  duration: number;
+  /** 是否循环播放 */
+  loop: boolean;
+  /** 脚本入口 URL；无脚本时为空串 */
+  scriptUrl: string;
+  /** 是否声明了外部脚本 */
+  hasScript: boolean;
+  /** 脚本导出名；缺省为 id */
+  exportName: string;
 }
 
 /** 一张背景图（背景目录下的一级文件） */

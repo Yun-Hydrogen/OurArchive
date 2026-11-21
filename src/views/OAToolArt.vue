@@ -8,7 +8,6 @@ const props = defineProps<{
 
 const ART_LABELS: Record<ToolArtVariant, string> = {
   skeleton: 'Spine 2D 立绘骨骼绑定与差分插槽检视插图',
-  emotion: '2D 表情动效时间轴与音画合成检视插图',
 };
 
 const label = computed(() => ART_LABELS[props.variant]);

@@ -12,7 +12,7 @@ src/
 ├── App.vue             # 应用根组件（外壳挂载点）
 ├── style.css           # 全局变量与重置
 ├── utils/              # 纯函数：format.ts / reactivity.ts
-├── modules/            # 16 个功能模块（见下表）
+├── modules/            # 13 个功能模块（见下表）
 └── views/              # 7 个页面 + 页面私有件（package/ 是资源包页的子目录）
 ```
 
@@ -23,8 +23,7 @@ src/
 | [ProjectIntroduction.md](./ProjectIntroduction.md) | 项目说明：技术栈、目录、命令、端口、环境变量、许可证 |
 | [ProjectDevelopNotice.md](./ProjectDevelopNotice.md) | **开发规范**：目录、命名、标识符、CSS、API、外载格式、UI 库与字体 |
 | [ProjectDevelopProcess.md](./ProjectDevelopProcess.md) | 功能进度：每条路由上的入口「有 / 没有」 |
-| [NeedNotice.md](./NeedNotice.md) | **踩坑总集**：55 条按主题分组，**改代码前先扫对应分组** |
-| [emotionstodo.md](./emotionstodo.md) | 表情系统：第三方实现逆向记录 |
+| [NeedNotice.md](./NeedNotice.md) | **踩坑总集**：按主题分组，**改代码前先扫对应分组** |
 
 ## 模块文档（`agents/modules/`）
 
@@ -38,16 +37,15 @@ src/
 | `CharacterProvider` | `characters.json` → 角色 + 头像 + 立绘存在性 | [CharacterProvider.md](./modules/CharacterProvider.md) |
 | `AudioProvider` | `music_info.json` / `sound_info.json` + 音频时长 | [AudioProvider.md](./modules/AudioProvider.md) |
 | `BackgroundProvider` | `index/category.yml` + 背景图扫描 | [BackgroundProvider.md](./modules/BackgroundProvider.md) |
-| `EmotionProvider` | `emotions.yml` → 合成图层与关键帧 | [EmotionProvider.md](./modules/EmotionProvider.md) |
-| `SkeletonRender` | 立绘渲染：后端适配、舞台交互、预览组件 | [SkeletonRender.md](./modules/SkeletonRender.md) |
-| `EmotionRender` | 表情关键帧解释与预览面板 | [EmotionRender.md](./modules/EmotionRender.md) |
+| `EmotionProvider` | `index/emotions.yml` 解析、路径校验与脚本元数据 | [EmotionProvider.md](./modules/EmotionProvider.md) |
+| `SkeletonRender` | 双骨骼舞台：Spine / DragonBones、Pixi 交互与预览组件 | [SkeletonRender.md](./modules/SkeletonRender.md) |
+| `EmotionRender` | 表情脚本加载、头顶挂载与播放 | [EmotionRender.md](./modules/EmotionRender.md) |
 | `BackgroundRender` | 背景宫格与大图灯箱 | [BackgroundRender.md](./modules/BackgroundRender.md) |
 | `AudioPlayer` | 背景音乐单例与播放控制 | [AudioPlayer.md](./modules/AudioPlayer.md) |
-| `ResourcePicker` | 通用资源选择对话框（Promise API） | [ResourcePicker.md](./modules/ResourcePicker.md) |
 | `Shell` | 常驻外壳：气泡、banner、鼠标特效、设置与关于、外壳时序 | [Shell.md](./modules/Shell.md) |
 | `ViewsManager` | 路由表、入口闸门、页面入场动画、统一页头 | [ViewsManager.md](./modules/ViewsManager.md) |
 
-模块命名后缀的含义（`*Provider` / `*Render` / `*Player` / `*Picker` / 无后缀）见
+模块命名后缀的含义（`*Provider` / `*Render` / `*Player` / 无后缀）见
 [ProjectDevelopNotice.md](./ProjectDevelopNotice.md#模块命名语义角色后缀)。
 
 ## 页面文档（`agents/views/`）

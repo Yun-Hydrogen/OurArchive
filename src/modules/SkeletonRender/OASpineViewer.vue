@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { rizui_button, rizui_cfgrow, rizui_infobox, rizui_progress, rizui_slider, rizui_switch } from 'riz-ui';
-import { useSpineStage } from '@/modules/SkeletonRender/useSpineStage';
+import { useSkeletonStage } from '@/modules/SkeletonRender/useSkeletonStage';
 import { useGlobalConfig } from '@/modules/ConfigProvider/useGlobalConfig';
-import type { SpineCharacter } from '@/modules/SkeletonRender/spinePackage';
+import type { SkeletonSource } from '@/modules/SkeletonRender/skeletonTypes';
 
 const props = defineProps<{
-  character: SpineCharacter;
+  character: SkeletonSource;
 }>();
 
 const emit = defineEmits<{
@@ -23,6 +23,7 @@ const {
   status,
   error,
   info,
+  rendererKind,
   variants,
   activeVariant,
   actions,
@@ -40,7 +41,7 @@ const {
   onPointerMove,
   onPointerUp,
   onWheel,
-} = useSpineStage(canvas, rendererMode);
+} = useSkeletonStage(canvas, rendererMode);
 
 /** 缩放走百分比滑条，内部仍换算成倍率 */
 const zoomPercent = computed({
@@ -57,8 +58,10 @@ const summary = computed(() => {
   if (!info.value) {
     return '';
   }
-  const renderer = backendKind.value === 'pixi-webgl' || backendKind.value === 'webgl' ? 'Pixi (WebGL)' : 'Canvas 2D';
-  return `Spine ${info.value.version} · 骨骼 ${info.value.bones} · 槽位 ${info.value.slots} · 动画 ${info.value.animations} · ${renderer}`;
+  const renderer = backendKind.value === 'pixi-webgl' ? 'Pixi (WebGL)' : 'Pixi (Canvas)';
+  const name = rendererKind.value === 'dragonbones' ? 'DragonBones' : 'Spine';
+  const version = rendererKind.value === 'dragonbones' ? '' : ` ${info.value.version}`;
+  return `${name}${version} · 骨骼 ${info.value.bones} · 槽位 ${info.value.slots} · 动画 ${info.value.animations} · ${renderer}`;
 });
 
 async function start() {
@@ -145,7 +148,7 @@ watch(
         <rizui_infobox
           v-else
           type="info"
-          text="该骨骼没有数字命名的差分动画，可直接用下方的动作预览。"
+          text="该骨骼没有可切换的差分，可直接用下方的动作预览。"
         />
       </section>
 

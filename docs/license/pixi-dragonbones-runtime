@@ -1,11 +1,6 @@
-本项目的表情渲染播放器参考使用来自 beichen23333 的 BA-Story，遵循其分发许可证 MIT License。
-
-仓库地址(于2026年11月14日摘录): https://github.com/beichen23333/BA-Story
-
-==================协议正文===================
 MIT License
 
-Copyright (c) 2026 beichen23333
+Copyright (c) 2025 h1ve2
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,4 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-==================协议结束===================

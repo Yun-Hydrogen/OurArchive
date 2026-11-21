@@ -20,6 +20,8 @@
   /* 顶部只留窗口呼吸感，标题区自己撑开，不再额外堆一大段空白 */
   padding-top: clamp(14px, 2vh, 22px);
   color: var(--oa-dark-blue);
+  /* 资源库沉浸页：设置按钮在右缘竖向把手上，页头不必为右上角让位 */
+  --oa-page-head-reserve: 0px;
   /*
    * 入场时卡片从下方平移 38px，超出视口的部分只做视觉裁剪；
    * 用 clip 而不是 hidden，页面不会因此产生可滚动区域。
@@ -513,6 +515,15 @@
   color: #8aa3b8;
 }
 
+.oa-pkg__skel__kind {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(0, 144, 254, 0.08);
+  color: #1769a8;
+  font-weight: 600;
+}
+
 .oa-pkg__skel__warn {
   color: #c07a00;
 }
@@ -861,14 +872,6 @@
   color: #a3b6c4;
 }
 
-/* ---------- 表情 ---------- */
-
-.oa-pkg__emotion-stage {
-  display: flex;
-  flex: 0 0 auto;
-  min-height: 0;
-}
-
 /* ---------- 背景 ---------- */
 
 .oa-pkg__bg-desc {
@@ -1062,6 +1065,13 @@
   background: rgba(0, 144, 254, 0.08);
   font-size: 11.5px;
   color: #1769a8;
+}
+
+@media (max-width: 1100px) {
+  /* 窄窗口下大卡片会贴到右缘，给沉浸式设置把手留出 34px 让位 */
+  .oa-pkg {
+    padding-right: 34px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

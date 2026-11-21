@@ -1,263 +1,211 @@
-# Emotions 表情资源开发者指南
+# 表情（Emotions）资源包开发者指南
 
-本文档面向资源包作者，说明 **Our Archive** 中「表情（Emotions）」的目录结构、`emotions.yml` 配置规范，以及**基于 JSON 动效时间轴与 Pixi.js 场景图**的编写方法。
-
-表情的全部表现——多图层材质、缓动物理曲线、缩放旋转节奏——均可通过外载的 **JSON 动效文件**（`motions/*.json`）进行定义，宿主解析后直接挂入 Pixi 舞台并驱动 GSAP 播放。**新增或调整表情不需要修改任何前端代码**。
+本文档面向资源包作者，说明 **Our Archive** 的表情目录结构、`emotions.yml` 配置，以及如何用资源包内的 JavaScript 脚本绘制表情。
 
 ---
 
 ## 1. 目录结构
 
-表情属于资源包的一个内容分类，由 `package.yml` 声明：
+```text
+<资源包>/
+└── emtions/                  # 目录名由 package.yml 的 Emotions.path 决定
+    ├── index/
+    │   └── emotions.yml
+    ├── images/
+    │   ├── emoicon_balloon_n.png
+    │   └── emoicon_heart.png
+    └── scripts/
+        └── heart.js          # 一条表情一个脚本，按需拆分
+```
+
+`package.yml` 里需要声明分类与目录：
 
 ```yaml
 - package_content:
     - Emotions:
       supported: true
-      path: emotions        # 目录名可自定义，例如 emotions/ 或 emtions/
+      path: emtions
 ```
 
-推荐目录约定：
-
-```text
-<资源包>/emotions/
-├── index/
-│   └── emotions.yml        # 必需：表情索引（声明全部表情项）
-├── motions/                # 推荐：JSON 动效时间轴定义
-│   ├── heart.json
-│   ├── angry.json
-│   └── custom.json
-├── images/                 # 表情精灵材质（PNG / WebP）
-│   ├── emoicon_heart.png
-│   └── emoicon_balloon_n.png
-└── sounds/                 # 音效音频（.wav / .ogg / .mp3）
-    └── sfx_emotion_heart.wav
-```
-
-- 只认 `emotions.yml` 里声明过的条目；
-- 索引缺失或解析失败时，该分类显示为空，不影响资源包其它分类。
+程序只从 `path` 指向的目录读取 `index/emotions.yml`，也只允许下发该目录内的图片与 `.js` / `.mjs` 脚本。
 
 ---
 
-## 2. 顶层结构（`emotions.yml`）
+## 2. `index/emotions.yml`
 
 ```yaml
 emotions:
-  - id: heart                   # 必填，全局唯一标识
-    name: 爱心                  # 展示名，缺省回退 id
-    motion: motions/heart.json  # 推荐：外载 JSON 动效文件（相对 emotions/）
-    sound: sounds/sfx_heart.wav # 可选：音效文件
-    duration: 1.35              # 可选：总时长（秒），缺省读 JSON 中的 duration
-    loop: false                 # 可选：是否循环播放
+  - id: heart
+    name: 爱心
+    description: 头顶冒出爱心气泡
+    script: scripts/heart.js      # 该表情专用的脚本（导出名缺省等于 id）
+    images:
+      - images/emoicon_balloon_n.png
+      - images/emoicon_heart.png
+    duration: 1.35
+
+  - id: music
+    name: 音符
+    images:
+      - images/emoicon_note.png
+    duration: 1.1
+    loop: false
 ```
 
 | 字段 | 必填 | 说明 |
 | :--- | :--- | :--- |
-| `id` | ✅ | 表情唯一标识，建议小写英文（如 `heart`, `angry`） |
-| `name` | | 界面显示名（中文），缺省回退 `id` |
-| `motion` | ✅（推荐） | 指向 `motions/` 下的 `.json` 动效文件 |
-| `entry` | | 兼容旧版 `.svg` 文件路径 |
-| `sound` | | 音效路径（相对 emotions/），缺失时静默播放 |
-| `duration`| | 总时长（秒），缺省读取 JSON 内声明 |
-| `loop` | | `true` 时循环播放，直到切走表情或关闭 |
+| `id` | 是 | 表情唯一标识，同时作为默认 `export` |
+| `name` | 否 | 展示名，缺省为 `id` |
+| `description` | 否 | 展示描述（当前预览列表不显示，仅作为索引数据保留） |
+| `images` | 是 | 图片相对路径，按**从下到上**的绘制顺序排列；也接受单个字符串 |
+| `script` | 是 | 该表情的脚本相对路径；没有脚本的表情不会被播放 |
+| `export` | 否 | 脚本导出名；缺省为 `id` |
+| `duration` | 否 | 动画时长（秒），脚本没返回 Promise 时用它决定自动清理时机 |
+| `loop` | 否 | 是否循环；循环表情不会自动停止 |
+
+约定：
+
+- **一条表情一个脚本**，命名与 `id` 一致（`heart` → `scripts/heart.js`），便于按表情维护。
+- 早期版本支持过顶层 `script:`（整包共用入口）、`motion:`（旧 motion JSON）与 `sound:` / `entry:`；
+  这些字段已经从默认包里移除，新资源包不要再使用。
+
+格式与大小限制：
+
+- 脚本只允许 `.js` / `.mjs`，单文件最大 **512 KB**。
+- 路径必须位于表情目录内，越界路径会被忽略。
 
 ---
 
-## 3. 动效 JSON 怎么写（`motions/*.json`）
+## 3. 脚本入口
 
-动效 JSON 是纯数据格式，由 Pixi.js 场景图与 GSAP 物理曲线驱动：
+脚本是标准 ES Module。宿主按 `export` 取导出函数；没有同名导出时会尝试 `default[export]` 与 `default`。
 
-```json
-{
-  "version": "1.0",
-  "id": "heart",
-  "duration": 1.35,
-  "startOffset": { "x": 0, "y": 0 },
-  "layers": [
-    {
-      "name": "balloon",
-      "texture": "images/emoicon_balloon_n.png",
-      "anchor": { "x": 0.5, "y": 1.0 },
-      "initial": { "scale": 0.2, "alpha": 0 },
-      "keyframes": [
-        { "to": { "scale": 1.15, "alpha": 1 }, "duration": 0.25, "ease": "back.out(2)" },
-        { "to": { "scale": 1.0 }, "duration": 0.15 },
-        { "to": { "scale": 0.8, "alpha": 0 }, "duration": 0.2, "delay": 0.6 }
-      ]
-    },
-    {
-      "name": "heart_icon",
-      "texture": "images/emoicon_heart.png",
-      "anchor": { "x": 0.5, "y": 0.5 },
-      "position": { "x": 0, "y": -45 },
-      "initial": { "scale": 0, "alpha": 0 },
-      "keyframes": [
-        { "to": { "scale": 1.25, "alpha": 1 }, "duration": 0.28, "ease": "elastic.out(1, 0.45)", "delay": 0.08 },
-        { "to": { "scale": 1.0 }, "duration": 0.15 },
-        { "to": { "scale": 1.15 }, "duration": 0.2, "delay": 0.2, "ease": "power2.out" },
-        { "to": { "scale": 1.0 }, "duration": 0.15 },
-        { "to": { "alpha": 0 }, "duration": 0.18, "delay": 0.3 }
-      ]
-    }
-  ]
+```js
+// scripts/heart.js —— 文件名与表情 id 一致，由 emotions.yml 的 script 绑定
+export function heart(ctx) {
+  const { PIXI, container, textures, gsap, audio } = ctx;
+
+  // 气泡宽 = 0.38 × 540 设计像素，任何角色上比例一致
+  const balloonScale = (0.38 * 540) / textures['emoicon_balloon_n.png'].width;
+  const balloonWidth = textures['emoicon_balloon_n.png'].width * balloonScale;
+  const balloonHeight = textures['emoicon_balloon_n.png'].height * balloonScale;
+
+  // 容器原点就是头顶锚点：用「气泡宽」为单位定位到角色左上方
+  const balloon = new PIXI.Sprite(textures['emoicon_balloon_n.png']);
+  balloon.anchor.set(1, 1);
+  balloon.position.set(balloonWidth * -0.7, balloonWidth * 0.35);
+  balloon.scale.set(balloonScale);
+  container.addChild(balloon);
+
+  // 爱心落在气泡主体中心（0.48 / 0.5 是气泡贴图里的相对位置）
+  const heartScale = (0.4 * balloonWidth) / textures['emoicon_heart.png'].width;
+  const heart = new PIXI.Sprite(textures['emoicon_heart.png']);
+  heart.anchor.set(0.5);
+  heart.position.set(
+    balloon.x - balloonWidth * 0.52,
+    balloon.y - balloonHeight * 0.5
+  );
+  heart.scale.set(0.001);
+  container.addChild(heart);
+
+  audio.play();
+
+  const timeline = gsap.timeline();
+  timeline
+    .to(balloon, { alpha: 1, duration: 0.14 }, 0)
+    .to(heart, { alpha: 1, duration: 0.12 }, 0.06)
+    .to(heart.scale, {
+      x: heartScale,
+      y: heartScale,
+      duration: 0.28,
+      ease: 'elastic.out(1, 0.5)',
+    }, 0.06)
+    .to([balloon, heart], { alpha: 0, duration: 0.32 }, 0.92);
+
+  // 返回清理函数；切换表情 / 卸载组件时调用
+  return () => timeline.kill();
 }
 ```
 
-### 3.1 字段说明
+脚本可以返回：
 
-- `layers`：图层数组，按声明顺序层叠。
-- `texture`：材质相对路径（如 `images/emoicon_heart.png`）。
-- `count` / `angleStep`：径向或多粒子数量与角度步长（如生气井字 3 个旋转分布 `count: 3, angleStep: 120`）。
-- `instances`：当一个图层包含多个不同初始位置/延迟的粒子（如星星/睡眠 Z），直接在 `instances` 里逐一指定。
-- `initial`：初始属性（`scale`, `scaleX`, `scaleY`, `x`, `y`, `angle`, `alpha`, `visible`）。
-- `keyframes`：关键帧序列，每个关键帧包含 `to`（目标状态）、`duration`（秒）、`ease`（缓动函数）、`delay`（延迟）。
-- 缓动支持所有标准 GSAP 缓动名：`"back.out(2)"`、`"elastic.out(1, 0.5)"`、`"power4.out"`、`"none"` 等。
-| `loop` | | `true` 时循环播放，直到换表情 / 离开页面 |
-| `sound` | | 音效路径；缺失或文件不存在时静默播放（不报错） |
-
-### 锚点怎么定
-
-`anchor` 是「表情贴在角色身上的那个点」。绝大多数表情应该锚在**画布底部中心**，也就是整个表情的下边缘中点——这样它看起来是从头顶"冒"出来的。
-
-不写 `anchor` 时，宿主依次回退到：
-
-1. SVG 内部的 `<metadata data-anchor="x y"/>`；
-2. 画布中心偏上（`width / 2`, `height * 0.1`）。
-
-> 推荐在 SVG 里写 `<metadata data-anchor="...">`，让 SVG 自己描述锚点，`emotions.yml` 就不用重复配置。
+- `void`：宿主按 `duration` 等待后清理（`loop: true` 时一直保留）。
+- 清理函数：在停止、切换、卸载时调用。
+- `Promise<void | (() => void)>`：宿主等待完成；完成后按 `loop` 决定是否停止。
 
 ---
 
-## 3. SVG 怎么写
+## 4. Context
 
-### 3.1 硬性约束
-
-表情 SVG 会被**内联进页面**，所以必须满足：
-
-- **不允许任何 JavaScript**：`<script>`、`onclick` 之类的 `on*` 属性、`javascript:` URL 都会被剔除。
-- **不允许引用外部资源**：图片必须是 `data:` URI，或者内部的 `#id` 引用；外部 URL 会被抹掉。
-- **不允许 `@import` 与外链 `url()`**：内联样式里的都会被清理。
-- 允许：`<image>`（data URI）、`<path>`/`<rect>`/`<circle>` 等图形、渐变/滤镜/蒙版、`<style>`、`<animate>` / `<animateTransform>` / `<set>`。
-
-> 为什么不用 `<img src="x.svg">`：**Chromium 里 `<img>` 引用的 SVG 不会播放 SMIL**，表情会停在第一帧。宿主因此改成取回文本、净化后内联进 DOM。
-
-### 3.2 画布尺寸
-
-宿主从 SVG 的 `width` / `height`（或 `viewBox`）取画布尺寸，再按角色身高等比缩放到舞台。所以：
-
-```xml
-<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="14 32 271 217" width="271" height="217">
-```
-
-- 画布可以只包住内容，不必是 540×1012。
-- 宿主按 `width` 做等比缩放，因此**同一个表情在矮角色和高角色身上比例一致**。
-
-### 3.3 动画：SMIL
-
-所有补间都写在 SVG 自己身上，宿主不做任何插值。可用：
-
-- `<animate attributeName="opacity" ...>` —— 淡入淡出、硬显隐（配合 `keyTimes`）
-- `<animateTransform type="translate|rotate|scale" ...>` —— 位移 / 旋转 / 缩放
-- `<set attributeName="..." to="...">` —— 定点赋值
-
-时长以「秒」为单位（`dur="0.8s"`），`keyTimes` 与 `values` 的项数必须一致。
-
-### 3.4 关键：缩放 / 旋转要绕自己的中心
-
-SMIL **没有 `transform-origin`**，`type="scale"` 永远绕元素当前坐标系的 `(0,0)` 缩放。直接写会得到"从左上角弹出"的效果。
-
-正确写法是三层嵌套：
-
-```xml
-<!-- 想围绕图片中心 (w/2, h/2) 缩放 -->
-<g transform="translate(cx,cy)">        <!-- 1. 移到支点 -->
-  <g>                                    <!-- 2. 在这里缩放 -->
-    <animateTransform attributeName="transform" type="scale"
-                    values="0.2 0.2;1.2 1.2;1 1"
-                    keyTimes="0;0.25;1" dur="1s" fill="freeze"/>
-    <g transform="translate(-w/2,-h/2)"> <!-- 3. 把图挪回去 -->
-      <image href="data:image/png;base64,..." x="0" y="0" width="w" height="h"/>
-    </g>
-  </g>
-</g>
-```
-
-同理，旋转要绕某点，也是先 `translate` 到该点再 `rotate`。
-
-推荐把支点放在**元素中心或底部**：
-- 「弹出来」的符号（感叹号、问号）：支点放在底部中心，看起来是从下面长出来；
-- 「原地放大」的元素（星星、爱心）：支点放在正中心。
-
-### 3.5 让多个元素错开时间
-
-两种写法：
-
-1. 每个 `<animate>` 上写 `begin="0.2s"`（推荐，简单直观）；
-2. 在 `keyTimes` 里把前面一段留在 `0`（例如 `0;0.4;0.5;1`）。
-
-### 3.6 示例：一个完整的最小表情
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" width="200" height="220">
-  <metadata data-anchor="100 200"/>
-
-  <!-- 气泡底：1.1s 后淡出 -->
-  <g transform="translate(100,140)">
-    <g>
-      <g transform="translate(-100,-95)">
-        <image href="data:image/png;base64,..." x="0" y="0" width="200" height="190"/>
-      </g>
-    </g>
-    <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.9;1" dur="1.1s" fill="freeze"/>
-  </g>
-
-  <!-- 主体：从底部弹出，再轻微回弹 -->
-  <g transform="translate(100,170)">
-    <g>
-      <animateTransform attributeName="transform" type="scale"
-                        values="0.2 0.2;1.25 1.25;1 1" keyTimes="0;0.22;0.4"
-                        dur="1.1s" fill="freeze"/>
-      <g transform="translate(-40,-40)">
-        <image href="data:image/png;base64,..." x="0" y="0" width="80" height="80"/>
-      </g>
-    </g>
-    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.84;1"
-             dur="1.1s" fill="freeze"/>
-  </g>
-</svg>
-```
-
----
-
-## 4. 音效
-
-- 音效由**宿主播放**，SVG 里不要写 `<audio>`（也不允许脚本）。
-- 新的表情音效会**打断上一段**，同一时间只保留一段。
-- 音量跟随设置里的「预览音频 / 音效音量」；播放期间主界面 BGM 会被压住，结束后恢复。
-- 文件放哪都行，只要 `sound:` 写成相对 `emotions/` 的路径。
-
----
-
-## 5. 调试
-
-1. 把资源包放进 `<资源根>/res/`，打开「资源管理 → 资源包 → 表情」。
-2. 先选一个预览角色（表情会叠在这个立绘的头顶）。
-3. 点表情按钮即可播放；`duration` 到点会自动收起。
-
-常见问题：
-
-| 现象 | 原因 |
+| 字段 | 说明 |
 | :--- | :--- |
-| 表情停在第一帧不动 | SVG 里用了 `<img>` 式外链图片，或动画写成了 CSS `@keyframes` 但被净化掉——请用 SMIL 并把图片转成 `data:` URI |
-| 表情从角落里"弹出" | 缩放 / 旋转没做 `translate → 变换 → translate(-w/2,-h/2)` 三层嵌套 |
-| 表情离头顶很远 | `anchor`（或 `<metadata data-anchor>`）不是画布底部中心 |
-| 表情不消失 | `duration` 没写或写得比实际动画长 |
-| 列表显示「未找到」 | `entry` 路径不对，或文件不是 `.svg` |
+| `apiVersion` | 当前为 `1`；破坏性改动会递增 |
+| `id` | 表情 id |
+| `container` | 已挂到头顶锚点的 Pixi 容器，坐标原点即锚点，内部按 540×1012 设计像素换算 |
+| `character` | 角色根容器（Spine 实例或 DragonBones display） |
+| `framePoint(nx, ny)` | 把角色包围盒的 0–1 比例坐标换算成容器内设计坐标 |
+| `textures` | 预载贴图，键为文件名（如 `heart.png`）与完整 URL |
+| `images` | 图片 URL 数组 |
+| `designUnit` | 1 设计像素对应的舞台全局像素，一般不需要手动换算 |
+| `duration` / `loop` | `emotions.yml` 的声明值 |
+| `signal` | `AbortSignal`，切换或停止时触发 |
+| `PIXI` | Pixi 命名空间 |
+| `gsap` | GSAP 实例，可选使用 |
+| `ticker` | `add(cb)` / `remove(cb)`，回调参数为秒 |
+| `audio` | `play()` / `stop()` / `element` |
+| `onCleanup(fn)` | 注册清理函数 |
+
+### 坐标
+
+- `container` 的原点就是角色**头顶锚点**（Spine 优先 `Head` / `head`，没有时退化到 `halo` / `Halo`），因此 `(0, 0)` 表示头部中心。
+- 容器内部使用 **540 × 1012 设计像素**：`frameUnit = 角色包围盒宽 / 540`，所以 1 个设计像素在不同角色上的视觉大小一致。
+- 贴图尺寸一律按设计框换算，不要写死缩放：
+
+```js
+const scale = (0.38 * 540) / texture.width; // 显示宽度 = 0.38 × 540 设计像素
+```
+
+- 子元素之间推荐用「父元素显示宽 / 高」做单位，这样父元素换尺寸时不会错位：
+
+```js
+heart.position.set(
+  balloon.x - balloonWidth * 0.52, // 气泡主体中心
+  balloon.y - balloonHeight * 0.5
+);
+```
+
+- 需要按角色整体布局定位时，可用 `ctx.framePoint(nx, ny)` 把角色包围盒的 0–1 比例换算成容器坐标。
+- 角色平移、缩放时，宿主会让表情容器跟随；脚本不需要处理舞台缩放。
+
+### 关于 BA-Story 的「固定盒」
+
+BA-Story 用的是一个 **540 × 1012 的设计画布**（不是角色骨骼包围盒）。它的表情配置
+`startPositionOffset` 是 0–1 的归一化坐标，换算到 Spine 本地坐标的公式是：
+
+```ts
+offsetX = (startPositionOffset.x - 0.8) * 540
+offsetY = (startPositionOffset.y - 1.2) * 1012
+```
+
+`0.8 / 1.2` 是 BA Spine 资源导出原点在设计框里的位置；图片缩放按 `scale * 540 / image.width`。
+
+我们保留了相同的「设计像素」尺度与图片缩放公式，但表情容器挂在**头顶锚点**上，
+而不是骨骼原点，所以位置用「相对头顶的偏移」表达更直观，也不需要知道骨骼原点在哪。
 
 ---
 
-## 6. 参考实现
+## 5. 只支持脚本表情
 
-`res/DefaultPackage/emtions/svg/` 下有 19 个完整示例（`heart` / `respond` / `dot` / `exclaim` / `question` / `surprise` / `angry` / `sad` / `music` / `twinkle` / `upset` / `sweat` / `shy` / `chat` / `steam` / `sigh` / `bulb` / `tear` / `zzz`），可以直接抄结构改内容。
+表情的表现**完全由包内脚本决定**，宿主不再提供任何内置动画：
+
+- 没有 `script` 的表情会出现在列表里，但「预览」按钮不可用，也不会被播放；
+- 脚本里没写的元素就不会出现，宿主不会替你补气泡或图标；
+- `duration` 只在脚本未返回 Promise 时用于决定何时自动清理（`loop: true` 时不清）。
+
+---
+
+## 6. 限制
+
+- 暂不支持 DragonBones 二进制骨骼（`.dbbin`），请导出 `*_ske.json` + `*_tex.json`。
+- DragonBones 当前只暴露动作列表，插槽差分留待后续版本。
+- 脚本不能可靠地在服务端渲染（SSR）环境运行；表情只在浏览器端播放。

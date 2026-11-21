@@ -2,20 +2,19 @@
 import { onMounted, ref } from 'vue';
 import { rizui_button, rizui_infobox, rizui_progress } from 'riz-ui';
 import {
-  toSpineCharacters,
-  toSpineFiles,
-  toSpineFilesFromDrop,
-  type SpineCharacter,
-  type SpineFile,
-} from '@/modules/SkeletonRender/spinePackage';
+  toSkeletonFiles,
+  toSkeletonFilesFromDrop,
+  toSkeletonSources,
+} from '@/modules/SkeletonRender/skeletonPackage';
+import type { SkeletonFile, SkeletonSource } from '@/modules/SkeletonRender/skeletonTypes';
 
 const emit = defineEmits<{
-  (e: 'select', character: SpineCharacter): void;
+  (e: 'select', character: SkeletonSource): void;
 }>();
 
 const dirInput = ref<HTMLInputElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
-const characters = ref<SpineCharacter[]>([]);
+const characters = ref<SkeletonSource[]>([]);
 const reading = ref(false);
 const dragging = ref(false);
 const error = ref('');
@@ -32,16 +31,16 @@ function resetInput(input: HTMLInputElement | null) {
   }
 }
 
-function applyEntries(entries: SpineFile[]) {
+function applyEntries(entries: SkeletonFile[]) {
   if (!entries.length) {
     error.value = '没有读到任何文件。';
     return;
   }
-  const found = toSpineCharacters(entries);
+  const found = toSkeletonSources(entries);
   if (!found.length) {
     characters.value = [];
     error.value =
-      '没有找到完整的立绘包。一个立绘包需要同一目录下同时包含 .skel（或 .json）、.atlas 与贴图（.png / .webp）。';
+      '没有找到完整的骨骼包。Spine 需要 .skel（或 .json）+ .atlas + 贴图；DragonBones 需要 _ske.json + _tex.json + 贴图。';
     return;
   }
   error.value = '';
@@ -55,7 +54,7 @@ async function handleFilesSelected(files: FileList | null, input: HTMLInputEleme
   }
   reading.value = true;
   try {
-    applyEntries(toSpineFiles(files));
+    applyEntries(toSkeletonFiles(files));
   } finally {
     reading.value = false;
     resetInput(input);
@@ -70,7 +69,7 @@ async function handleDrop(event: DragEvent) {
   }
   reading.value = true;
   try {
-    applyEntries(await toSpineFilesFromDrop(transfer));
+    applyEntries(await toSkeletonFilesFromDrop(transfer));
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : String(cause);
   } finally {
@@ -91,7 +90,7 @@ function handleDragLeave(event: DragEvent) {
 }
 
 /** 选到角色后通知父级 */
-function choose(character: SpineCharacter) {
+function choose(character: SkeletonSource) {
   emit('select', character);
 }
 
@@ -131,8 +130,8 @@ function clearAll() {
 
       <p class="oa-spine-uploader__title">把角色文件夹拖到这里</p>
       <p class="oa-spine-uploader__hint">
-        一个立绘包需要同一目录下的 <code>.skel</code>（或 <code>.json</code>）、<code>.atlas</code>
-        与贴图。<br />
+        Spine：<code>.skel</code>（或 <code>.json</code>）+ <code>.atlas</code> + 贴图。<br />
+        DragonBones：<code>*_ske.json</code> + <code>*_tex.json</code> + 贴图。<br />
         也可以直接拖入整个 <code>skeletons</code> 目录，会按子目录拆成多个角色。
       </p>
 
@@ -173,7 +172,7 @@ function clearAll() {
         multiple
         tabindex="-1"
         aria-hidden="true"
-        accept=".skel,.json,.atlas,.png,.webp,.jpg,.jpeg"
+        accept=".skel,.json,.atlas,.png,.webp,.jpg,.jpeg,.dbbin"
         @change="handleFilesSelected(($event.target as HTMLInputElement).files, fileInput)"
       />
     </div>
@@ -196,7 +195,9 @@ function clearAll() {
           <button type="button" class="oa-spine-uploader__item" @click="choose(character)">
             <span class="oa-spine-uploader__item-id">{{ character.id }}</span>
             <span class="oa-spine-uploader__item-meta">
-              {{ character.skeleton.name }} · {{ character.atlas.name }} ·
+              {{ character.kind === 'dragonbones' ? 'DragonBones' : 'Spine' }} ·
+              {{ character.skeleton.name }} ·
+              {{ character.kind === 'spine' ? character.atlas?.name : character.textureJson?.name }} ·
               {{ character.textures.length }} 张贴图
             </span>
             <span class="oa-spine-uploader__item-go">预览</span>

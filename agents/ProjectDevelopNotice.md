@@ -30,9 +30,8 @@
 
 | 后缀 | 什么时候用 | 现有 |
 | --- | --- | --- |
-| `*Provider` | 解析源数据并供给组件，**不碰像素** | `PackageProvider` / `CharacterProvider` / `AudioProvider` / `EmotionProvider` / `BackgroundProvider` / `ConfigProvider` / `SkeletonRuntimeProvider` |
-| `*Render` / `*Player` | 把数据画出来 / 播出来 | `SkeletonRender` / `EmotionRender` / `BackgroundRender` / `AudioPlayer` |
-| `*Picker` | 交互选择，产出「用户选了什么」 | `ResourcePicker` |
+| `*Provider` | 解析源数据并供给组件，**不碰像素** | `PackageProvider` / `CharacterProvider` / `AudioProvider` / `BackgroundProvider` / `ConfigProvider` / `SkeletonRuntimeProvider` |
+| `*Render` / `*Player` | 把数据画出来 / 播出来 | `SkeletonRender` / `BackgroundRender` / `AudioPlayer` |
 | 无后缀 | 基础设施或装配层，领域名本身已说明问题 | `Initializer` / `API` / `Shell` / `ViewsManager` |
 
 判定法：**去掉后缀别人还能猜对内容 → 就不要后缀**。
@@ -61,7 +60,7 @@
 
 | 类别 | 约定 | 示例 |
 | --- | --- | --- |
-| 类型 / 接口 / 枚举 | PascalCase，**不加前缀** | `PackageMusic`、`SpineBackend` |
+| 类型 / 接口 / 枚举 | PascalCase，**不加前缀** | `PackageMusic`、`SkeletonRenderer` |
 | 组件名 | 与文件名一致 | `OASpineViewer` |
 | 函数 | 动词开头 camelCase | `readPackageMusic`、`formatBytes` |
 | DOM 事件处理 | `handle<Thing>` | `handleNavSelect` |
@@ -120,8 +119,7 @@
 | `characters.json` 字段 `name_id` 为 snake_case，`spine` 指立绘 id 列表 | 数据侧保持原名；参数侧用 `nameId`，代码里一律说 `skeleton` |
 | `preload_assets.yml` 的 `file_type` | 只认这一种拼写，不兜底别名 |
 
-外载格式的完整说明：预加载清单见 [docs/configs_doc/preload.md](../docs/configs_doc/preload.md)，
-表情见 [docs/configs_doc/emotions.md](../docs/configs_doc/emotions.md)。
+外载格式的完整说明：预加载清单见 [docs/configs_doc/preload.md](../docs/configs_doc/preload.md)。
 
 ## UI 库与字体
 

@@ -7,8 +7,8 @@
 | 文件 | 作用 |
 | --- | --- |
 | `routes.ts` | `ROUTE_NAMES` / `ROUTE_PATHS`：路由名与路径的唯一真源 |
-| `router.ts` | `router` 实例（7 条懒加载路由 + 兜底重定向）与入口闸门 `beforeEach` |
-| `access.ts` | 入口闸门的内存状态：`unlockApp()` / `isAppUnlocked()` |
+| `router.ts` | `router` 实例（7 条懒加载路由 + 兜底重定向）、入口闸门与会话记忆 |
+| `access.ts` | 入口闸门状态 + 会话保持：`unlockApp()` / `isAppUnlocked()` / `rememberRoute()` / `canRestoreSession()` |
 | `useEnterAnimation.ts` | 页面入场开关：等数据就绪后再播、到点撤 class |
 | `OAPageHeader.vue` | 统一页头：标题 / 副标题 / 返回按钮 / `actions` 插槽 |
 
@@ -31,17 +31,28 @@
 2. 输入输出：由 `main.ts` 里 `app.use(router)` 注入；页面用 `useRouter()` 拿实例 `push`。
 3. 注意事项：兜底的 `redirect` 是函数式 `() => ROUTE_PATHS.splash`，保证深层错地址不会落在一个空页面上；页面组件全部 `() => import(...)`，新增路由不要写成静态引入。
 
-### `unlockApp()` / `isAppUnlocked()`（`access.ts`）
+### `access.ts`（闸门 + 会话保持）
 
-1. 作用：入口闸门状态；`isUnlocked` 是模块级 `ref`，**纯内存、刻意不落 sessionStorage**。
-2. 输入输出：`unlockApp()` 无参无返回；`isAppUnlocked(): boolean`。
-3. 注意事项：状态只在内存里意味着**刷新即回到 gate**，这是一条刻意保留的契约（保证「每次都是从入口进入」）；如果要让刷新后停在内页，不要靠 sessionStorage 打补丁，那会破坏入口契约。唯一解锁点是 splash 的首次点击（`handleStart()` 里调 `unlockApp()`）。见 NeedNotice 条目 06。
+1. 作用：入口闸门状态 + 「刷新保留当前界面」。
+2. 输入输出：
+   - `unlockApp()`：splash 首次点击后调用，同时把 `oa:unlocked` 写进 `sessionStorage`；
+   - `isAppUnlocked(): boolean`：内存态；
+   - `rememberRoute(fullPath)` / `rememberedRoute()`：`afterEach` 里记录上一页（只记非 `/`）；
+   - `canRestoreSession(): boolean`：会话保持开启 + 本会话解锁过 + 有记录，三者同时成立；
+   - `setKeepSession(enabled)`：把配置项 `keep_session` 同步进 `localStorage`（`oa:keep-session`），
+     关闭时顺带清掉记录，保证下一次刷新回到引导页。
+3. 注意事项：
+   - 闸门本身仍在内存里（`isUnlocked`）；会话恢复是**显式开关**，不再靠内存态硬拦刷新。
+   - 路由守卫在配置请求返回前就要判断，所以开关另存了一份 `localStorage` 镜像，默认开启。
+   - 关闭会话保持后，`oa:last-route` 与 `oa:unlocked` 会被清掉，行为回到「刷新必回引导页」。
 
-### 入口闸门（`router.beforeEach`）
+### 入口闸门（`router.beforeEach` / `afterEach`）
 
-1. 作用：`to.name === ROUTE_NAMES.splash` 直接放行；其余路由在 `!isAppUnlocked()` 时返回 `{ name: ROUTE_NAMES.splash, replace: true }`。
-2. 输入输出：无参，返回 `true` 或一个重定向 location 对象。
-3. 注意事项：必须用 `replace` 而不是 `push`——`push` 会在历史栈里塞一条马上又被重定向的死链，返回键行为会变得不可预期（现在的行为是：`/home` 里按返回 → 回到 `/`）。直接访问、刷新、外部链接进入 `/home`、`/tools`、`/tools/skeleton`、`/resources` 及资源包子页面都会被换回 `/`，splash 的白屏引导是唯一解锁入口。
+1. 作用：`splash` 直接放行；已解锁放行；未解锁但满足 `canRestoreSession()` 时，
+   调用 `unlockApp()` + `useAppShell().enterSession()` 后放行（刷新恢复，不跳转）；否则重定向回 splash。
+2. `afterEach`：非 splash 路由写入 `rememberRoute(to.fullPath)`，供刷新恢复。
+3. 注意事项：必须用 `replace` 而不是 `push`——`push` 会在历史栈里塞一条马上又被重定向的死链。
+   会话保持开启时，直接在地址栏打开深层页面（同一会话内）也会被放行；关闭时回到「刷新即回引导页」的老行为。
 
 ### `useEnterAnimation(isReady, duration)`
 
@@ -53,7 +64,7 @@
 
 1. 作用：把 7 个页面各写一份的 `.oa-xxx__head` 收成一处，只保留文案与「返回按钮在左还是在右」两个决定项。
 2. 输入输出：props `title: string`、`subtitle?: string`（默认 `''`）、`backLabel?: string`（不传则不渲染返回按钮）、`backPosition?: 'start' | 'end'`（默认 `'end'`）；`emit('back')`；具名插槽 `actions` 放右侧标签/搜索等。
-3. 注意事项：`backPosition="start"` 目前只有 `PackageCharacterView`、`SkeletonPreviewView` 用（返回在标题旁），其余页面在右；页头自带 `padding-right: clamp(64px, 6vw, 80px)`，是给 `position: fixed` 的常驻设置按钮让位，改窄会让窄窗口下的返回键被挡住点不到；副标题默认单行省略，≤620px 才允许换行。
+3. 注意事项：`backPosition="start"` 目前只有 `PackageCharacterView`、`SkeletonPreviewView` 用（返回在标题旁），其余页面在右；页头自带 `padding-right: var(--oa-page-head-reserve, clamp(64px, 6vw, 80px))`，默认值是为 `position: fixed` 的常驻设置按钮让位；资源库这类把设置改成右缘把手的沉浸页，在页面根节点把该变量覆盖为 `0px` 即可收回这块留白。改窄会让窄窗口下的返回键被挡住点不到；副标题默认单行省略，≤620px 才允许换行。
 
 ## 注意事项
 

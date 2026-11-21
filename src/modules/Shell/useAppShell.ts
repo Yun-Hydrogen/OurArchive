@@ -37,6 +37,15 @@ export function useAppShell() {
       gatePassed.value = true;
     },
 
+    /**
+     * 刷新后恢复会话：直接进入「已登录外壳」状态，
+     * 让 banner / 背景 / 设置与刷新前保持一致，不再走一次 splash。
+     */
+    enterSession() {
+      stage.value = 'home';
+      gatePassed.value = true;
+    },
+
     /** 重播 banner 动画：递增 token 让外壳重挂 SVG */
     playBannerAnimation() {
       bannerPlayToken.value += 1;

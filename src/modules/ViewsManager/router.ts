@@ -1,6 +1,12 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/modules/ViewsManager/routes';
-import { isAppUnlocked } from '@/modules/ViewsManager/access';
+import {
+  canRestoreSession,
+  isAppUnlocked,
+  rememberRoute,
+  unlockApp,
+} from '@/modules/ViewsManager/access';
+import { useAppShell } from '@/modules/Shell/useAppShell';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -26,12 +32,6 @@ const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.skeletonPreview,
     component: () => import('@/views/SkeletonPreviewView.vue'),
     meta: { title: 'Our Archive - 立绘骨骼预览' },
-  },
-  {
-    path: ROUTE_PATHS.emotionPreview,
-    name: ROUTE_NAMES.emotionPreview,
-    component: () => import('@/views/EmotionPreviewView.vue'),
-    meta: { title: 'Our Archive - 表情动效预览' },
   },
   {
     path: ROUTE_PATHS.resources,
@@ -64,17 +64,34 @@ export const router = createRouter({
 });
 
 /**
- * 入口闸门：只有从 splash gate 进入过，才允许访问其它页面。
- * 直接访问 /home（或刷新、外部链接跳转）都会换到 `/`，且不污染历史栈。
+ * 入口闸门 + 会话保持。
+ *
+ * - 正常进入：只有从 splash gate 进入过，才允许访问其它页面；
+ * - 刷新恢复：开启「会话保持」时，本会话解锁过且记着上一页，就直接放行深层地址，
+ *   并让外壳跳过 splash（不强制跳转）；否则维持原行为回到 `/`。
  */
 router.beforeEach((to) => {
   if (to.name === ROUTE_NAMES.splash) {
     return true;
   }
 
-  if (!isAppUnlocked()) {
-    return { name: ROUTE_NAMES.splash, replace: true };
+  if (isAppUnlocked()) {
+    return true;
   }
 
-  return true;
+  if (canRestoreSession()) {
+    unlockApp();
+    useAppShell().enterSession();
+    return true;
+  }
+
+  return { name: ROUTE_NAMES.splash, replace: true };
+});
+
+/** 记住停留过的页面，供刷新后恢复 */
+router.afterEach((to) => {
+  if (to.name === ROUTE_NAMES.splash) {
+    return;
+  }
+  rememberRoute(to.fullPath);
 });

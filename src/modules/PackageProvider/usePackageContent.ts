@@ -77,7 +77,7 @@ export function usePackageContent(packageId: string) {
   const backgroundsError = ref('');
   let backgroundsLoaded = false;
 
-  /** 表情清单同理（含关键帧，体积小但仍按需拉取） */
+  /** 表情清单同理（含脚本元数据） */
   const emotionsLoading = ref(false);
   const emotionsError = ref('');
   let emotionsLoaded = false;
@@ -193,7 +193,7 @@ export function usePackageContent(packageId: string) {
     }
   }
 
-  /** 拉取表情清单（读 index/emotions.yml），同样按需且只拉一次 */
+  /** 拉取表情清单（读 index/emotions.yml），按需且只拉一次 */
   async function loadEmotions(force = false) {
     if (emotionsLoading.value) {
       return;
